@@ -382,6 +382,10 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// 消息去重缓存（防止钉钉重试导致重复处理）
+const processedMsgIds = new Set();
+const MAX_CACHE_SIZE = 1000;
+
 // ============ Stream 客户端 ============
 
 async function startStreamClient() {
@@ -417,6 +421,21 @@ async function startStreamClient() {
       let message = res.data || res;
       if (typeof message === 'string') {
         message = JSON.parse(message);
+      }
+      
+      // 消息去重检查
+      const msgId = message.msgId || res.headers?.messageId;
+      if (msgId && processedMsgIds.has(msgId)) {
+        console.log(`[去重] 消息已处理过，忽略: ${msgId}`);
+        return;
+      }
+      if (msgId) {
+        processedMsgIds.add(msgId);
+        // 限制缓存大小
+        if (processedMsgIds.size > MAX_CACHE_SIZE) {
+          const first = processedMsgIds.values().next().value;
+          processedMsgIds.delete(first);
+        }
       }
       
       const senderId = message.senderId || message.senderStaffId || message.senderId;
