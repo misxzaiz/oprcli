@@ -87,13 +87,12 @@ class ClaudeCodeAgent extends BaseAgent {
   async *stream(message, options = {}) {
     const { sessionId, systemPrompt } = options;
     const events = [];
-    let currentSessionId = sessionId;
 
-    const waitForComplete = new Promise((resolve) => {
+    // 先等待所有事件收集完成
+    await new Promise((resolve) => {
       const opts = {
         onEvent: (event) => {
           events.push(event);
-          yield event; // 流式输出
         },
         onError: (error) => {
           console.error('[ClaudeCodeAgent] 错误:', error);
@@ -113,8 +112,13 @@ class ClaudeCodeAgent extends BaseAgent {
       }
     });
 
-    // 等待完成
-    await waitForComplete;
+    // 流式输出所有事件
+    for (const event of events) {
+      yield {
+        type: 'event',
+        data: event
+      };
+    }
 
     // 返回会话信息
     const newSessionId = this._extractSessionId(events) || sessionId;

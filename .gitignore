@@ -4,3 +4,10 @@ npm-debug.log
 .DS_Store
 *.log
 .claude-connector.json
+
+# 数据文件
+data/
+*.json
+!agent-config.example.json
+!package.json
+!package-lock.json
