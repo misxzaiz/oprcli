@@ -330,6 +330,42 @@ function sleep(ms) {
 const processedMsgIds = new Set();
 const MAX_CACHE_SIZE = 1000;
 
+// 并发控制
+const MAX_CONCURRENT_MESSAGES = 3; // 最多同时处理3条消息
+let activeMessageCount = 0;
+const messageQueue = [];
+
+/**
+ * 消息队列处理器
+ */
+async function processWithQueue(res) {
+  // 如果还有空位，立即处理
+  if (activeMessageCount < MAX_CONCURRENT_MESSAGES) {
+    activeMessageCount++;
+    const startTime = Date.now();
+    console.log(`[队列] 开始处理消息，活跃: ${activeMessageCount}/${MAX_CONCURRENT_MESSAGES}`);
+
+    try {
+      await processMessageAsync(res);
+      const elapsed = Date.now() - startTime;
+      console.log(`[队列] 消息处理完成，耗时: ${elapsed}ms`);
+    } finally {
+      activeMessageCount--;
+
+      // 处理队列中的下一条消息
+      if (messageQueue.length > 0) {
+        const next = messageQueue.shift();
+        console.log(`[队列] 从队列中取下一条消息，剩余: ${messageQueue.length}`);
+        processWithQueue(next);
+      }
+    }
+  } else {
+    // 队列已满，加入等待队列
+    console.log(`[队列] ⚠️  消息排队，当前活跃: ${activeMessageCount}, 队列: ${messageQueue.length}`);
+    messageQueue.push(res);
+  }
+}
+
 // ============ Stream 客户端 ============
 
 async function startStreamClient() {
@@ -387,7 +423,13 @@ async function startStreamClient() {
   });
 
   // 注册机器人消息回调
-  client.registerCallbackListener(TOPIC_ROBOT, async (res) => {
+  client.registerCallbackListener(TOPIC_ROBOT, (res) => {
+    // ✅ 使用队列处理，不阻塞且控制并发
+    processWithQueue(res);
+  });
+
+  // 异步处理消息函数
+  async function processMessageAsync(res) {
     try {
       console.log('[Stream] ⭐ 收到机器人消息');
       console.log('[Stream] 完整数据:', JSON.stringify(res, null, 2));
@@ -423,7 +465,7 @@ async function startStreamClient() {
         return;
       }
 
-      // 处理消息
+      // ⚠️ 这个 await 现在不会阻塞新消息的接收
       const reply = await processMessage(conversationId, content, senderId);
 
       console.log(`[发送] 准备发送回复，长度: ${reply.length} 字符`);
@@ -443,7 +485,7 @@ async function startStreamClient() {
     } catch (err) {
       console.error('[Stream] 处理消息错误:', err);
     }
-  });
+  }
 
   // 启动客户端
   try {
