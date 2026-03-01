@@ -496,6 +496,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             message,
+            sessionId: currentSessionId || undefined,  // ✅ 发送会话 ID
             systemPrompt: document.getElementById('systemPrompt').value || null
           })
         });

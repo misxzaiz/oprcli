@@ -71,7 +71,7 @@ app.post('/api/message', async (req, res) => {
     });
   }
 
-  const { message, systemPrompt } = req.body;
+  const { message, sessionId, systemPrompt } = req.body;
 
   if (!message || !message.trim()) {
     return res.status(400).json({
@@ -82,7 +82,7 @@ app.post('/api/message', async (req, res) => {
 
   try {
     const events = [];
-    const isResume = !!currentSessionId;
+    const isResume = !!sessionId;  // 使用客户端传来的 sessionId
 
     // 使用 Promise 等待会话完成
     return new Promise((resolve, reject) => {
@@ -90,7 +90,8 @@ app.post('/api/message', async (req, res) => {
         let result;
 
         if (isResume) {
-          result = connector.continueSession(currentSessionId, message, {
+          // 继续会话
+          result = connector.continueSession(sessionId, message, {
             systemPrompt,
             onEvent: (event) => {
               events.push(event);
@@ -100,7 +101,7 @@ app.post('/api/message', async (req, res) => {
               console.log('[Web Server] Process completed, exit code:', exitCode);
               resolve({
                 success: true,
-                sessionId: currentSessionId,
+                sessionId: sessionId,  // 返回客户端传来的 sessionId
                 isResume,
                 events: events,
                 exitCode,
@@ -117,6 +118,7 @@ app.post('/api/message', async (req, res) => {
             }
           });
         } else {
+          // 开启新会话
           result = connector.startSession(message, {
             systemPrompt,
             onEvent: (event) => {
@@ -133,7 +135,7 @@ app.post('/api/message', async (req, res) => {
               console.log('[Web Server] Process completed, exit code:', exitCode);
               resolve({
                 success: true,
-                sessionId: currentSessionId,
+                sessionId: currentSessionId,  // 返回新会话的 sessionId
                 isResume,
                 events: events,
                 exitCode,
