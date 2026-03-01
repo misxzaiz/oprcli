@@ -6,9 +6,11 @@
   "scripts": {
     "test": "node test-simple.js",
     "test:full": "node test-connector.js",
+    "test:agents": "node test-agents.js",
     "web": "node web-server.js",
     "start": "node web-server.js",
     "dingtalk": "node dingtalk-stream.js",
+    "dingtalk:multi": "node dingtalk-stream-multi-agent.js",
     "dingtalk:webhook": "node dingtalk-webhook.js"
   },
   "keywords": [

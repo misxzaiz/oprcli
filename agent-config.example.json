@@ -1,0 +1,46 @@
+{
+  "default": "claude-code",
+  "agents": [
+    {
+      "id": "claude-code",
+      "type": "claude-code",
+      "workDir": ".",
+      "enabled": true,
+      "comment": "Claude Code - 最强大的代码助手，支持文件操作和工具调用"
+    },
+    {
+      "id": "deepseek",
+      "type": "deepseek",
+      "apiKey": "YOUR_DEEPSEEK_API_KEY",
+      "baseUrl": "https://api.deepseek.com/v1",
+      "model": "deepseek-chat",
+      "enabled": true,
+      "comment": "DeepSeek - 高性价比的国产大模型"
+    },
+    {
+      "id": "openai",
+      "type": "openai",
+      "apiKey": "YOUR_OPENAI_API_KEY",
+      "baseUrl": "https://api.openai.com/v1",
+      "model": "gpt-3.5-turbo",
+      "enabled": false,
+      "comment": "OpenAI GPT - 经典的大语言模型"
+    }
+  ],
+  "comment": "配置说明：",
+  "instructions": {
+    "default": "默认使用的 Agent ID",
+    "agents": "Agent 配置列表",
+    "id": "Agent 唯一标识符",
+    "type": "Agent 类型 (claude-code, openai, deepseek)",
+    "enabled": "是否启用该 Agent",
+    "comment": "每个 Agent 的说明"
+  },
+  "env_variables": {
+    "DEFAULT_AGENT": "默认 Agent ID（覆盖文件配置）",
+    "DEEPSEEK_API_KEY": "DeepSeek API 密钥",
+    "OPENAI_API_KEY": "OpenAI API 密钥",
+    "CLAUDE_CMD_PATH": "Claude 命令路径（可选）",
+    "CLAUDE_WORK_DIR": "Claude 工作目录（可选）"
+  }
+}
