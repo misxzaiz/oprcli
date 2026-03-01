@@ -314,72 +314,175 @@ function truncateOutput(output, maxLength) {
 }
 
 /**
- * 格式化事件消息
+ * 提取 thinking 内容（从 assistant 事件中）
+ */
+function extractThinkingFromAssistant(event) {
+  const thinkingParts = event.message?.content
+    ?.filter(c => c.type === 'thinking')
+    ?.map(c => c.thinking)
+    ?.join('\n') || '';
+
+  if (thinkingParts && thinkingParts.length > 200) {
+    return thinkingParts.substring(0, 200) + '\n...(已截断)';
+  }
+
+  return thinkingParts;
+}
+
+/**
+ * 检查是否是包含 thinking 的 result 消息
+ */
+function isResultWithThinking(event) {
+  if (event.type !== 'assistant') return false;
+
+  const hasText = event.message?.content?.some(c => c.type === 'text');
+  const hasThinking = event.message?.content?.some(c => c.type === 'thinking');
+
+  // 如果同时有文本和 thinking，说明是 result 消息
+  return hasText && hasThinking;
+}
+
+/**
+ * 格式化事件消息（优化版）
  */
 function formatEventMessage(event, context) {
   const { index, elapsed } = context;
 
-  // 如果不显示时间，移除时间戳
+  // 时间后缀
   const timeStr = streamConfig.showTime ? `\n⏱️ ${elapsed}s` : '';
 
-  switch (event.type) {
-    case 'thinking':
-      if (!streamConfig.showThinking) return null;
-      return {
-        msgtype: 'text',
-        text: {
-          content: `💭 [思考 ${index}] ${event.content || ''}${timeStr}`
-        }
-      };
+  // ==================== System 事件 ====================
+  if (event.type === 'system') {
+    // System 事件不显示给用户（技术细节）
+    return null;
+  }
 
-    case 'tool_start':
-      if (!streamConfig.showTools) return null;
-      const toolIcon = getToolIcon(event.tool);
-      return {
-        msgtype: 'text',
-        text: {
-          content: `${toolIcon} [工具 ${index}] **${event.tool}**\n\`\`\`\n${event.command || ''}\n\`\`\`${timeStr}`
-        }
-      };
+  // ==================== Thinking 事件 ====================
+  if (event.type === 'thinking') {
+    if (!streamConfig.showThinking) return null;
 
-    case 'tool_output':
-      if (!streamConfig.showTools) return null;
-      const output = truncateOutput(event.output, streamConfig.maxOutputLength);
-      return {
-        msgtype: 'text',
-        text: {
-          content: `📤 [输出 ${index}]\n\`\`\`\n${output}\n\`\`\`${timeStr}`
-        }
-      };
+    const thinkingContent = event.content || '';
+    const truncated = thinkingContent.length > 200
+      ? thinkingContent.substring(0, 200) + '\n...(已截断)'
+      : thinkingContent;
 
-    case 'tool_end':
-      if (!streamConfig.showTools) return null;
-      const statusIcon = event.exitCode === 0 ? '✅' : '❌';
-      return {
-        msgtype: 'text',
-        text: {
-          content: `${statusIcon} [完成 ${index}] **${event.tool}** 退出码: ${event.exitCode}${timeStr}`
-        }
-      };
+    return {
+      msgtype: 'text',
+      text: {
+        content: `💭 思考中...\n\n${truncated}${timeStr}`
+      }
+    };
+  }
 
-    case 'assistant':
-      // 正确提取 assistant 消息内容
-      const assistantText = event.message?.content
+  // ==================== Tool Start 事件 ====================
+  if (event.type === 'tool_start') {
+    if (!streamConfig.showTools) return null;
+
+    const toolIcon = getToolIcon(event.tool);
+    const command = event.command || '';
+
+    return {
+      msgtype: 'text',
+      text: {
+        content: `${toolIcon} 执行工具：${event.tool}\n\n命令：\n\`\`\`\n${command}\n\`\`\`${timeStr}`
+      }
+    };
+  }
+
+  // ==================== Tool Output 事件 ====================
+  if (event.type === 'tool_output') {
+    if (!streamConfig.showTools) return null;
+
+    const output = event.output || '';
+    const truncated = truncateOutput(output, streamConfig.maxOutputLength);
+    const isTruncated = output.length > streamConfig.maxOutputLength;
+
+    return {
+      msgtype: 'text',
+      text: {
+        content: `📤 输出：\n\n\`\`\`\n${truncated}\n\`\`\`\n\n${isTruncated ? `(已截断，共 ${output.length} 字符)` : ''}${timeStr}`
+      }
+    };
+  }
+
+  // ==================== Tool End 事件 ====================
+  if (event.type === 'tool_end') {
+    if (!streamConfig.showTools) return null;
+
+    // 成功时跳过，失败时显示错误
+    if (event.exitCode === 0) {
+      return null;  // 成功不显示
+    }
+
+    // 失败时显示错误信息
+    return {
+      msgtype: 'text',
+      text: {
+        content: `❌ 工具失败：${event.tool}\n退出码：${event.exitCode}${timeStr}`
+      }
+    };
+  }
+
+  // ==================== Assistant 事件 ====================
+  if (event.type === 'assistant') {
+    // 检查是否只包含 thinking（没有文本内容）
+    const hasText = event.message?.content?.some(c => c.type === 'text');
+    const hasThinking = event.message?.content?.some(c => c.type === 'thinking');
+
+    // 如果只有 thinking，显示为思考过程
+    if (!hasText && hasThinking) {
+      const thinkingContent = extractThinkingFromAssistant(event);
+      if (thinkingContent) {
+        return {
+          msgtype: 'text',
+          text: {
+            content: `💭 思考中...\n\n${thinkingContent}${timeStr}`
+          }
+        };
+      }
+      return null;
+    }
+
+    // 如果同时有文本和 thinking（result 消息），只显示文本，过滤 thinking
+    if (hasText && hasThinking) {
+      const textParts = event.message?.content
         ?.filter(c => c.type === 'text')
         ?.map(c => c.text)
-        ?.join('') || event.content || '(无内容)';
+        ?.join('\n') || '';
 
+      if (textParts.trim()) {
+        return {
+          msgtype: 'text',
+          text: {
+            content: `💬 回复：\n\n${textParts}${timeStr}`
+          }
+        };
+      }
+      return null;
+    }
+
+    // 普通的 assistant 事件（只有文本）
+    const textParts = event.message?.content
+      ?.filter(c => c.type === 'text')
+      ?.map(c => c.text)
+      ?.join('\n') || '';
+
+    if (textParts.trim()) {
       return {
         msgtype: 'text',
         text: {
-          content: `💬 [回复 ${index}]\n${assistantText}${timeStr}`
+          content: `💬 回复：\n\n${textParts}${timeStr}`
         }
       };
+    }
 
-    default:
-      // 不发送其他事件
-      return null;
+    // 没有内容，跳过
+    return null;
   }
+
+  // ==================== 其他事件 ====================
+  // 不发送其他类型的事件
+  return null;
 }
 
 // ==================== 钉钉 Stream 集成 ====================
