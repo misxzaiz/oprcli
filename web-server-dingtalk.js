@@ -46,6 +46,329 @@ const sessionMap = new Map();
 // 消息去重（记录已处理的消息 ID）
 const processedMessages = new Set();
 
+// ==================== 配置和常量 ====================
+
+// 加载配置
+function loadConfig() {
+  const configPath = path.join(__dirname, '.claude-connector.json');
+  try {
+    return require(configPath);
+  } catch (e) {
+    return {};
+  }
+}
+
+const config = loadConfig();
+
+// 流式响应配置
+const streamConfig = {
+  enabled: config.dingtalk?.streaming?.enabled !== false,  // 默认启用
+  mode: config.dingtalk?.streaming?.mode || 'realtime',     // realtime | batch
+  sendInterval: config.dingtalk?.streaming?.sendInterval || 2000,
+  maxOutputLength: config.dingtalk?.streaming?.maxOutputLength || 500,
+  showThinking: config.dingtalk?.streaming?.showThinking !== false,  // 默认显示
+  showTools: config.dingtalk?.streaming?.showTools !== false,        // 默认显示
+  showTime: config.dingtalk?.streaming?.showTime !== false,          // 默认显示
+  debugRawEvents: config.dingtalk?.streaming?.debugRawEvents || false // 调试模式：输出原始事件
+};
+
+// 日志配置
+const LogLevel = {
+  DEBUG: 0,
+  INFO: 1,
+  EVENT: 2,
+  SUCCESS: 3,
+  WARNING: 4,
+  ERROR: 5
+};
+
+const logConfig = {
+  level: config.dingtalk?.logging?.level || 'EVENT',
+  colored: config.dingtalk?.logging?.colored !== false
+};
+
+// 日志级别映射
+const logLevelMap = {
+  'DEBUG': LogLevel.DEBUG,
+  'INFO': LogLevel.INFO,
+  'EVENT': LogLevel.EVENT,
+  'SUCCESS': LogLevel.SUCCESS,
+  'WARNING': LogLevel.WARNING,
+  'ERROR': LogLevel.ERROR
+};
+
+const currentLogLevel = logLevelMap[logConfig.level] || LogLevel.EVENT;
+
+// 颜色代码
+const colors = {
+  reset: '\x1b[0m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m',
+  gray: '\x1b[90m'
+};
+
+// ==================== 工具类 ====================
+
+/**
+ * 速率限制器
+ * 防止消息发送过快被钉钉限制
+ */
+class RateLimiter {
+  constructor(maxRequests = 5, perMilliseconds = 1000) {
+    this.maxRequests = maxRequests;
+    this.perMilliseconds = perMilliseconds;
+    this.requests = [];
+  }
+
+  async waitForSlot() {
+    const now = Date.now();
+    // 清理过期的请求记录
+    this.requests = this.requests.filter(t => now - t < this.perMilliseconds);
+
+    // 如果达到限制，等待
+    if (this.requests.length >= this.maxRequests) {
+      const oldest = this.requests[0];
+      const waitTime = this.perMilliseconds - (now - oldest);
+      if (waitTime > 0) {
+        await sleep(waitTime);
+      }
+      this.requests.shift();
+    }
+
+    this.requests.push(now);
+  }
+
+  getStats() {
+    return {
+      recent: this.requests.length,
+      max: this.maxRequests
+    };
+  }
+}
+
+// 创建速率限制器实例（每秒最多 5 条消息）
+const rateLimiter = new RateLimiter(5, 1000);
+
+/**
+ * 睡眠函数
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ==================== 日志系统 ====================
+
+/**
+ * 日志函数
+ */
+function log(level, category, message, data = null) {
+  if (level < currentLogLevel) return;
+
+  const timestamp = new Date().toISOString().split('T')[1].substring(0, 12);
+  const levelNames = {
+    [LogLevel.DEBUG]: 'DEBUG',
+    [LogLevel.INFO]: 'INFO',
+    [LogLevel.EVENT]: 'EVENT',
+    [LogLevel.SUCCESS]: 'SUCCESS',
+    [LogLevel.WARNING]: 'WARNING',
+    [LogLevel.ERROR]: 'ERROR'
+  };
+
+  const levelIcons = {
+    [LogLevel.DEBUG]: '🔍',
+    [LogLevel.INFO]: 'ℹ️',
+    [LogLevel.EVENT]: '📡',
+    [LogLevel.SUCCESS]: '✅',
+    [LogLevel.WARNING]: '⚠️',
+    [LogLevel.ERROR]: '❌'
+  };
+
+  const color = {
+    [LogLevel.DEBUG]: colors.cyan,
+    [LogLevel.INFO]: colors.blue,
+    [LogLevel.EVENT]: colors.magenta,
+    [LogLevel.SUCCESS]: colors.green,
+    [LogLevel.WARNING]: colors.yellow,
+    [LogLevel.ERROR]: colors.red
+  }[level];
+
+  const categoryColor = logConfig.colored ? color : '';
+  const resetColor = logConfig.colored ? colors.reset : '';
+
+  let logMsg = `${categoryColor}[${timestamp}] ${levelIcons[level]} [${levelNames[level]}] [${category}] ${message}${resetColor}`;
+
+  if (data && currentLogLevel <= LogLevel.DEBUG) {
+    logMsg += '\n' + JSON.stringify(data, null, 2);
+  }
+
+  console.log(logMsg);
+}
+
+/**
+ * 记录事件日志
+ */
+function logEvent(event, context) {
+  const { index, elapsed } = context;
+
+  switch (event.type) {
+    case 'thinking':
+      if (streamConfig.showThinking) {
+        log(LogLevel.EVENT, 'THINKING', `思考过程 #${index}`, {
+          content: event.content?.substring(0, 100) || '',
+          elapsed: `${elapsed}s`
+        });
+      }
+      break;
+
+    case 'tool_start':
+      if (streamConfig.showTools) {
+        log(LogLevel.EVENT, 'TOOL', `🔧 工具调用 #${index}: ${event.tool}`, {
+          command: event.command?.substring(0, 100) || '',
+          elapsed: `${elapsed}s`
+        });
+      }
+      break;
+
+    case 'tool_output':
+      if (streamConfig.showTools && currentLogLevel <= LogLevel.DEBUG) {
+        const output = event.output?.substring(0, 200) || '';
+        log(LogLevel.DEBUG, 'TOOL', `📤 工具输出 #${index}`, {
+          output: output + (event.output?.length > 200 ? '...' : ''),
+          truncated: event.output?.length > 200,
+          elapsed: `${elapsed}s`
+        });
+      }
+      break;
+
+    case 'tool_end':
+      if (streamConfig.showTools) {
+        const status = event.exitCode === 0 ? '✅ 成功' : '❌ 失败';
+        log(LogLevel.EVENT, 'TOOL', `${status} #${index}: ${event.tool}`, {
+          exitCode: event.exitCode,
+          elapsed: `${elapsed}s`
+        });
+      }
+      break;
+
+    case 'assistant':
+      log(LogLevel.SUCCESS, 'ASSISTANT', `💬 Claude 回复 #${index}`, {
+        length: event.content?.length || 0,
+        preview: event.content?.substring(0, 80) || '',
+        elapsed: `${elapsed}s`
+      });
+      break;
+
+    case 'error':
+      log(LogLevel.ERROR, 'ERROR', `❌ 错误 #${index}`, {
+        error: event.message || event.error,
+        elapsed: `${elapsed}s`
+      });
+      break;
+
+    default:
+      log(LogLevel.DEBUG, 'EVENT', `未知事件 #${index}: ${event.type}`, {
+        elapsed: `${elapsed}s`
+      });
+  }
+}
+
+// ==================== 消息格式化 ====================
+
+/**
+ * 获取工具图标
+ */
+function getToolIcon(tool) {
+  const icons = {
+    'Bash': '🖥️',
+    'Editor': '📝',
+    'Browser': '🌐',
+    'Computer': '💻',
+    'Unknown': '🔧'
+  };
+  return icons[tool] || icons['Unknown'];
+}
+
+/**
+ * 截断输出
+ */
+function truncateOutput(output, maxLength) {
+  if (!output || output.length <= maxLength) return output || '';
+  return output.substring(0, maxLength) + `\n... (已截断，共 ${output.length} 字符)`;
+}
+
+/**
+ * 格式化事件消息
+ */
+function formatEventMessage(event, context) {
+  const { index, elapsed } = context;
+
+  // 如果不显示时间，移除时间戳
+  const timeStr = streamConfig.showTime ? `\n⏱️ ${elapsed}s` : '';
+
+  switch (event.type) {
+    case 'thinking':
+      if (!streamConfig.showThinking) return null;
+      return {
+        msgtype: 'text',
+        text: {
+          content: `💭 [思考 ${index}] ${event.content || ''}${timeStr}`
+        }
+      };
+
+    case 'tool_start':
+      if (!streamConfig.showTools) return null;
+      const toolIcon = getToolIcon(event.tool);
+      return {
+        msgtype: 'text',
+        text: {
+          content: `${toolIcon} [工具 ${index}] **${event.tool}**\n\`\`\`\n${event.command || ''}\n\`\`\`${timeStr}`
+        }
+      };
+
+    case 'tool_output':
+      if (!streamConfig.showTools) return null;
+      const output = truncateOutput(event.output, streamConfig.maxOutputLength);
+      return {
+        msgtype: 'text',
+        text: {
+          content: `📤 [输出 ${index}]\n\`\`\`\n${output}\n\`\`\`${timeStr}`
+        }
+      };
+
+    case 'tool_end':
+      if (!streamConfig.showTools) return null;
+      const statusIcon = event.exitCode === 0 ? '✅' : '❌';
+      return {
+        msgtype: 'text',
+        text: {
+          content: `${statusIcon} [完成 ${index}] **${event.tool}** 退出码: ${event.exitCode}${timeStr}`
+        }
+      };
+
+    case 'assistant':
+      // 正确提取 assistant 消息内容
+      const assistantText = event.message?.content
+        ?.filter(c => c.type === 'text')
+        ?.map(c => c.text)
+        ?.join('') || event.content || '(无内容)';
+
+      return {
+        msgtype: 'text',
+        text: {
+          content: `💬 [回复 ${index}]\n${assistantText}${timeStr}`
+        }
+      };
+
+    default:
+      // 不发送其他事件
+      return null;
+  }
+}
+
 // ==================== 钉钉 Stream 集成 ====================
 
 /**
@@ -123,7 +446,58 @@ async function initDingTalkStream() {
 }
 
 /**
- * 处理钉钉消息
+ * 流式发送事件到钉钉
+ */
+async function streamEventToDingTalk(event, sessionWebhook, context) {
+  const { index, elapsed } = context;
+
+  // 调试模式：直接输出原始事件
+  if (streamConfig.debugRawEvents) {
+    const rawMessage = {
+      msgtype: 'text',
+      text: {
+        content: `🔍 [调试 #${index}] ${event.type}\n\`\`\`\n${JSON.stringify(event, null, 2)}\n\`\`\`\n⏱️ ${elapsed}s`
+      }
+    };
+
+    try {
+      await rateLimiter.waitForSlot();
+      await sendToDingTalk(sessionWebhook, rawMessage);
+      log(LogLevel.DEBUG, 'DINGTALK', `📤 已发送原始事件 #${index}`);
+    } catch (error) {
+      log(LogLevel.ERROR, 'DINGTALK', `❌ 发送失败 #${index}`, {
+        error: error.message
+      });
+    }
+    return;
+  }
+
+  // 正常模式：格式化消息
+  const message = formatEventMessage(event, context);
+  if (!message) return;  // 跳过不需要发送的事件
+
+  // 记录日志
+  logEvent(event, context);
+
+  try {
+    // 速率限制
+    await rateLimiter.waitForSlot();
+
+    // 发送到钉钉
+    await sendToDingTalk(sessionWebhook, message);
+
+    log(LogLevel.INFO, 'DINGTALK', `📤 已发送消息 #${index} (${event.type})`, {
+      elapsed: `${elapsed}s`
+    });
+  } catch (error) {
+    log(LogLevel.ERROR, 'DINGTALK', `❌ 发送失败 #${index}`, {
+      error: error.message
+    });
+  }
+}
+
+/**
+ * 处理钉钉消息（支持流式响应）
  */
 async function handleDingTalkMessage(message) {
   // message 是 DWClientDownStream 格式
@@ -144,6 +518,9 @@ async function handleDingTalkMessage(message) {
     }
   }
 
+  let eventCount = 0;
+  const allEvents = [];  // 记录所有事件用于调试
+
   try {
     // 解析机器人消息数据
     const robotMessage = JSON.parse(data);
@@ -156,11 +533,14 @@ async function handleDingTalkMessage(message) {
       sessionWebhook
     } = robotMessage;
 
-    console.log(`[DingTalk] 💬 ${senderNick}: ${text?.content?.substring(0, 50) || '(空消息)'}...`);
+    log(LogLevel.INFO, 'DINGTALK', `💬 收到消息: ${senderNick}`, {
+      content: text?.content?.substring(0, 50) || '(空消息)',
+      conversationId
+    });
 
     // 只处理文本消息
     if (msgtype !== 'text') {
-      console.log(`[DingTalk] ⚠️  不支持的消息类型: ${msgtype}`);
+      log(LogLevel.WARNING, 'DINGTALK', `⚠️ 不支持的消息类型: ${msgtype}`);
       return { status: 'SUCCESS' };
     }
 
@@ -168,13 +548,13 @@ async function handleDingTalkMessage(message) {
     const messageContent = text?.content?.trim() || '';
 
     if (!messageContent) {
-      console.log('[DingTalk] ⚠️  消息内容为空');
+      log(LogLevel.WARNING, 'DINGTALK', '⚠️ 消息内容为空');
       return { status: 'SUCCESS' };
     }
 
     // 检查 connector 是否已初始化
     if (!connector || !connector.connected) {
-      console.log('[DingTalk] ⚠️  Claude 未连接');
+      log(LogLevel.ERROR, 'DINGTALK', '⚠️ Claude 未连接');
       await sendToDingTalk(sessionWebhook, {
         msgtype: 'text',
         text: {
@@ -188,36 +568,117 @@ async function handleDingTalkMessage(message) {
     let sessionId = sessionMap.get(conversationId);
     const isResume = !!sessionId;
 
-    console.log(`[DingTalk] 📝 会话: ${conversationId}, Claude Session: ${sessionId || '新会话'}`);
+    log(LogLevel.INFO, 'DINGTALK', `📝 会话信息`, {
+      conversationId,
+      sessionId: sessionId || '新会话',
+      mode: streamConfig.enabled ? '流式' : '非流式'
+    });
 
-    // 调用 Claude
-    let claudeResponse = '';
+    // 更新 sessionMap
+    if (!isResume && sessionId) {
+      sessionMap.set(conversationId, sessionId);
+    }
+
+    // 发送开始提示
+    if (streamConfig.enabled) {
+      await sendToDingTalk(sessionWebhook, {
+        msgtype: 'text',
+        text: {
+          content: '🤖 开始处理您的请求...\n\n' + (streamConfig.mode === 'realtime' ? '我将流式返回处理过程，请稍等 ⏳' : '正在处理中...')
+        }
+      });
+    }
+
+    // 流式处理标志
+    let messageCount = 0;
+    let finalResponse = '';
+    const startTime = Date.now();
 
     await new Promise((resolve, reject) => {
       const options = {
-        onEvent: (event) => {
-          // 处理 assistant 消息
-          if (event.type === 'assistant') {
-            const text = event.message.content
-              .filter(c => c.type === 'text')
-              .map(c => c.text)
-              .join('');
-            claudeResponse += text;
+        onEvent: async (event) => {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          const context = {
+            index: ++messageCount,
+            elapsed
+          };
+
+          // 调试：记录所有事件
+          if (currentLogLevel <= LogLevel.DEBUG) {
+            log(LogLevel.DEBUG, 'EVENT', `📡 收到事件 #${messageCount}: ${event.type}`, {
+              eventType: event.type,
+              hasMessage: !!event.message,
+              hasContent: !!event.content,
+              elapsed: `${elapsed}s`
+            });
           }
 
           // 捕获真实的 sessionId（新会话时）
           if (!isResume && event.type === 'system' && event.session_id) {
             sessionId = event.session_id;
             sessionMap.set(conversationId, sessionId);
-            console.log(`[DingTalk] 🆔 新会话ID: ${sessionId}`);
+            log(LogLevel.INFO, 'SESSION', `🆔 新会话ID: ${sessionId}`);
+          }
+
+          // 流式发送
+          if (streamConfig.enabled) {
+            await streamEventToDingTalk(event, sessionWebhook, context);
+          } else {
+            // 非流式模式：只累积 assistant 消息
+            if (event.type === 'assistant') {
+              const text = event.message?.content
+                ?.filter(c => c.type === 'text')
+                ?.map(c => c.text)
+                ?.join('') || '';
+              finalResponse += text;
+            }
           }
         },
-        onComplete: (exitCode) => {
-          console.log(`[DingTalk] ✅ Claude 完成，退出码: ${exitCode}`);
+        onComplete: async (exitCode) => {
+          const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+
+          log(LogLevel.SUCCESS, 'SESSION', `✅ Claude 完成`, {
+            exitCode,
+            totalTime: `${totalTime}s`,
+            messageCount,
+            mode: streamConfig.enabled ? '流式' : '非流式'
+          });
+
+          // 非流式模式：发送完整回复
+          if (!streamConfig.enabled && finalResponse) {
+            await sendToDingTalk(sessionWebhook, {
+              msgtype: 'text',
+              text: {
+                content: finalResponse || '🤔 我思考了一下，但没有生成回复'
+              }
+            });
+          }
+
+          // 流式模式：发送完成提示
+          if (streamConfig.enabled) {
+            await sendToDingTalk(sessionWebhook, {
+              msgtype: 'text',
+              text: {
+                content: `\n✅ 处理完成！\n\n共发送 ${messageCount} 条消息\n总耗时: ${totalTime}s`
+              }
+            });
+          }
+
           resolve();
         },
-        onError: (err) => {
-          console.error('[DingTalk] ❌ Claude 错误:', err);
+        onError: async (err) => {
+          log(LogLevel.ERROR, 'SESSION', '❌ Claude 错误', {
+            error: err.message
+          });
+
+          // 发送错误提示
+          await sendToDingTalk(sessionWebhook, {
+            msgtype: 'text',
+            text: {
+              content: `❌ 处理失败\n\n错误: ${err.message}\n\n请重试或联系管理员`
+            }
+          });
+
           reject(err);
         }
       };
@@ -233,21 +694,19 @@ async function handleDingTalkMessage(message) {
       }
     });
 
-    // 发送回复到钉钉（使用 sessionWebhook）
-    const responseText = claudeResponse || '🤔 我思考了一下，但没有生成回复';
-    await sendToDingTalk(sessionWebhook, {
-      msgtype: 'text',
-      text: {
-        content: responseText
-      }
+    log(LogLevel.SUCCESS, 'DINGTALK', `✅ 消息处理完成`, {
+      messageCount,
+      conversationId
     });
-
-    console.log(`[DingTalk] ✅ 回复已发送 (${responseText.length} 字符)`);
 
     return { status: 'SUCCESS' };
 
   } catch (error) {
-    console.error('[DingTalk] ❌ 处理消息失败:', error);
+    log(LogLevel.ERROR, 'DINGTALK', '❌ 处理消息失败', {
+      error: error.message,
+      stack: error.stack
+    });
+
     return {
       status: 'LATER',
       message: error.message

@@ -6,6 +6,22 @@
   "dingtalk": {
     "clientId": "dingxxxxxxxxxxxxxxxx",
     "clientSecret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    "enabled": true
+    "enabled": true,
+
+    "streaming": {
+      "enabled": true,
+      "mode": "realtime",
+      "sendInterval": 2000,
+      "maxOutputLength": 500,
+      "showThinking": true,
+      "showTools": true,
+      "showTime": true
+    },
+
+    "logging": {
+      "level": "EVENT",
+      "colored": true,
+      "file": null
+    }
   }
 }
