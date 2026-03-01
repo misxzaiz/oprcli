@@ -1,0 +1,11 @@
+{
+  "claudeCmdPath": "C:\\Users\\YourUsername\\AppData\\Roaming\\npm\\claude.cmd",
+  "workDir": "D:\\MyProject",
+  "gitBinPath": "C:\\Program Files\\Git\\bin\\bash.exe",
+
+  "dingtalk": {
+    "clientId": "dingxxxxxxxxxxxxxxxx",
+    "clientSecret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "enabled": true
+  }
+}

@@ -6,7 +6,9 @@
   "scripts": {
     "test": "node test-simple.js",
     "test:full": "node test-connector.js",
+    "test:dingtalk": "node test-dingtalk.js",
     "web": "node web-server.js",
+    "web:dingtalk": "node web-server-dingtalk.js",
     "start": "node web-server.js"
   },
   "keywords": [
@@ -15,7 +17,9 @@
     "anthropic",
     "ai",
     "cli",
-    "connector"
+    "connector",
+    "dingtalk",
+    "钉钉"
   ],
   "author": "",
   "license": "MIT",
@@ -23,9 +27,11 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
+    "dingtalk-stream": "^2.1.4",
     "express": "^4.18.2"
   },
   "devDependencies": {
+    "axios": "^1.13.6",
     "jest": "^29.0.0"
   }
 }
