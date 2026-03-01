@@ -69,7 +69,8 @@ const streamConfig = {
   showThinking: config.dingtalk?.streaming?.showThinking !== false,  // 默认显示
   showTools: config.dingtalk?.streaming?.showTools !== false,        // 默认显示
   showTime: config.dingtalk?.streaming?.showTime !== false,          // 默认显示
-  debugRawEvents: config.dingtalk?.streaming?.debugRawEvents || false // 调试模式：输出原始事件
+  debugRawEvents: config.dingtalk?.streaming?.debugRawEvents || false, // 调试模式：输出原始事件
+  useMarkdown: config.dingtalk?.streaming?.useMarkdown || false          // 使用 Markdown 格式
 };
 
 // 日志配置
@@ -343,6 +344,28 @@ function isResultWithThinking(event) {
 }
 
 /**
+ * 构建钉钉消息对象
+ */
+function buildMessage(content, title = 'Claude助手') {
+  if (streamConfig.useMarkdown) {
+    return {
+      msgtype: 'markdown',
+      markdown: {
+        title: title,
+        text: content
+      }
+    };
+  } else {
+    return {
+      msgtype: 'text',
+      text: {
+        content: content
+      }
+    };
+  }
+}
+
+/**
  * 格式化事件消息（优化版）
  */
 function formatEventMessage(event, context) {
@@ -366,12 +389,7 @@ function formatEventMessage(event, context) {
       ? thinkingContent.substring(0, 200) + '\n...(已截断)'
       : thinkingContent;
 
-    return {
-      msgtype: 'text',
-      text: {
-        content: `💭 思考中...\n\n${truncated}${timeStr}`
-      }
-    };
+    return buildMessage(`💭 思考中...\n\n${truncated}${timeStr}`, '思考中');
   }
 
   // ==================== Tool Start 事件 ====================
@@ -381,12 +399,7 @@ function formatEventMessage(event, context) {
     const toolIcon = getToolIcon(event.tool);
     const command = event.command || '';
 
-    return {
-      msgtype: 'text',
-      text: {
-        content: `${toolIcon} 执行工具：${event.tool}\n\n命令：\n\`\`\`\n${command}\n\`\`\`${timeStr}`
-      }
-    };
+    return buildMessage(`${toolIcon} 执行工具：${event.tool}\n\n命令：\n\`\`\`\n${command}\n\`\`\`${timeStr}`, '执行工具');
   }
 
   // ==================== Tool Output 事件 ====================
@@ -397,12 +410,7 @@ function formatEventMessage(event, context) {
     const truncated = truncateOutput(output, streamConfig.maxOutputLength);
     const isTruncated = output.length > streamConfig.maxOutputLength;
 
-    return {
-      msgtype: 'text',
-      text: {
-        content: `📤 输出：\n\n\`\`\`\n${truncated}\n\`\`\`\n\n${isTruncated ? `(已截断，共 ${output.length} 字符)` : ''}${timeStr}`
-      }
-    };
+    return buildMessage(`📤 输出：\n\n\`\`\`\n${truncated}\n\`\`\`\n\n${isTruncated ? `(已截断，共 ${output.length} 字符)` : ''}${timeStr}`, '工具输出');
   }
 
   // ==================== Tool End 事件 ====================
@@ -415,12 +423,7 @@ function formatEventMessage(event, context) {
     }
 
     // 失败时显示错误信息
-    return {
-      msgtype: 'text',
-      text: {
-        content: `❌ 工具失败：${event.tool}\n退出码：${event.exitCode}${timeStr}`
-      }
-    };
+    return buildMessage(`❌ 工具失败：${event.tool}\n退出码：${event.exitCode}${timeStr}`, '工具失败');
   }
 
   // ==================== Assistant 事件 ====================
@@ -433,12 +436,7 @@ function formatEventMessage(event, context) {
     if (!hasText && hasThinking) {
       const thinkingContent = extractThinkingFromAssistant(event);
       if (thinkingContent) {
-        return {
-          msgtype: 'text',
-          text: {
-            content: `💭 思考中...\n\n${thinkingContent}${timeStr}`
-          }
-        };
+        return buildMessage(`💭 思考中...\n\n${thinkingContent}${timeStr}`, '思考中');
       }
       return null;
     }
@@ -451,12 +449,7 @@ function formatEventMessage(event, context) {
         ?.join('\n') || '';
 
       if (textParts.trim()) {
-        return {
-          msgtype: 'text',
-          text: {
-            content: `💬 回复：\n\n${textParts}${timeStr}`
-          }
-        };
+        return buildMessage(`💬 回复：\n\n${textParts}${timeStr}`, 'Claude回复');
       }
       return null;
     }
@@ -468,12 +461,7 @@ function formatEventMessage(event, context) {
       ?.join('\n') || '';
 
     if (textParts.trim()) {
-      return {
-        msgtype: 'text',
-        text: {
-          content: `💬 回复：\n\n${textParts}${timeStr}`
-        }
-      };
+      return buildMessage(`💬 回复：\n\n${textParts}${timeStr}`, 'Claude回复');
     }
 
     // 没有内容，跳过
@@ -678,12 +666,9 @@ async function handleDingTalkMessage(message) {
     // 检查 connector 是否已初始化
     if (!connector || !connector.connected) {
       log(LogLevel.ERROR, 'DINGTALK', '⚠️ Claude 未连接');
-      await sendToDingTalk(sessionWebhook, {
-        msgtype: 'text',
-        text: {
-          content: '⚠️ Claude Code CLI 未连接，请先检查配置文件\n\n配置路径: .claude-connector.json\n\n需要配置:\n- claudeCmdPath\n- workDir\n- gitBinPath'
-        }
-      });
+      await sendToDingTalk(sessionWebhook,
+        buildMessage('⚠️ Claude Code CLI 未连接，请先检查配置文件\n\n配置路径: .claude-connector.json\n\n需要配置:\n- claudeCmdPath\n- workDir\n- gitBinPath', '连接错误')
+      );
       return { status: 'SUCCESS' };
     }
 
@@ -765,22 +750,16 @@ async function handleDingTalkMessage(message) {
 
           // 非流式模式：发送完整回复
           if (!streamConfig.enabled && finalResponse) {
-            await sendToDingTalk(sessionWebhook, {
-              msgtype: 'text',
-              text: {
-                content: finalResponse || '🤔 我思考了一下，但没有生成回复'
-              }
-            });
+            await sendToDingTalk(sessionWebhook,
+              buildMessage(finalResponse || '🤔 我思考了一下，但没有生成回复', 'Claude回复')
+            );
           }
 
           // 流式模式：发送完成提示
           if (streamConfig.enabled) {
-            await sendToDingTalk(sessionWebhook, {
-              msgtype: 'text',
-              text: {
-                content: `\n✅ 处理完成！\n\n共发送 ${messageCount} 条消息\n总耗时: ${totalTime}s`
-              }
-            });
+            await sendToDingTalk(sessionWebhook,
+              buildMessage(`\n✅ 处理完成！\n\n共发送 ${messageCount} 条消息\n总耗时: ${totalTime}s`, '处理完成')
+            );
           }
 
           resolve();
@@ -791,12 +770,9 @@ async function handleDingTalkMessage(message) {
           });
 
           // 发送错误提示
-          await sendToDingTalk(sessionWebhook, {
-            msgtype: 'text',
-            text: {
-              content: `❌ 处理失败\n\n错误: ${err.message}\n\n请重试或联系管理员`
-            }
-          });
+          await sendToDingTalk(sessionWebhook,
+            buildMessage(`❌ 处理失败\n\n错误: ${err.message}\n\n请重试或联系管理员`, '处理失败')
+          );
 
           reject(err);
         }
