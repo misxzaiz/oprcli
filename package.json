@@ -1,0 +1,31 @@
+{
+  "name": "claude-connector",
+  "version": "1.0.0",
+  "description": "独立 Node.js 模块，用于与 Claude Code CLI 交互",
+  "main": "claude-connector.js",
+  "scripts": {
+    "test": "node test-simple.js",
+    "test:full": "node test-connector.js",
+    "web": "node web-server.js",
+    "start": "node web-server.js"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "ai",
+    "cli",
+    "connector"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  }
+}
