@@ -446,12 +446,16 @@ class ClaudeConnector {
 
     if (process.platform === 'win32') {
       cmd = this.nodeExe;
+      // 复制环境变量但排除 CLAUDECODE，避免嵌套会话冲突
+      const env = { ...process.env };
+      delete env.CLAUDECODE;  // ← 关键：删除 CLAUDECODE 环境变量
+
       spawnOptions = {
         cwd: this.workDir,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true, // 不显示窗口
         env: {
-          ...process.env,
+          ...env,
           ...(this.gitBinPath && { CLAUDE_CODE_GIT_BASH_PATH: this.gitBinPath })
         }
       };
@@ -459,7 +463,11 @@ class ClaudeConnector {
       cmd = this.claudeCmdPath;
       spawnOptions = {
         cwd: this.workDir,
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          ...(this.gitBinPath && { CLAUDE_CODE_GIT_BASH_PATH: this.gitBinPath })
+        }
       };
     }
 
