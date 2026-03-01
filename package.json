@@ -11,7 +11,8 @@
     "start": "node web-server.js",
     "dingtalk": "node dingtalk-stream.js",
     "dingtalk:multi": "node dingtalk-stream-multi-agent.js",
-    "dingtalk:webhook": "node dingtalk-webhook.js"
+    "dingtalk:webhook": "node dingtalk-webhook.js",
+    "check:dingtalk": "node check-dingtalk-config.js"
   },
   "keywords": [
     "claude",

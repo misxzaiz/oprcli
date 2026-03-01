@@ -368,13 +368,29 @@ async function startStreamClient() {
   const client = new DWClient({
     clientId: CONFIG.dingtalk.clientId,
     clientSecret: CONFIG.dingtalk.clientSecret,
-    debug: false,
+    debug: true,  // ✅ 启用调试模式
+  });
+
+  console.log('[配置] SDK Debug 模式已启用');
+
+  // 监听连接状态
+  client.on('connected', () => {
+    console.log('[Stream] ✅ 连接已建立');
+  });
+
+  client.on('disconnected', () => {
+    console.error('[Stream] ❌ 连接已断开');
+  });
+
+  client.on('error', (err) => {
+    console.error('[Stream] ❌ 发生错误:', err.message);
   });
 
   // 注册机器人消息回调
   client.registerCallbackListener(TOPIC_ROBOT, async (res) => {
     try {
-      console.log('[Stream] 收到机器人消息');
+      console.log('[Stream] ⭐ 收到机器人消息');
+      console.log('[Stream] 完整数据:', JSON.stringify(res, null, 2));
 
       // 解析消息
       let message = res.data || res;
@@ -432,12 +448,29 @@ async function startStreamClient() {
   // 启动客户端
   try {
     await client.connect();
-    console.log('[Stream] 已连接，等待消息...');
+    console.log('[Stream] ✅ 已连接到钉钉服务器');
+    console.log('[Stream] 等待消息中...');
     console.log('');
     console.log('💬 发送 /help 查看命令列表');
+    console.log('💬 发送任何消息测试连接');
     console.log('');
+    console.log('========================================');
+    console.log('🔍 调试模式已启用，所有消息将显示');
+    console.log('========================================');
+    console.log('');
+
+    // 定期心跳检测（每30秒）
+    setInterval(() => {
+      console.log(`[心跳] ${new Date().toLocaleTimeString()} - 连接正常`);
+    }, 30000);
+
   } catch (err) {
-    console.error('[Stream] 连接失败:', err);
+    console.error('[Stream] ❌ 连接失败:', err);
+    console.error('');
+    console.error('可能的原因：');
+    console.error('1. Client ID 或 Client Secret 错误');
+    console.error('2. 网络连接问题');
+    console.error('3. 钉钉服务暂时不可用');
     process.exit(1);
   }
 }

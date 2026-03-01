@@ -88,7 +88,7 @@ class OpenAIAgent extends BaseAgent {
     const requestBody = {
       model: this.model,
       messages,
-      stream: false
+      stream: false  // 非流式，完整返回
     };
 
     // 如果启用工具
