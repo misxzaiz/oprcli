@@ -773,6 +773,16 @@ async function handleDingTalkMessage(message) {
             });
           }
 
+          // 流式模式：发送完成提示
+          if (streamConfig.enabled) {
+            await sendToDingTalk(sessionWebhook, {
+              msgtype: 'text',
+              text: {
+                content: `\n✅ 处理完成！\n\n共发送 ${messageCount} 条消息\n总耗时: ${totalTime}s`
+              }
+            });
+          }
+
           resolve();
         },
         onError: async (err) => {
