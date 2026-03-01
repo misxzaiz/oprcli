@@ -702,16 +702,6 @@ async function handleDingTalkMessage(message) {
       sessionMap.set(conversationId, sessionId);
     }
 
-    // 发送开始提示
-    if (streamConfig.enabled) {
-      await sendToDingTalk(sessionWebhook, {
-        msgtype: 'text',
-        text: {
-          content: '🤖 开始处理您的请求...\n\n' + (streamConfig.mode === 'realtime' ? '我将流式返回处理过程，请稍等 ⏳' : '正在处理中...')
-        }
-      });
-    }
-
     // 流式处理标志
     let messageCount = 0;
     let finalResponse = '';
@@ -779,16 +769,6 @@ async function handleDingTalkMessage(message) {
               msgtype: 'text',
               text: {
                 content: finalResponse || '🤔 我思考了一下，但没有生成回复'
-              }
-            });
-          }
-
-          // 流式模式：发送完成提示
-          if (streamConfig.enabled) {
-            await sendToDingTalk(sessionWebhook, {
-              msgtype: 'text',
-              text: {
-                content: `\n✅ 处理完成！\n\n共发送 ${messageCount} 条消息\n总耗时: ${totalTime}s`
               }
             });
           }
