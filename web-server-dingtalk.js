@@ -97,7 +97,20 @@ const logLevelMap = {
   'ERROR': LogLevel.ERROR
 };
 
-const currentLogLevel = logLevelMap[logConfig.level] || LogLevel.EVENT;
+const currentLogLevel = logLevelMap.hasOwnProperty(logConfig.level)
+  ? logLevelMap[logConfig.level]
+  : LogLevel.EVENT;
+
+// 启动时输出配置信息（调试用）
+console.log('[Config] 钉钉配置加载完成:');
+console.log('  - streaming.enabled:', streamConfig.enabled);
+console.log('  - streaming.debugRawEvents:', streamConfig.debugRawEvents);
+console.log('  - logConfig.level:', logConfig.level);
+console.log('  - logLevelMap[logConfig.level]:', logLevelMap[logConfig.level]);
+console.log('  - currentLogLevel:', currentLogLevel);
+console.log('  - LogLevel.DEBUG:', LogLevel.DEBUG);
+console.log('  - LogLevel.EVENT:', LogLevel.EVENT);
+console.log('  - 日志级别映射:', logLevelMap);
 
 // 颜色代码
 const colors = {
@@ -451,6 +464,9 @@ async function initDingTalkStream() {
 async function streamEventToDingTalk(event, sessionWebhook, context) {
   const { index, elapsed } = context;
 
+  // 🔴 强制输出：事件类型（不受日志级别限制）
+  console.log(`[DEBUG-STREAM] 📡 收到事件 #${index}: ${event.type}`);
+
   // 调试模式：直接输出原始事件
   if (streamConfig.debugRawEvents) {
     const rawMessage = {
@@ -463,18 +479,22 @@ async function streamEventToDingTalk(event, sessionWebhook, context) {
     try {
       await rateLimiter.waitForSlot();
       await sendToDingTalk(sessionWebhook, rawMessage);
-      log(LogLevel.DEBUG, 'DINGTALK', `📤 已发送原始事件 #${index}`);
+      console.log(`[DEBUG-STREAM] 📤 已发送原始事件 #${index}`);
     } catch (error) {
-      log(LogLevel.ERROR, 'DINGTALK', `❌ 发送失败 #${index}`, {
-        error: error.message
-      });
+      console.error(`[DEBUG-STREAM] ❌ 发送失败 #${index}:`, error.message);
     }
     return;
   }
 
   // 正常模式：格式化消息
   const message = formatEventMessage(event, context);
-  if (!message) return;  // 跳过不需要发送的事件
+  if (!message) {
+    console.log(`[DEBUG-STREAM] ⏭️  跳过事件 #${index} (${event.type})`);
+    return;
+  }
+
+  // 🔴 强制输出：即将发送消息
+  console.log(`[DEBUG-STREAM] 📤 准备发送消息 #${index} (${event.type})`);
 
   // 记录日志
   logEvent(event, context);
@@ -604,6 +624,12 @@ async function handleDingTalkMessage(message) {
           };
 
           // 调试：记录所有事件
+          // 🔴 强制输出完整的原始事件 JSON（不受日志级别限制）
+          console.log(`\n${colors.cyan}[DEBUG-EVENT]${colors.reset} 📡 收到事件 #${messageCount}: ${event.type}`);
+          console.log(JSON.stringify(event, null, 2));
+          console.log('');  // 空行分隔
+
+          // 简化的事件日志
           if (currentLogLevel <= LogLevel.DEBUG) {
             log(LogLevel.DEBUG, 'EVENT', `📡 收到事件 #${messageCount}: ${event.type}`, {
               eventType: event.type,
