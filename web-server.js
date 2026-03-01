@@ -125,9 +125,9 @@ app.post('/api/message', async (req, res) => {
               events.push(event);
               console.log('[Web Server] Event:', event.type, event);
 
-              // 捕获真实的 sessionId
-              if (event.type === 'system' && event.extra?.session_id) {
-                currentSessionId = event.extra.session_id;
+              // 捕获真实的 sessionId（修复：session_id 在 event 上，不是 extra 里）
+              if (event.type === 'system' && event.session_id) {
+                currentSessionId = event.session_id;
                 console.log('[Web Server] Captured session ID:', currentSessionId);
               }
             },
