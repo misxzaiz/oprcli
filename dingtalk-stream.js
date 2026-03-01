@@ -117,7 +117,7 @@ async function sendBySessionWebhook(webhookUrl, message) {
   return new Promise((resolve, reject) => {
     const url = new URL(webhookUrl);
     const chunks = splitMessage(message, 2000);
-    
+
     // 只发送第一段，后续分段需要额外处理
     const postData = JSON.stringify({
       msgtype: 'text',
@@ -125,6 +125,9 @@ async function sendBySessionWebhook(webhookUrl, message) {
         content: chunks[0]
       }
     });
+
+    console.log(`[Webhook] URL: ${url.hostname}${url.pathname}`);
+    console.log(`[Webhook] 发送内容长度: ${chunks[0].length} 字符`);
 
     const options = {
       hostname: url.hostname,
@@ -142,15 +145,29 @@ async function sendBySessionWebhook(webhookUrl, message) {
       res.on('end', () => {
         try {
           const result = JSON.parse(data);
-          console.log('[钉钉] 发送结果:', result.errmsg || 'success');
+          console.log('[Webhook] 响应状态:', res.statusCode);
+          console.log('[Webhook] 响应内容:', JSON.stringify(result));
+
+          if (result.errcode === 0 || result.errmsg === 'ok') {
+            console.log('[Webhook] ✅ 发送成功');
+          } else {
+            console.error('[Webhook] ❌ 发送失败:', result);
+          }
+
           resolve(result);
         } catch (err) {
+          console.error('[Webhook] ❌ 解析响应失败:', err.message);
+          console.error('[Webhook] 原始响应:', data);
           reject(err);
         }
       });
     });
 
-    req.on('error', reject);
+    req.on('error', (err) => {
+      console.error('[Webhook] ❌ 请求错误:', err.message);
+      reject(err);
+    });
+
     req.write(postData);
     req.end();
   });
@@ -280,13 +297,18 @@ async function processMessage(conversationId, content, senderId, isGroup = false
     console.log('[Claude] 连接状态:', status);
     
     const events = [];
-    
+
     // 使用 Promise 等待进程完成
     const waitForComplete = new Promise((resolve) => {
       const options = {
         onEvent: (event) => {
           events.push(event);
-          console.log('[Claude 事件]', event.type || event);
+          // 详细日志：前3个事件打印完整内容，之后只打印类型
+          if (events.length <= 3) {
+            console.log('[Claude 事件]', JSON.stringify(event, null, 2));
+          } else {
+            console.log('[Claude 事件]', event.type || event);
+          }
         },
         onError: (error) => {
           console.error('[Claude] 错误:', error);
@@ -325,30 +347,64 @@ async function processMessage(conversationId, content, senderId, isGroup = false
 }
 
 /**
- * 从事件中提取响应文本
+ * 从事件中提取响应文本（改进版）
  */
 function extractResponse(events) {
+  console.log(`[提取] 开始分析 ${events.length} 个事件`);
+
   const result = [];
   let hasAssistantContent = false;
-  
+
+  // 方法1：从 assistant 事件提取（完整响应）
   for (const event of events) {
-    // assistant 事件的 message.content 是数组，包含完整响应
-    if (event.type === 'assistant' && event.message?.content) {
-      hasAssistantContent = true;
-      for (const block of event.message.content) {
-        if (block.type === 'text' && block.text) {
-          result.push(block.text);
+    if (event.type === 'assistant') {
+      console.log('[提取] 找到 assistant 事件');
+
+      // 尝试多种可能的结构
+      if (event.message?.content && Array.isArray(event.message.content)) {
+        hasAssistantContent = true;
+        for (const block of event.message.content) {
+          if (block.type === 'text' && block.text) {
+            result.push(block.text);
+          }
         }
+        console.log(`[提取] 从 message.content 提取到 ${result.join('').length} 字符`);
+      }
+
+      // 可能的其他结构
+      if (result.length === 0 && event.content) {
+        if (typeof event.content === 'string') {
+          hasAssistantContent = true;
+          result.push(event.content);
+          console.log(`[提取] 从 event.content 提取到 ${event.content.length} 字符`);
+        } else if (Array.isArray(event.content)) {
+          hasAssistantContent = true;
+          for (const block of event.content) {
+            if (typeof block === 'string') result.push(block);
+            if (block?.text) result.push(block.text);
+          }
+          console.log(`[提取] 从 event.content[] 提取到 ${result.join('').length} 字符`);
+        }
+      }
+
+      // 检查直接文本字段
+      if (result.length === 0 && event.text) {
+        hasAssistantContent = true;
+        result.push(event.text);
+        console.log(`[提取] 从 event.text 提取到 ${event.text.length} 字符`);
       }
     }
   }
-  
-  // 如果已经从 assistant 事件提取了内容，就不需要再处理 delta 事件
+
+  // 如果已经从 assistant 事件提取了内容
   if (hasAssistantContent) {
-    return result.join('').trim() || '（无响应）';
+    const final = result.join('').trim();
+    console.log(`[提取] Assistant 模式提取完成，总长度: ${final.length}`);
+    return final || '（无响应）';
   }
-  
-  // 否则从 content_block_delta 事件提取（流式输出场景）
+
+  // 方法2：从流式事件提取（content_block_delta）
+  console.log('[提取] 尝试从流式事件提取');
   for (const event of events) {
     if (event.type === 'content_block_delta' && event.delta?.text) {
       result.push(event.delta.text);
@@ -359,8 +415,16 @@ function extractResponse(events) {
     if (typeof event.content === 'string') result.push(event.content);
     if (typeof event.text === 'string') result.push(event.text);
   }
-  
-  return result.join('').trim() || '（无响应）';
+
+  const final = result.join('').trim();
+  console.log(`[提取] 流式模式提取完成，总长度: ${final.length}`);
+
+  if (!final) {
+    console.warn('[提取] 警告：未能提取到任何响应内容');
+    console.warn('[提取] 事件类型列表:', events.map(e => e.type));
+  }
+
+  return final || '（无响应）';
 }
 
 /**
@@ -454,15 +518,23 @@ async function startStreamClient() {
       
       // 处理消息
       const reply = await processMessage(conversationId, content, senderId, isGroup);
-      
+
+      console.log(`[发送] 准备发送回复，长度: ${reply.length} 字符`);
+      console.log(`[发送] 前100字符预览: ${reply.substring(0, 100)}...`);
+
       // 发送回复 - 使用 sessionWebhook 更简单
       if (message.sessionWebhook) {
+        console.log('[发送] 使用 sessionWebhook 方式');
         await sendBySessionWebhook(message.sessionWebhook, reply);
       } else if (isGroup && chatId) {
+        console.log(`[发送] 使用群聊方式，chatId: ${chatId}`);
         await sendGroupMessage(chatId, reply, atUserIds);
       } else {
+        console.log(`[发送] 使用单聊方式，senderId: ${senderId}`);
         await sendDingTalkMessage(senderId, reply);
       }
+
+      console.log('[发送] 消息发送完成');
       
     } catch (err) {
       console.error('[Stream] 处理消息错误:', err);
