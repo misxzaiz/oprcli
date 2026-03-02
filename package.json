@@ -1,25 +1,24 @@
 {
-  "name": "claude-connector",
-  "version": "1.0.0",
-  "description": "独立 Node.js 模块，用于与 Claude Code CLI 交互",
-  "main": "claude-connector.js",
+  "name": "oprcli",
+  "version": "2.0.0",
+  "description": "统一 AI CLI 连接器服务器 - 支持 Claude Code 和 IFlow",
+  "main": "server.js",
   "scripts": {
-    "test": "node test-simple.js",
-    "test:full": "node test-connector.js",
-    "test:dingtalk": "node test-dingtalk.js",
-    "web": "node web-server.js",
-    "web:dingtalk": "node web-server-dingtalk.js",
-    "start": "node web-server.js"
+    "start": "node server.js",
+    "dev": "node server.js",
+    "diagnose": "node diagnose-dingtalk.js"
   },
   "keywords": [
     "claude",
     "claude-code",
+    "iflow",
     "anthropic",
     "ai",
     "cli",
     "connector",
     "dingtalk",
-    "钉钉"
+    "钉钉",
+    "unified"
   ],
   "author": "",
   "license": "MIT",
@@ -27,11 +26,9 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
-    "dingtalk-stream": "^2.1.4",
-    "express": "^4.18.2"
-  },
-  "devDependencies": {
     "axios": "^1.13.6",
-    "jest": "^29.0.0"
+    "dingtalk-stream": "^2.1.4",
+    "dotenv": "^17.3.1",
+    "express": "^4.18.2"
   }
 }

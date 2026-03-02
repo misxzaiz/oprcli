@@ -1,0 +1,151 @@
+/**
+ * 钉钉 Stream 集成模块
+ * 处理钉钉机器人消息收发
+ */
+
+const axios = require('axios')
+
+class DingTalkIntegration {
+  constructor(config, logger, rateLimiter) {
+    this.config = config
+    this.logger = logger
+    this.rateLimiter = rateLimiter
+    this.client = null
+    this.sessionMap = new Map()
+    this.processedMessages = new Set()
+  }
+
+  async init(messageHandler = null) {
+    if (!this.config.enabled) {
+      this.logger.warning('DINGTALK', '未启用')
+      return false
+    }
+
+    this.logger.info('DINGTALK', '开始初始化...')
+    this.logger.debug('DINGTALK', '配置信息', {
+      clientId: this.config.clientId?.substring(0, 10) + '...',
+      hasClientSecret: !!this.config.clientSecret
+    })
+
+    try {
+      const { DWClient, TOPIC_ROBOT } = require('dingtalk-stream')
+
+      this.logger.debug('DINGTALK', '创建 DWClient 实例')
+
+      this.client = new DWClient({
+        clientId: this.config.clientId,
+        clientSecret: this.config.clientSecret
+      })
+
+      this.logger.debug('DINGTALK', '注册事件监听器')
+
+      this.client.on('connected', () => {
+        this.logger.success('DINGTALK', 'WebSocket 连接成功')
+      })
+
+      this.client.on('disconnected', () => {
+        this.logger.warning('DINGTALK', '连接断开')
+      })
+
+      this.client.on('error', (error) => {
+        this.logger.error('DINGTALK', '连接错误', { error: error.message, stack: error.stack })
+      })
+
+      // ⭐ 关键修复：在连接之前注册消息处理器
+      // 这样可以确保不会遗漏任何消息
+      if (messageHandler) {
+        this.logger.debug('DINGTALK', '注册消息处理器（连接前）')
+        this.client.registerCallbackListener(TOPIC_ROBOT, async (message) => {
+          const messageId = message.headers?.messageId
+          
+          // 🔥 关键：立即响应钉钉服务器，避免 60 秒后重试
+          // 必须在收到消息后立即响应，然后再异步处理
+          if (messageId) {
+            this.logger.debug('DINGTALK', `立即响应钉钉服务器，messageId: ${messageId}`)
+            this.client.socketCallBackResponse(messageId, { status: 'SUCCESS' })
+          }
+          
+          // 异步处理消息（不阻塞响应）
+          this.logger.debug('DINGTALK', '✅ 收到消息', { headers: message.headers })
+          await messageHandler(message)
+        })
+        this.logger.success('DINGTALK', '消息处理器已注册（连接前）')
+      }
+
+      this.logger.info('DINGTALK', '正在连接到钉钉服务器...')
+      await this.client.connect()
+      this.logger.success('DINGTALK', '初始化成功，客户端已连接')
+      return true
+    } catch (error) {
+      this.logger.error('DINGTALK', '初始化失败', {
+        error: error.message,
+        stack: error.stack
+      })
+      return false
+    }
+  }
+
+  registerMessageHandler(handler) {
+    if (!this.client) {
+      this.logger.error('DINGTALK', '客户端未初始化，无法注册消息处理器')
+      return
+    }
+
+    // ⚠️ 警告：动态注册消息处理器可能会错过已发送的消息
+    // 推荐在 init(messageHandler) 时传入处理器
+    this.logger.warning('DINGTALK', '动态注册消息处理器（推荐在 init 时传入）')
+
+    const { TOPIC_ROBOT } = require('dingtalk-stream')
+    this.client.registerCallbackListener(TOPIC_ROBOT, async (message) => {
+      this.logger.debug('DINGTALK', '✅ 收到消息（动态注册）', { headers: message.headers })
+      await handler(message)
+    })
+
+    this.logger.success('DINGTALK', '消息处理器已注册')
+  }
+
+  async send(sessionWebhook, message) {
+    if (!sessionWebhook) {
+      throw new Error('sessionWebhook is required')
+    }
+
+    await this.rateLimiter.waitForSlot()
+
+    try {
+      await axios.post(sessionWebhook, message)
+      this.logger.debug('DINGTALK', '消息已发送')
+    } catch (error) {
+      this.logger.error('DINGTALK', '发送失败', { error: error.message })
+      throw error
+    }
+  }
+
+  getSessionId(conversationId) {
+    return this.sessionMap.get(conversationId)
+  }
+
+  setSessionId(conversationId, sessionId) {
+    this.sessionMap.set(conversationId, sessionId)
+  }
+
+  isProcessed(messageId) {
+    return this.processedMessages.has(messageId)
+  }
+
+  markAsProcessed(messageId) {
+    this.processedMessages.add(messageId)
+    if (this.processedMessages.size > 1000) {
+      const first = this.processedMessages.values().next().value
+      this.processedMessages.delete(first)
+    }
+  }
+
+  async close() {
+    if (this.client) {
+      await this.client.close()
+      this.logger.info('DINGTALK', 'Stream 客户端已关闭')
+    }
+  }
+}
+
+module.exports = DingTalkIntegration

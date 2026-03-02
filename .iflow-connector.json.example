@@ -1,7 +1,10 @@
 {
-  "claudeCmdPath": "C:\\Users\\YourUsername\\AppData\\Roaming\\npm\\claude.cmd",
+  "iflowPath": "iflow",
   "workDir": "D:\\MyProject",
-  "gitBinPath": "C:\\Program Files\\Git\\bin\\bash.exe",
+  "includeDirectories": [
+    "D:\\tmp",
+    "E:\\shared"
+  ],
 
   "dingtalk": {
     "clientId": "dingxxxxxxxxxxxxxxxx",
