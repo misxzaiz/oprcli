@@ -10,6 +10,10 @@ class MessageFormatter {
   }
 
   formatEvent(event, context) {
+    console.log('=== Event Debug Info ===')
+    console.log('Event:', JSON.stringify(event, null, 2))
+    console.log('Context:', context)
+    console.log('========================')
     const { index, elapsed } = context
     const timeStr = this.config.showTime ? `\n⏱️ ${elapsed}s` : ''
 
@@ -82,6 +86,16 @@ class MessageFormatter {
   _formatAssistant(event, timeStr) {
     const hasText = event.message?.content?.some(c => c.type === 'text')
     const hasThinking = event.message?.content?.some(c => c.type === 'thinking')
+    const hasToolUse = event.message?.content?.some(c => c.type === 'tool_use')
+
+    // 处理工具调用
+    if (hasToolUse && this.config.showTools) {
+      const toolUse = event.message.content.find(c => c.type === 'tool_use')
+      return this._buildMessage(
+        `🔧 工具调用：${toolUse.name}\n输入：${JSON.stringify(toolUse.input, null, 2)}${timeStr}`,
+        '工具调用'
+      )
+    }
 
     if (!hasText && hasThinking) {
       return this._formatThinkingFromAssistant(event, timeStr)

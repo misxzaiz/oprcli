@@ -28,6 +28,7 @@ class IFlowConnector extends BaseConnector {
     super(options);
     this.iflowPath = options.iflowPath || 'iflow';
     this.includeDirectories = options.includeDirectories || [];
+    this.systemPrompt = options.systemPrompt || null;
     this.jsonlMonitors = new Map(); // sessionId -> interval
     this.currentSessionId = null;
   }
@@ -150,11 +151,21 @@ class IFlowConnector extends BaseConnector {
   }
 
   _spawnProcess(args) {
+    // 构建环境变量，支持系统提示词
+    const env = { ...process.env };
+
+    // 通过环境变量传递系统提示词给 IFlow
+    if (this.systemPrompt && this.systemPrompt.trim()) {
+      env.IFLOW_systemPrompt = this.systemPrompt.trim();
+      console.log('[IFlowConnector] 已设置系统提示词环境变量');
+    }
+
     const spawnOptions = {
       cwd: this.workDir,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
-      shell: this._isWindows()
+      shell: this._isWindows(),
+      env
     };
 
     console.log(`[IFlowConnector] 执行命令: ${this.iflowPath} ${args.join(' ')}`);

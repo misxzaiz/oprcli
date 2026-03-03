@@ -28,6 +28,7 @@ class ClaudeConnector extends BaseConnector {
     super(options);
     this.claudeCmdPath = options.claudeCmdPath;
     this.gitBinPath = options.gitBinPath;
+    this.systemPrompt = options.systemPrompt || null;
     this.nodeExe = null;
     this.cliJs = null;
   }
@@ -118,7 +119,7 @@ class ClaudeConnector extends BaseConnector {
     console.log(`[ClaudeConnector] 启动会话: ${tempId}`);
     console.log(`[ClaudeConnector] 消息长度: ${message.length} 字符`);
 
-    const args = this._buildCommandArgs(message, options.systemPrompt, false);
+    const args = this._buildCommandArgs(message, this.systemPrompt, false);
     const child = this._spawnProcess(args);
 
     // 保存临时 sessionId
@@ -152,7 +153,7 @@ class ClaudeConnector extends BaseConnector {
       this._terminateProcess(session.process);
     }
 
-    const args = this._buildCommandArgs(message, options.systemPrompt, true, sessionId);
+    const args = this._buildCommandArgs(message, this.systemPrompt, true, sessionId);
     const child = this._spawnProcess(args);
 
     this._registerSession(sessionId, { process: child });
