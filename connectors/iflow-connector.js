@@ -133,43 +133,46 @@ class IFlowConnector extends BaseConnector {
   // ==================== 辅助方法 ====================
 
   _buildCommandArgs(message, isResume, sessionId = null) {
-    const args = ['--yolo'];
+    // 只在第一次会话时添加系统提示词
+    let finalMessage = message;
+    if (!isResume && this.systemPrompt && this.systemPrompt.trim()) {
+      finalMessage = `${this.systemPrompt}\n\n${message}`;
+      console.log('[IFlowConnector] 已添加系统提示词到 prompt（首次会话）');
+    }
+
+    // 构建命令字符串（用于 shell 模式）
+    let cmdStr = '--yolo';
 
     if (this.includeDirectories.length > 0) {
       for (const dir of this.includeDirectories) {
-        args.push('--include-directories', dir);
+        cmdStr += ` --include-directories "${dir}"`;
       }
     }
 
     if (isResume && sessionId) {
-      args.push('--resume', sessionId);
+      cmdStr += ` --resume ${sessionId}`;
     }
 
-    args.push('--prompt', message);
+    // 给 prompt 参数加引号以处理空格
+    cmdStr += ` --prompt "${finalMessage.replace(/"/g, '\\"')}"`;
 
-    return args;
+    return cmdStr;
   }
 
-  _spawnProcess(args) {
-    // 构建环境变量，支持系统提示词
-    const env = { ...process.env };
-
-    // 通过环境变量传递系统提示词给 IFlow
-    if (this.systemPrompt && this.systemPrompt.trim()) {
-      env.IFLOW_systemPrompt = this.systemPrompt.trim();
-      console.log('[IFlowConnector] 已设置系统提示词环境变量');
-    }
-
+  _spawnProcess(cmdStr) {
     const spawnOptions = {
       cwd: this.workDir,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
-      shell: this._isWindows(),
-      env
+      shell: this._isWindows()
     };
 
-    console.log(`[IFlowConnector] 执行命令: ${this.iflowPath} ${args.join(' ')}`);
-    return spawn(this.iflowPath, args, spawnOptions);
+    // 构建完整的命令
+    const fullCommand = `"${this.iflowPath}" ${cmdStr}`;
+    console.log(`[IFlowConnector] 执行命令: ${fullCommand}`);
+
+    // 使用命令字符串而不是数组，让 shell 正确解析带引号的参数
+    return spawn(fullCommand, [], spawnOptions);
   }
 
   _setupEventHandlers(child, sessionId, options) {

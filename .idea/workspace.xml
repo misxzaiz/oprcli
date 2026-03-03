@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="支持系统提示词">
-      <change beforePath="$PROJECT_DIR$/utils/message-formatter.js" beforeDir="false" afterPath="$PROJECT_DIR$/utils/message-formatter.js" afterDir="false" />
+    <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="修复工具调用失败的问题（实际是显示错误）没完全修复">
+      <change afterPath="$PROJECT_DIR$/start.bat" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/connectors/iflow-connector.js" beforeDir="false" afterPath="$PROJECT_DIR$/connectors/iflow-connector.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/claude.txt" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/claude.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/default.txt" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/default.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/iflow.txt" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/iflow.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -35,6 +40,7 @@
     "git-widget-placeholder": "main",
     "ignore.virus.scanning.warn.message": "true",
     "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "D:/temp/oprcli",
     "nodejs_package_manager_path": "npm",
     "project.structure.last.edited": "Project",
     "project.structure.proportion": "0.15",
@@ -44,6 +50,11 @@
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\temp\oprcli" />
+    </key>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -144,7 +155,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772554564348</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="修复工具调用失败的问题（实际是显示错误）没完全修复">
+      <option name="closed" value="true" />
+      <created>1772554884682</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1772554884682</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -176,6 +195,7 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="2132312" />
     <MESSAGE value="支持系统提示词" />
-    <option name="LAST_COMMIT_MESSAGE" value="支持系统提示词" />
+    <MESSAGE value="修复工具调用失败的问题（实际是显示错误）没完全修复" />
+    <option name="LAST_COMMIT_MESSAGE" value="修复工具调用失败的问题（实际是显示错误）没完全修复" />
   </component>
 </project>
