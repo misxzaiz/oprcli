@@ -1,12 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="2132312">
-      <change beforePath="$PROJECT_DIR$/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/.env.example" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/connectors/claude-connector.js" beforeDir="false" afterPath="$PROJECT_DIR$/connectors/claude-connector.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/connectors/iflow-connector.js" beforeDir="false" afterPath="$PROJECT_DIR$/connectors/iflow-connector.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/config.js" beforeDir="false" afterPath="$PROJECT_DIR$/utils/config.js" afterDir="false" />
+    <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="支持系统提示词">
       <change beforePath="$PROJECT_DIR$/utils/message-formatter.js" beforeDir="false" afterPath="$PROJECT_DIR$/utils/message-formatter.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -141,7 +136,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772473405982</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="支持系统提示词">
+      <option name="closed" value="true" />
+      <created>1772554564348</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1772554564348</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -172,6 +175,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="2132312" />
-    <option name="LAST_COMMIT_MESSAGE" value="2132312" />
+    <MESSAGE value="支持系统提示词" />
+    <option name="LAST_COMMIT_MESSAGE" value="支持系统提示词" />
   </component>
 </project>

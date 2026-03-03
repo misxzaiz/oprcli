@@ -91,6 +91,19 @@ class MessageFormatter {
     // 处理工具调用
     if (hasToolUse && this.config.showTools) {
       const toolUse = event.message.content.find(c => c.type === 'tool_use')
+      
+      // 追踪工具调用状态
+      if (!this.pendingTools) this.pendingTools = new Map()
+      this.pendingTools.set(toolUse.id, {
+        name: toolUse.name,
+        input: toolUse.input,
+        timestamp: Date.now(),
+        status: 'started'
+      })
+      
+      console.log(`[Tool Tracker] 工具开始: ${toolUse.name} (ID: ${toolUse.id})`)
+      console.log(`[Tool Tracker] 待处理工具:`, Array.from(this.pendingTools.entries()))
+      
       return this._buildMessage(
         `🔧 工具调用：${toolUse.name}\n输入：${JSON.stringify(toolUse.input, null, 2)}${timeStr}`,
         '工具调用'
@@ -134,6 +147,13 @@ class MessageFormatter {
   _formatResult(event, timeStr) {
     const result = event.result || ''
     const truncated = this._truncate(result, this.config.maxLength)
+    
+    // 检查未完成的工具
+    if (this.pendingTools && this.pendingTools.size > 0) {
+      console.log(`[Tool Tracker] 结果事件触发，待处理工具:`, Array.from(this.pendingTools.entries()))
+      // 清空待处理工具（假设结果事件意味着会话结束）
+      this.pendingTools.clear()
+    }
 
     return this._buildMessage(
       `📋 最终结果：\n\n\`\`\`\n${truncated}\n\`\`\`\n\n${result.length > this.config.maxLength ? `(已截断，共 ${result.length} 字符)` : ''}${timeStr}`,
