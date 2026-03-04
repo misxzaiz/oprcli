@@ -1,12 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="修复工具调用失败的问题（实际是显示错误）没完全修复">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/claude.txt" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/claude.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/default.txt" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/default.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/iflow.txt" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/iflow.txt" afterDir="false" />
-    </list>
+    <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="修复工具调用失败的问题（实际是显示错误）没完全修复" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
