@@ -14,7 +14,7 @@ class Config {
   load() {
     // 核心配置
     this.provider = process.env.PROVIDER || 'claude'
-    this.port = process.env.PORT ? parseInt(process.env.PORT) : null,
+    this.port = process.env.PORT ? parseInt(process.env.PORT) : null
 
     // Claude 配置
     this.claude = {
