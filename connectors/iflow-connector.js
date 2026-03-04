@@ -291,7 +291,8 @@ class IFlowConnector extends BaseConnector {
     const { onEvent } = options;
     const sessionDir = this._getProjectSessionDir();
     let jsonlPath = null;
-    let lineCount = 0;
+    let lastPosition = 0; // 使用文件位置跟踪而不是行数
+    let lastSize = 0;
     let attempts = 0;
     const maxAttempts = 100;
 
@@ -306,24 +307,37 @@ class IFlowConnector extends BaseConnector {
           if (jsonlPath) {
             console.log('[IFlowConnector] 找到 JSONL 文件:', jsonlPath);
             try {
-              const content = fs.readFileSync(jsonlPath, 'utf-8');
-              lineCount = content.split('\n').filter(l => l.trim()).length;
-              console.log('[IFlowConnector] JSONL 当前行数:', lineCount);
+              const stats = fs.statSync(jsonlPath);
+              lastSize = stats.size;
+              lastPosition = 0;
+              console.log('[IFlowConnector] JSONL 文件大小:', lastSize);
             } catch (e) {}
           }
         } catch (e) {}
       }
 
-      if (jsonlPath && fs.existsSync(jsonlPath)) {
+      // 使用增量读取代替完整文件重读
+      if (jsonlPath) {
         try {
-          const content = fs.readFileSync(jsonlPath, 'utf-8');
-          const lines = content.split('\n').filter(l => l.trim());
+          const stats = fs.statSync(jsonlPath);
+          const currentSize = stats.size;
 
-          if (lines.length > lineCount) {
-            console.log(`[IFlowConnector] 检测到新内容: ${lines.length - lineCount} 行`);
+          // 文件有新内容
+          if (currentSize > lastSize) {
+            console.log(`[IFlowConnector] 检测到新内容: ${currentSize - lastSize} 字节`);
 
-            for (let i = lineCount; i < lines.length; i++) {
-              const line = lines[i];
+            // 只读取新增的部分
+            const fd = fs.openSync(jsonlPath, 'r');
+            const buffer = Buffer.alloc(currentSize - lastSize);
+            fs.readSync(fd, buffer, 0, buffer.length, lastPosition);
+            fs.closeSync(fd);
+
+            const newContent = buffer.toString('utf-8');
+            const lines = newContent.split('\n').filter(l => l.trim());
+
+            console.log(`[IFlowConnector] 新增行数: ${lines.length}`);
+
+            for (const line of lines) {
               const event = this._parseJsonlLine(line);
 
               if (event) {
@@ -353,9 +367,16 @@ class IFlowConnector extends BaseConnector {
               }
             }
 
-            lineCount = lines.length;
+            // 更新位置
+            lastSize = currentSize;
+            lastPosition = currentSize;
           }
-        } catch (e) {}
+        } catch (e) {
+          // 文件可能被删除或正在写入，忽略错误
+          if (e.code !== 'ENOENT') {
+            console.error('[IFlowConnector] 读取 JSONL 失败:', e.message);
+          }
+        }
       }
 
       attempts++;
@@ -574,29 +595,6 @@ class IFlowConnector extends BaseConnector {
     }
 
     return '';
-  }
-
-  _terminateProcess(child) {
-    if (this._isWindows()) {
-      spawn('taskkill', ['/F', '/T', '/PID', child.pid.toString()], {
-        stdio: 'ignore'
-      });
-    } else {
-      child.kill('SIGTERM');
-      setTimeout(() => {
-        if (!child.killed) {
-          child.kill('SIGKILL');
-        }
-      }, 500).unref();
-    }
-  }
-
-  _isWindows() {
-    return process.platform === 'win32';
-  }
-
-  _generateTempId() {
-    return `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 }
 

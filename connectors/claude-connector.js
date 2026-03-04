@@ -368,25 +368,6 @@ class ClaudeConnector extends BaseConnector {
       }
     });
   }
-
-  _terminateProcess(child) {
-    if (process.platform === 'win32') {
-      spawn('taskkill', ['/F', '/T', '/PID', child.pid.toString()], {
-        stdio: 'ignore'
-      });
-    } else {
-      child.kill('SIGTERM');
-      setTimeout(() => {
-        if (!child.killed) {
-          child.kill('SIGKILL');
-        }
-      }, 500).unref();
-    }
-  }
-
-  _generateTempId() {
-    return `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  }
 }
 
 module.exports = ClaudeConnector;

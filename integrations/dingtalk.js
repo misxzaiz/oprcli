@@ -12,7 +12,9 @@ class DingTalkIntegration {
     this.rateLimiter = rateLimiter
     this.client = null
     this.sessionMap = new Map()
-    this.processedMessages = new Set()
+    // 使用 Map + 时间戳来正确删除最旧的消息（Set 是无序的）
+    this.processedMessages = new Map() // messageId -> timestamp
+    this.maxProcessedMessages = 1000
   }
 
   async init(messageHandler = null) {
@@ -133,10 +135,24 @@ class DingTalkIntegration {
   }
 
   markAsProcessed(messageId) {
-    this.processedMessages.add(messageId)
-    if (this.processedMessages.size > 1000) {
-      const first = this.processedMessages.values().next().value
-      this.processedMessages.delete(first)
+    const now = Date.now()
+    this.processedMessages.set(messageId, now)
+
+    // 删除最旧的消息（按时间戳）
+    if (this.processedMessages.size > this.maxProcessedMessages) {
+      let oldestTimestamp = Infinity
+      let oldestMessageId = null
+
+      for (const [id, timestamp] of this.processedMessages.entries()) {
+        if (timestamp < oldestTimestamp) {
+          oldestTimestamp = timestamp
+          oldestMessageId = id
+        }
+      }
+
+      if (oldestMessageId) {
+        this.processedMessages.delete(oldestMessageId)
+      }
     }
   }
 

@@ -132,6 +132,45 @@ class BaseConnector {
   _getSession(sessionId) {
     return this.activeSessions.get(sessionId)
   }
+
+  // ==================== 共享工具方法 ====================
+
+  /**
+   * 生成临时会话 ID
+   * @returns {string}
+   */
+  _generateTempId() {
+    return `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  }
+
+  /**
+   * 终止子进程（平台相关）
+   * @param {Object} child - 子进程对象
+   */
+  _terminateProcess(child) {
+    const { spawn } = require('child_process')
+
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/F', '/T', '/PID', child.pid.toString()], {
+        stdio: 'ignore'
+      })
+    } else {
+      child.kill('SIGTERM')
+      setTimeout(() => {
+        if (!child.killed) {
+          child.kill('SIGKILL')
+        }
+      }, 500).unref()
+    }
+  }
+
+  /**
+   * 检查是否为 Windows 平台
+   * @returns {boolean}
+   */
+  _isWindows() {
+    return process.platform === 'win32'
+  }
 }
 
 module.exports = BaseConnector
