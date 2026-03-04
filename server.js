@@ -16,7 +16,6 @@
 require('dotenv').config()
 
 const express = require('express')
-const path = require('path')
 const config = require('./utils/config')
 const Logger = require('./integrations/logger')
 const RateLimiter = require('./utils/rate-limiter')
@@ -58,7 +57,6 @@ class UnifiedServer {
   _setupMiddleware() {
     this.app.use(express.json())
     this.app.use(express.urlencoded({ extended: true }))
-    this.app.use(express.static(path.join(__dirname, 'public')))
   }
 
   _setupRoutes() {
@@ -497,16 +495,26 @@ class UnifiedServer {
       this.logger.success('DINGTALK', '钉钉集成已启动')
     }
 
-    // 启动服务器
-    this.app.listen(config.port, () => {
+    // 启动 HTTP 服务器（仅在端口配置时）
+    if (config.port) {
+      this.app.listen(config.port, () => {
+        console.log('\n========================================')
+        console.log('  Unified AI CLI Connector Server')
+        console.log('========================================')
+        console.log(`\n🌐 服务器运行在: http://localhost:${config.port}`)
+        console.log(`🤖 提供商: ${config.provider.toUpperCase()}`)
+        console.log(`📱 钉钉: ${dingtalkEnabled ? '✅ 已启用' : '❌ 未启用'}`)
+        console.log('\n按 Ctrl+C 停止服务器\n')
+      })
+    } else {
       console.log('\n========================================')
       console.log('  Unified AI CLI Connector Server')
       console.log('========================================')
-      console.log(`\n🌐 服务器运行在: http://localhost:${config.port}`)
-      console.log(`🤖 提供商: ${config.provider.toUpperCase()}`)
+      console.log(`\n🤖 提供商: ${config.provider.toUpperCase()}`)
       console.log(`📱 钉钉: ${dingtalkEnabled ? '✅ 已启用' : '❌ 未启用'}`)
+      console.log(`🌐 API: 未启用（未配置端口）`)
       console.log('\n按 Ctrl+C 停止服务器\n')
-    })
+    }
   }
 
   async handleDingTalkMessage(message) {

@@ -4,3 +4,7 @@ npm-debug.log
 .DS_Store
 *.log
 .claude-connector.json
+
+# 临时测试文件（排除所有 test- 开头的文件）
+test-*.js
+!diagnose-dingtalk.js
