@@ -78,6 +78,9 @@ class UnifiedServer {
     this.app.post('/api/interrupt', this.handleInterrupt.bind(this))
     this.app.post('/api/reset', this.handleReset.bind(this))
     this.app.get('/api/dingtalk/status', this.handleDingTalkStatus.bind(this))
+
+    // 内部 API：定时任务管理（仅允许本地访问）
+    this.app.post('/api/tasks/reload', this.handleTasksReload.bind(this))
   }
 
   async handleConnect(req, res) {
@@ -229,6 +232,57 @@ class UnifiedServer {
       connected: this.dingtalk.client?.connected || false,
       activeSessions: this.dingtalk.getActiveSessions()
     })
+  }
+
+  /**
+   * 内部 API：重新加载定时任务配置
+   * 仅允许本地访问（127.0.0.1 或 ::1）
+   */
+  async handleTasksReload(req, res) {
+    // 安全检查：仅允许本地访问
+    const clientIp = req.ip || req.connection.remoteAddress
+    const isLocalhost =
+      clientIp === '127.0.0.1' ||
+      clientIp === '::1' ||
+      clientIp === '::ffff:127.0.0.1'
+
+    if (!isLocalhost) {
+      this.logger.warning('API', `拒绝非本地访问: ${clientIp}`)
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: 仅允许本地访问'
+      })
+    }
+
+    // 检查 scheduler 是否可用
+    if (!this.scheduler || !this.scheduler.taskManager) {
+      return res.status(503).json({
+        success: false,
+        error: '定时任务管理器未初始化'
+      })
+    }
+
+    try {
+      this.logger.info('API', '重新加载定时任务配置')
+
+      // 执行重新加载
+      await this.scheduler.taskManager.reload()
+
+      const status = this.scheduler.getStatus()
+      res.json({
+        success: true,
+        message: '任务配置已重新加载',
+        tasks: status.totalTasks,
+        enabledTasks: status.enabledTasks,
+        scheduledJobs: status.scheduledJobs
+      })
+    } catch (error) {
+      this.logger.error('API', '重新加载失败', { error: error.message })
+      res.status(500).json({
+        success: false,
+        error: error.message
+      })
+    }
   }
 
   _createConnector(options) {

@@ -181,7 +181,9 @@ D:/space/oprcli/         → 当前工作版本的任何文件
 **使用 Bash 工具创建**：
 1. 读取现有配置：`cat scheduler/tasks.json`
 2. 使用 Node.js 添加任务
-3. 告诉用户重新加载：`tasks reload`
+3. **触发重载（二选一）**：
+   - **方式 A（推荐）**：`curl -X POST http://localhost:13579/api/tasks/reload`
+   - **方式 B（备用）**：告诉用户发送 `tasks reload`
 
 ### Cron 表达式速查
 

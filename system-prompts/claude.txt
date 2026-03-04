@@ -211,7 +211,14 @@ D:/space/oprcli/         → 当前工作版本的任何文件
    "
    ```
 
-3. **告诉用户重新加载**：
+3. **触发重载（二选一）**：
+
+   **方式 A（推荐）**：API 自动重载
+   ```bash
+   curl -X POST http://localhost:13579/api/tasks/reload
+   ```
+
+   **方式 B（备用）**：告诉用户手动重载
    > ✅ 任务已创建，请发送 `tasks reload` 生效
    > 🧪 可以发送 `tasks run daily-weather` 立即测试
 
