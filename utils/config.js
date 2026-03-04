@@ -50,7 +50,14 @@ class Config {
       showTime: process.env.STREAM_SHOW_TIME !== 'false',
       showCompletionSummary: process.env.STREAM_SHOW_COMPLETION !== 'false',
       deduplicateResult: process.env.STREAM_DEDUPLICATE_RESULT !== 'false',  // 去重 result 事件
-      useMarkdown: process.env.STREAM_USE_MARKDOWN === 'true'
+      useMarkdown: process.env.STREAM_USE_MARKDOWN === 'true',
+      debugMode: process.env.STREAM_DEBUG_MODE === 'true',  // 调试模式开关
+      toolIcons: {  // 工具图标配置
+        'Bash': '🖥️',
+        'Editor': '📝',
+        'Browser': '🌐',
+        'Computer': '💻'
+      }
     }
 
     // 日志配置

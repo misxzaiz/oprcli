@@ -80,38 +80,15 @@ class ClaudeConnector extends BaseConnector {
   }
 
   async _testCommand() {
-    return new Promise((resolve) => {
-      let cmd, args;
-
-      if (process.platform === 'win32') {
-        cmd = this.nodeExe;
-        args = [this.cliJs, '--version'];
-      } else {
-        cmd = this.claudeCmdPath;
-        args = ['--version'];
-      }
-
-      const child = spawn(cmd, args, {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: true
-      });
-
-      let output = '';
-      child.stdout.on('data', (data) => { output += data.toString(); });
-      child.stderr.on('data', () => {});
-
-      child.on('close', (code) => {
-        if (code === 0 && output.trim()) {
-          resolve(output.trim());
-        } else {
-          resolve(null);
-        }
-      });
-
-      child.on('error', () => {
-        resolve(null);
-      });
-    });
+    let cmd, args
+    if (process.platform === 'win32') {
+      cmd = this.nodeExe
+      args = [this.cliJs, '--version']
+    } else {
+      cmd = this.claudeCmdPath
+      args = ['--version']
+    }
+    return this._testCommandGeneric(cmd, args)
   }
 
   async _startSessionInternal(message, options) {

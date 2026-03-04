@@ -171,6 +171,42 @@ class BaseConnector {
   _isWindows() {
     return process.platform === 'win32'
   }
+
+  /**
+   * 通用的命令测试方法
+   * @param {string} command - 命令
+   * @param {string[]} args - 参数
+   * @param {Object} options - spawn 选项
+   * @returns {Promise<string|null>} 版本号或 null
+   */
+  async _testCommandGeneric(command, args = [], options = {}) {
+    const { spawn } = require('child_process')
+
+    return new Promise((resolve) => {
+      const child = spawn(command, args, {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+        ...options
+      })
+
+      let output = ''
+      child.stdout.on('data', (data) => { output += data.toString() })
+      child.stderr.on('data', (data) => { output += data.toString() })
+
+      child.on('close', (code) => {
+        if (code === 0 || output.trim()) {
+          const versionMatch = output.match(/(\d+\.\d+\.\d+)/)
+          resolve(versionMatch ? versionMatch[1] : output.trim() || 'unknown')
+        } else {
+          resolve(null)
+        }
+      })
+
+      child.on('error', () => {
+        resolve(null)
+      })
+    })
+  }
 }
 
 module.exports = BaseConnector

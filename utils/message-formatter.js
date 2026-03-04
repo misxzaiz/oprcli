@@ -3,6 +3,8 @@
  * 将不同类型的事件转换为钉钉消息格式
  */
 
+const { truncate } = require('./string-helper')
+
 class MessageFormatter {
   constructor(config, logger) {
     this.config = config
@@ -10,10 +12,10 @@ class MessageFormatter {
   }
 
   formatEvent(event, context) {
-    console.log('=== Event Debug Info ===')
-    console.log('Event:', JSON.stringify(event, null, 2))
-    console.log('Context:', context)
-    console.log('========================')
+    // 使用 logger 替代 console.log
+    if (this.config.debugMode) {
+      this.logger.debug('FORMATTER', 'Event received', { type: event.type, context })
+    }
     const { index, elapsed } = context
     const timeStr = this.config.showTime ? `\n⏱️ ${elapsed}s` : ''
 
@@ -65,7 +67,7 @@ class MessageFormatter {
     if (!this.config.showTools) return null
 
     const output = event.output || ''
-    const truncated = this._truncate(output, this.config.maxLength)
+    const truncated = truncate(output, this.config.maxLength, '')
 
     return this._buildMessage(
       `📤 输出：\n\n\`\`\`\n${truncated}\n\`\`\`\n\n${output.length > this.config.maxLength ? `(已截断，共 ${output.length} 字符)` : ''}${timeStr}`,
@@ -91,7 +93,7 @@ class MessageFormatter {
     // 处理工具调用
     if (hasToolUse && this.config.showTools) {
       const toolUse = event.message.content.find(c => c.type === 'tool_use')
-      
+
       // 追踪工具调用状态
       if (!this.pendingTools) this.pendingTools = new Map()
       this.pendingTools.set(toolUse.id, {
@@ -100,10 +102,13 @@ class MessageFormatter {
         timestamp: Date.now(),
         status: 'started'
       })
-      
-      console.log(`[Tool Tracker] 工具开始: ${toolUse.name} (ID: ${toolUse.id})`)
-      console.log(`[Tool Tracker] 待处理工具:`, Array.from(this.pendingTools.entries()))
-      
+
+      this.logger.debug('FORMATTER', '工具开始', {
+        tool: toolUse.name,
+        id: toolUse.id,
+        pendingCount: this.pendingTools.size
+      })
+
       return this._buildMessage(
         `🔧 工具调用：${toolUse.name}\n输入：${JSON.stringify(toolUse.input, null, 2)}${timeStr}`,
         '工具调用'
@@ -146,11 +151,13 @@ class MessageFormatter {
 
   _formatResult(event, timeStr) {
     const result = event.result || ''
-    const truncated = this._truncate(result, this.config.maxLength)
-    
+    const truncated = truncate(result, this.config.maxLength, '')
+
     // 检查未完成的工具
     if (this.pendingTools && this.pendingTools.size > 0) {
-      console.log(`[Tool Tracker] 结果事件触发，待处理工具:`, Array.from(this.pendingTools.entries()))
+      this.logger.debug('FORMATTER', '结果事件触发，待处理工具', {
+        count: this.pendingTools.size
+      })
       // 清空待处理工具（假设结果事件意味着会话结束）
       this.pendingTools.clear()
     }
@@ -208,13 +215,14 @@ class MessageFormatter {
   }
 
   _getToolIcon(tool) {
-    const icons = { 'Bash': '🖥️', 'Editor': '📝', 'Browser': '🌐', 'Computer': '💻' }
+    // 使用配置中的工具图标，或使用默认值
+    const icons = this.config.toolIcons || {
+      'Bash': '🖥️',
+      'Editor': '📝',
+      'Browser': '🌐',
+      'Computer': '💻'
+    }
     return icons[tool] || '🔧'
-  }
-
-  _truncate(str, maxLength) {
-    if (!str || str.length <= maxLength) return str || ''
-    return str.substring(0, maxLength)
   }
 }
 

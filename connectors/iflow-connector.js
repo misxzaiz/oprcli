@@ -47,30 +47,9 @@ class IFlowConnector extends BaseConnector {
   }
 
   async _testCommand() {
-    return new Promise((resolve) => {
-      const child = spawn(this.iflowPath, ['--version'], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: true,
-        shell: this._isWindows()
-      });
-
-      let output = '';
-      child.stdout.on('data', (data) => { output += data.toString(); });
-      child.stderr.on('data', (data) => { output += data.toString(); });
-
-      child.on('close', (code) => {
-        if (code === 0 || output.trim()) {
-          const versionMatch = output.match(/(\d+\.\d+\.\d+)/);
-          resolve(versionMatch ? versionMatch[1] : output.trim() || 'unknown');
-        } else {
-          resolve(null);
-        }
-      });
-
-      child.on('error', () => {
-        resolve(null);
-      });
-    });
+    const args = ['--version']
+    const options = this._isWindows() ? { shell: true } : {}
+    return this._testCommandGeneric(this.iflowPath, args, options)
   }
 
   async _startSessionInternal(message, options) {
