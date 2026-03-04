@@ -123,6 +123,25 @@ D:/space/oprcli/         → 当前工作版本的任何文件
 - MCP Browser 工具
 - 自定义 Skills
 
+### 🔌 插件系统 ⭐
+
+OPRCLI 支持强大的插件系统，可以动态扩展功能：
+- ✅ **插件管理**: 动态注册、加载和卸载插件
+- ✅ **配置管理**: 集中化配置，支持热更新
+- ✅ **上下文记忆**: 跨会话保存和共享信息
+
+**查看文档**:
+```bash
+cat system-prompts/docs/plugin-system.md
+```
+
+**API 访问**:
+```bash
+curl http://localhost:13579/api/plugins
+curl http://localhost:13579/api/config
+curl http://localhost:13579/api/memory/stats
+```
+
 ## 💡 项目架构理解
 
 ### 端口分配

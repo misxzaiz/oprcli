@@ -15,3 +15,7 @@ test-*.js
 
 # 定时任务配置文件（包含敏感信息）
 scheduler/tasks.json
+
+# 插件系统运行时文件
+memory/
+nul
