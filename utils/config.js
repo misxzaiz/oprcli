@@ -6,6 +6,12 @@
 const fs = require('fs')
 const path = require('path')
 
+// 提示词模式常量
+const PROMPT_MODES = {
+  FULL: 'full',
+  SLIM: 'slim'
+}
+
 class Config {
   constructor() {
     this.load()
@@ -16,8 +22,12 @@ class Config {
     this.provider = process.env.PROVIDER || 'claude'
     this.port = process.env.PORT ? parseInt(process.env.PORT) : null
 
-    // 提示词模式
-    this.promptMode = process.env.PROMPT_MODE || 'full'
+    // 提示词模式（带验证）
+    this.promptMode = process.env.PROMPT_MODE || PROMPT_MODES.FULL
+    if (!Object.values(PROMPT_MODES).includes(this.promptMode)) {
+      console.warn(`[CONFIG] 警告: 无效的 PROMPT_MODE: "${this.promptMode}"，使用默认值: ${PROMPT_MODES.FULL}`)
+      this.promptMode = PROMPT_MODES.FULL
+    }
 
     // Claude 配置
     this.claude = {
@@ -105,9 +115,7 @@ class Config {
   _loadSystemPromptFromFile(filename) {
     try {
       const filepath = path.join(this.systemPrompts.promptsDir, filename)
-      if (fs.existsSync(filepath)) {
-        return fs.readFileSync(filepath, 'utf-8').trim()
-      }
+      return fs.readFileSync(filepath, 'utf-8').trim()
     } catch (err) {
       // 文件读取失败，静默忽略
     }
@@ -210,5 +218,8 @@ class Config {
     throw new Error(`Unknown provider: ${targetProvider}`)
   }
 }
+
+// 导出常量供外部使用
+Config.PROMPT_MODES = PROMPT_MODES
 
 module.exports = new Config()
