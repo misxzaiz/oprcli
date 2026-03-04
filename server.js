@@ -120,7 +120,9 @@ class UnifiedServer {
   }
 
   async handleMessage(req, res) {
-    if (!this.connector?.connected) {
+    // 从 connectors Map 中获取默认连接器
+    const connector = this.connectors.get(this.defaultProvider)
+    if (!connector?.connected) {
       return res.status(400).json({ success: false, error: '未连接，请先调用 /api/connect' })
     }
 
@@ -156,9 +158,9 @@ class UnifiedServer {
         }
 
         if (isResume) {
-          this.connector.continueSession(sessionId, message, options)
+          connector.continueSession(sessionId, message, options)
         } else {
-          const result = this.connector.startSession(message, options)
+          const result = connector.startSession(message, options)
           this.currentSessionId = result.sessionId
         }
       })
