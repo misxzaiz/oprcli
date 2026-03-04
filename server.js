@@ -24,8 +24,6 @@ const DingTalkIntegration = require('./integrations/dingtalk')
 const MessageFormatter = require('./utils/message-formatter')
 const ClaudeConnector = require('./connectors/claude-connector')
 const IFlowConnector = require('./connectors/iflow-connector')
-const MemorySystem = require('./utils/memory-system')
-const { CommandTypes, Providers, EventTypes, MessageTypes, MemoryTags } = require('./utils/constants')
 
 class UnifiedServer {
   constructor() {
@@ -39,10 +37,6 @@ class UnifiedServer {
     this.connectors = new Map()  // 'claude' | 'iflow' -> connector instance
     this.conversationProviders = new Map()  // conversationId -> provider
     this.defaultProvider = config.provider
-
-    // 永久记忆系统
-    this.memorySystem = new MemorySystem()
-    this.logger.info('MEMORY', '✅ 永久记忆系统已初始化')
 
     this._setupMiddleware()
     this._setupRoutes()
@@ -315,32 +309,6 @@ class UnifiedServer {
       return { type: 'help' }
     }
 
-    // 记忆系统命令
-    if (trimmed === 'load') {
-      return { type: 'memory_load' }
-    }
-
-    if (trimmed.startsWith('search ')) {
-      const query = content.substring(7).trim()
-      return { type: 'memory_search', query }
-    }
-
-    if (trimmed.startsWith('搜索 ')) {
-      const query = content.substring(3).trim()
-      return { type: 'memory_search', query }
-    }
-
-    if (trimmed === 'stats' || trimmed === '统计') {
-      return { type: 'memory_stats' }
-    }
-
-    if (trimmed.startsWith('tag ')) {
-      const parts = content.substring(4).trim().split(/\s+/)
-      const id = parts[0]
-      const tags = parts.slice(1)
-      return { type: 'memory_tag', id, tags }
-    }
-
     return null
   }
 
@@ -357,18 +325,6 @@ class UnifiedServer {
 
       case 'help':
         return await this._handleHelp(sessionWebhook)
-
-      case 'memory_load':
-        return await this._handleMemoryLoad(sessionWebhook)
-
-      case 'memory_search':
-        return await this._handleMemorySearch(command.query, sessionWebhook)
-
-      case 'memory_stats':
-        return await this._handleMemoryStats(sessionWebhook)
-
-      case 'memory_tag':
-        return await this._handleMemoryTag(command.id, command.tags, sessionWebhook)
 
       default:
         this.logger.warning('COMMAND', `未知命令类型: ${command.type}`)
@@ -475,141 +431,10 @@ class UnifiedServer {
   • status / 状态  - 查看当前状态
   • help / 帮助  - 显示此帮助
 
-🧠 永久记忆：
-  • load  - 触发记忆总结
-  • search <关键词> / 搜索 <关键词>  - 搜索记忆
-  • stats / 统计  - 查看记忆统计
-  • tag <id> <标签...>  - 为记忆添加标签
-
 💡 可用模型：${availableProviders || '无'}`
 
     await this._sendReply(sessionWebhook, help.trim())
     return { status: 'SUCCESS' }
-  }
-
-  // ==================== 记忆系统命令处理 ====================
-
-  async _handleMemoryLoad(sessionWebhook) {
-    try {
-      this.logger.info('MEMORY', '开始处理 load 命令...')
-      await this._sendReply(sessionWebhook, '🔄 正在处理记忆总结，请稍候...')
-
-      const result = await this.memorySystem.handleLoad()
-
-      let response = `📊 记忆总结完成\n\n`
-      response += `📝 原始记忆：${result.raw_memories_count} 条\n`
-      response += `✨ 新总结：${result.new_summaries.length} 条\n`
-      response += `🔗 合并总结：${result.merged_summaries.length} 条\n\n`
-
-      response += `📈 当前总结层级：\n`
-      for (let level = 0; level < 5; level++) {
-        const summaries = result.current_state[level] || []
-        const threshold = this.memorySystem.summaryThresholds[level]
-        if (summaries.length > 0) {
-          response += `  Level ${level} (${threshold.name}): ${summaries.length} 条\n`
-        }
-      }
-
-      await this._sendReply(sessionWebhook, response)
-      this.logger.success('MEMORY', 'Load 命令处理完成')
-      return { status: 'SUCCESS' }
-    } catch (error) {
-      this.logger.error('MEMORY', 'Load 命令处理失败', { error: error.message })
-      await this._sendReply(sessionWebhook, `❌ 处理失败: ${error.message}`)
-      return { status: 'SUCCESS' }
-    }
-  }
-
-  async _handleMemorySearch(query, sessionWebhook) {
-    try {
-      if (!query) {
-        await this._sendReply(sessionWebhook, '❌ 请提供搜索关键词\n\n示例：search 钉钉')
-        return { status: 'SUCCESS' }
-      }
-
-      this.logger.info('MEMORY', `搜索记忆: ${query}`)
-      const results = this.memorySystem.searchMemories(query, { limit: 10 })
-
-      if (results.length === 0) {
-        await this._sendReply(sessionWebhook, `🔍 未找到匹配的记忆\n\n关键词: ${query}`)
-        return { status: 'SUCCESS' }
-      }
-
-      let response = `🔍 搜索结果 (${results.length} 条)\n\n`
-      results.slice(0, 5).forEach((memory, idx) => {
-        const date = new Date(memory.timestamp).toLocaleString('zh-CN')
-        const tags = memory.tags.length > 0 ? ` [${memory.tags.join(', ')}]` : ''
-        response += `${idx + 1}. ${date}${tags}\n`
-        response += `   ${memory.content.substring(0, 80)}${memory.content.length > 80 ? '...' : ''}\n\n`
-      })
-
-      if (results.length > 5) {
-        response += `...还有 ${results.length - 5} 条结果\n`
-      }
-
-      await this._sendReply(sessionWebhook, response)
-      return { status: 'SUCCESS' }
-    } catch (error) {
-      this.logger.error('MEMORY', '搜索失败', { error: error.message })
-      await this._sendReply(sessionWebhook, `❌ 搜索失败: ${error.message}`)
-      return { status: 'SUCCESS' }
-    }
-  }
-
-  async _handleMemoryStats(sessionWebhook) {
-    try {
-      const stats = this.memorySystem.getStats()
-
-      let response = `📊 记忆系统统计\n\n`
-      response += `📝 原始记忆：\n`
-      response += `  总计: ${stats.raw_memories.total} 条\n`
-      response += `  未总结: ${stats.raw_memories.unsummarized} 条\n`
-      response += `  已总结: ${stats.raw_memories.summarized} 条\n\n`
-
-      response += `📑 总结层级：\n`
-      for (let level = 0; level < 5; level++) {
-        const count = stats.summaries.by_level[level] || 0
-        const threshold = this.memorySystem.summaryThresholds[level]
-        response += `  Level ${level} (${threshold.name}): ${count} 条\n`
-      }
-
-      response += `\n💾 存储：\n`
-      response += `  原始记忆: ${(stats.storage.raw_size / 1024).toFixed(2)} KB\n`
-      response += `  总结: ${(stats.storage.summaries_size / 1024).toFixed(2)} KB\n`
-
-      await this._sendReply(sessionWebhook, response)
-      return { status: 'SUCCESS' }
-    } catch (error) {
-      this.logger.error('MEMORY', '获取统计失败', { error: error.message })
-      await this._sendReply(sessionWebhook, `❌ 获取统计失败: ${error.message}`)
-      return { status: 'SUCCESS' }
-    }
-  }
-
-  async _handleMemoryTag(memoryId, tags, sessionWebhook) {
-    try {
-      if (!memoryId || !tags || tags.length === 0) {
-        await this._sendReply(sessionWebhook, '❌ 请提供记忆ID和标签\n\n示例：tag abc123 重要 项目')
-        return { status: 'SUCCESS' }
-      }
-
-      const memory = this.memorySystem.getMemory(memoryId)
-      if (!memory) {
-        await this._sendReply(sessionWebhook, `❌ 未找到记忆: ${memoryId}`)
-        return { status: 'SUCCESS' }
-      }
-
-      // 合并标签（不重复）
-      const newTags = [...new Set([...memory.tags, ...tags])]
-      this.memorySystem.updateMemory(memoryId, null, newTags)
-
-      await this._sendReply(sessionWebhook, `✅ 标签已添加\n\n记忆ID: ${memoryId}\n新标签: ${newTags.join(', ')}`)
-      return { status: 'SUCCESS' }
-    } catch (error) {
-      this.logger.error('MEMORY', '添加标签失败', { error: error.message })
-      await this._sendReply(sessionWebhook, `❌ 添加标签失败: ${error.message}`)
-      return { status: 'SUCCESS' }
-    }
   }
 
   async _sendReply(sessionWebhook, text) {
@@ -807,26 +632,13 @@ class UnifiedServer {
       let assistantHash = null     // 内容哈希
       let sessionEndSent = false   // session_end 是否已发送
 
-      // 🧠 记忆系统：记录对话
-      let userMemoryId = null
-      let aiMemoryId = null
-      let conversationHistory = []  // 对话历史
-
-      try {
-        // 记录用户消息到记忆系统
-        userMemoryId = this.memorySystem.createMemory(messageContent, ['user', 'message']).id
-        this.logger.debug('MEMORY', `✅ 用户消息已记录: ${userMemoryId}`)
-      } catch (error) {
-        this.logger.warning('MEMORY', `记录用户消息失败: ${error.message}`)
-      }
-
       this.logger.info('DINGTALK', `开始调用 ${isResume ? 'continueSession' : 'startSession'}...`)
 
       await new Promise((resolve, reject) => {
         const options = {
           onEvent: async (event) => {
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-            const context = { index: ++messageCount, elapsed: elapsed, sentIndex: sentMessageCount + 1 }
+            const context = { index: ++messageCount, elapsed, sentIndex: sentMessageCount + 1 }
 
             // 🔍 详细事件日志
             this.logger.info('EVENT', `#${messageCount} [${event.type}]`)
@@ -894,29 +706,15 @@ class UnifiedServer {
               })
             }
 
-            // 🧠 记忆系统：收集AI回复内容
-            if (event.type === 'assistant') {
-              const text = event.message?.content
-                ?.filter(c => c.type === 'text')
-                ?.map(c => c.text)
-                ?.join('') || ''
-              if (text) {
-                conversationHistory.push({ role: 'assistant', content: text, timestamp: new Date().toISOString() })
-              }
-            }
-            else if (event.type === 'result' && event.result) {
-              conversationHistory.push({ role: 'result', content: event.result, timestamp: new Date().toISOString() })
-            }
-
             // 流式发送
             if (config.streaming.enabled) {
               const formatted = this.messageFormatter.formatEvent(event, context)
               if (formatted) {
                 sentMessageCount++
-                this.logger.info('DINGTALK', '发送消息 #' + sentMessageCount + '/' + messageCount + ' (' + formatted.msgtype + ')')
+                this.logger.info('DINGTALK', `✅ 发送消息 #${sentMessageCount}/${messageCount} (${formatted.msgtype})`)
                 try {
                   await this.dingtalk.send(sessionWebhook, formatted)
-                  this.logger.debug('DINGTALK', '发送成功')
+                  this.logger.debug('DINGTALK', `发送成功`)
                 } catch (error) {
                   this.logger.error('DINGTALK', '发送失败', { error: error.message })
                 }
@@ -928,19 +726,6 @@ class UnifiedServer {
           onComplete: async (exitCode) => {
             const totalTime = ((Date.now() - startTime) / 1000).toFixed(1)
             this.logger.success('SESSION', `✅ 完成，退出码: ${exitCode}, 耗时: ${totalTime}s, 事件数: ${messageCount}, 发送数: ${sentMessageCount}`)
-
-            // 🧠 记忆系统：保存AI回复
-            try {
-              if (conversationHistory.length > 0) {
-                const aiResponse = conversationHistory
-                  .map(item => `[${item.role}]: ${item.content.substring(0, 500)}`)
-                  .join('\n\n')
-                aiMemoryId = this.memorySystem.createMemory(aiResponse, ['assistant', 'response']).id
-                this.logger.debug('MEMORY', `✅ AI回复已记录: ${aiMemoryId}`)
-              }
-            } catch (error) {
-              this.logger.warning('MEMORY', `记录AI回复失败: ${error.message}`)
-            }
 
             // 🎯 发送完成消息到钉钉（如果配置启用且还未发送）
             if (config.streaming.showCompletionSummary && !sessionEndSent) {
