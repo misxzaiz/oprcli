@@ -35,7 +35,6 @@ class UnifiedServer {
 
     // 多模型支持
     this.connectors = new Map()  // 'claude' | 'iflow' -> connector instance
-    this.conversationProviders = new Map()  // conversationId -> provider
     this.defaultProvider = config.provider
 
     this._setupMiddleware()
@@ -100,15 +99,10 @@ class UnifiedServer {
     res.json({
       defaultProvider: this.defaultProvider,
       connectors: connectorsStatus,
-      conversationProviders: Array.from(this.conversationProviders.entries()),
       dingtalk: {
         enabled: config.dingtalk.enabled,
         connected: this.dingtalk.client?.connected || false,
-        activeSessions: Array.from(this.dingtalk.sessionMap.entries()).map(([convId, sessId]) => ({
-          conversationId: convId,
-          sessionId: sessId,
-          provider: this.conversationProviders.get(convId) || this.defaultProvider
-        }))
+        activeSessions: this.dingtalk.getActiveSessions()
       }
     })
   }
@@ -178,8 +172,7 @@ class UnifiedServer {
     }
 
     // 清空所有会话映射
-    this.dingtalk.sessionMap.clear()
-    this.conversationProviders.clear()
+    this.dingtalk.clearSessions()
 
     res.json({
       success: true,
@@ -199,8 +192,7 @@ class UnifiedServer {
     }
 
     // 清空所有会话映射
-    this.dingtalk.sessionMap.clear()
-    this.conversationProviders.clear()
+    this.dingtalk.clearSessions()
 
     res.json({ success: true })
   }
@@ -209,10 +201,7 @@ class UnifiedServer {
     res.json({
       enabled: config.dingtalk.enabled,
       connected: this.dingtalk.client?.connected || false,
-      activeSessions: Array.from(this.dingtalk.sessionMap.entries()).map(([convId, sid]) => ({
-        conversationId: convId,
-        sessionId: sid
-      }))
+      activeSessions: this.dingtalk.getActiveSessions()
     })
   }
 
@@ -231,46 +220,34 @@ class UnifiedServer {
     const availableProviders = []
     const errors = []
 
-    // 尝试初始化 Claude
-    if (config.claude.cmdPath && config.claude.workDir) {
-      try {
-        this.logger.info('CONNECTOR', '正在初始化 Claude...')
-        const claudeOptions = config.getConnectorOptions('claude')
-        const claudeConnector = new ClaudeConnector(claudeOptions)
-        const result = await claudeConnector.connect()
+    // 并行初始化任务列表
+    const initTasks = []
 
-        if (result.success) {
-          this.connectors.set('claude', claudeConnector)
-          availableProviders.push('claude')
-          this.logger.success('CONNECTOR', `Claude 初始化成功 (版本: ${result.version || 'unknown'})`)
-        } else {
-          errors.push(`Claude: ${result.error}`)
-        }
-      } catch (error) {
-        this.logger.warning('CONNECTOR', 'Claude 初始化失败', { error: error.message })
-        errors.push(`Claude: ${error.message}`)
-      }
+    // 准备 Claude 初始化任务
+    if (config.claude.cmdPath && config.claude.workDir) {
+      initTasks.push(this._initClaude())
     }
 
-    // 尝试初始化 IFlow
+    // 准备 IFlow 初始化任务
     if (config.iflow.workDir) {
-      try {
-        this.logger.info('CONNECTOR', '正在初始化 IFlow...')
-        const iflowOptions = config.getConnectorOptions('iflow')
-        const iflowConnector = new IFlowConnector(iflowOptions)
-        const result = await iflowConnector.connect()
+      initTasks.push(this._initIFlow())
+    }
 
+    // 并行执行所有初始化任务
+    if (initTasks.length > 0) {
+      this.logger.info('CONNECTOR', `并行初始化 ${initTasks.length} 个模型...`)
+      const results = await Promise.all(initTasks)
+
+      // 收集结果
+      results.forEach(result => {
         if (result.success) {
-          this.connectors.set('iflow', iflowConnector)
-          availableProviders.push('iflow')
-          this.logger.success('CONNECTOR', `IFlow 初始化成功 (版本: ${result.version || 'unknown'})`)
+          this.connectors.set(result.provider, result.connector)
+          availableProviders.push(result.provider)
+          this.logger.success('CONNECTOR', `${result.provider.toUpperCase()} 初始化成功 (版本: ${result.version || 'unknown'})`)
         } else {
-          errors.push(`IFlow: ${result.error}`)
+          errors.push(result.error)
         }
-      } catch (error) {
-        this.logger.warning('CONNECTOR', 'IFlow 初始化失败', { error: error.message })
-        errors.push(`IFlow: ${error.message}`)
-      }
+      })
     }
 
     // 如果有错误，记录警告
@@ -279,6 +256,64 @@ class UnifiedServer {
     }
 
     return availableProviders
+  }
+
+  async _initClaude() {
+    try {
+      this.logger.info('CONNECTOR', '正在初始化 Claude...')
+      const claudeOptions = config.getConnectorOptions('claude')
+      const claudeConnector = new ClaudeConnector(claudeOptions)
+      const result = await claudeConnector.connect()
+
+      if (result.success) {
+        return {
+          success: true,
+          provider: 'claude',
+          connector: claudeConnector,
+          version: result.version
+        }
+      } else {
+        return {
+          success: false,
+          error: `Claude: ${result.error}`
+        }
+      }
+    } catch (error) {
+      this.logger.warning('CONNECTOR', 'Claude 初始化失败', { error: error.message })
+      return {
+        success: false,
+        error: `Claude: ${error.message}`
+      }
+    }
+  }
+
+  async _initIFlow() {
+    try {
+      this.logger.info('CONNECTOR', '正在初始化 IFlow...')
+      const iflowOptions = config.getConnectorOptions('iflow')
+      const iflowConnector = new IFlowConnector(iflowOptions)
+      const result = await iflowConnector.connect()
+
+      if (result.success) {
+        return {
+          success: true,
+          provider: 'iflow',
+          connector: iflowConnector,
+          version: result.version
+        }
+      } else {
+        return {
+          success: false,
+          error: `IFlow: ${result.error}`
+        }
+      }
+    } catch (error) {
+      this.logger.warning('CONNECTOR', 'IFlow 初始化失败', { error: error.message })
+      return {
+        success: false,
+        error: `IFlow: ${error.message}`
+      }
+    }
   }
 
   // ==================== 命令处理 ====================
@@ -345,19 +380,17 @@ class UnifiedServer {
     }
 
     // 中断当前任务（如果有）
-    const currentSessionId = this.dingtalk.getSessionId(conversationId)
-    if (currentSessionId) {
-      const currentProvider = this.conversationProviders.get(conversationId) || this.defaultProvider
-      const currentConnector = this.connectors.get(currentProvider)
+    const currentSession = this.dingtalk.getSession(conversationId)
+    if (currentSession?.sessionId) {
+      const currentConnector = this.connectors.get(currentSession.provider)
       if (currentConnector) {
-        currentConnector.interruptSession(currentSessionId)
-        this.logger.info('PROVIDER', `中断旧任务: ${currentSessionId}`)
+        currentConnector.interruptSession(currentSession.sessionId)
+        this.logger.info('PROVIDER', `中断旧任务: ${currentSession.sessionId}`)
       }
     }
 
-    // 切换模型
-    this.conversationProviders.set(conversationId, provider)
-    this.dingtalk.sessionMap.delete(conversationId)  // 清空旧 sessionId
+    // 切换模型（清空旧 sessionId，保留 provider）
+    this.dingtalk.setSession(conversationId, null, provider)
 
     const availableProviders = Array.from(this.connectors.keys()).map(p => p.toUpperCase()).join(', ')
     await this._sendReply(sessionWebhook,
@@ -370,19 +403,18 @@ class UnifiedServer {
   }
 
   async _handleInterrupt(conversationId, sessionWebhook) {
-    const sessionId = this.dingtalk.getSessionId(conversationId)
+    const session = this.dingtalk.getSession(conversationId)
 
-    if (!sessionId) {
+    if (!session?.sessionId) {
       await this._sendReply(sessionWebhook, '⚠️ 没有运行中的任务')
       return { status: 'SUCCESS' }
     }
 
-    const provider = this.conversationProviders.get(conversationId) || this.defaultProvider
-    const connector = this.connectors.get(provider)
+    const connector = this.connectors.get(session.provider)
 
     if (connector) {
-      connector.interruptSession(sessionId)
-      this.dingtalk.sessionMap.delete(conversationId)
+      connector.interruptSession(session.sessionId)
+      this.dingtalk.deleteSession(conversationId)
       await this._sendReply(sessionWebhook, '✅ 任务已中断')
       this.logger.info('PROVIDER', `会话 ${conversationId} 任务已中断`)
     } else {
@@ -393,8 +425,9 @@ class UnifiedServer {
   }
 
   async _handleStatus(conversationId, sessionWebhook) {
-    const provider = this.conversationProviders.get(conversationId) || this.defaultProvider
-    const sessionId = this.dingtalk.getSessionId(conversationId)
+    const session = this.dingtalk.getSession(conversationId)
+    const provider = session?.provider || this.defaultProvider
+    const sessionId = session?.sessionId || null
     const availableProviders = Array.from(this.connectors.entries())
       .filter(([_, conn]) => conn.connected)
       .map(([p, _]) => p.toUpperCase())
@@ -577,7 +610,9 @@ class UnifiedServer {
       }
 
       // 🤖 获取当前会话使用的 provider
-      const provider = this.conversationProviders.get(conversationId) || this.defaultProvider
+      const session = this.dingtalk.getSession(conversationId)
+      const provider = session?.provider || this.defaultProvider
+      const sessionId = session?.sessionId || null
       const connector = this.connectors.get(provider)
 
       this.logger.debug('DINGTALK', '使用模型', { provider })
@@ -597,16 +632,15 @@ class UnifiedServer {
       this.logger.success('SESSION', `ConversationID: ${conversationId}`)
       this.logger.success('SESSION', `Provider: ${provider}`)
 
-      const sessionMapSize = this.dingtalk.sessionMap.size
+      const sessionMapSize = this.dingtalk.conversations.size
       this.logger.success('SESSION', `SessionMap 大小: ${sessionMapSize}`)
 
       if (sessionMapSize > 0) {
         this.logger.success('SESSION', 'SessionMap 内容:', {
-          entries: Array.from(this.dingtalk.sessionMap.entries())
+          entries: Array.from(this.dingtalk.conversations.entries())
         })
       }
 
-      let sessionId = this.dingtalk.getSessionId(conversationId)
       const isResume = !!sessionId
 
       this.logger.success('SESSION', `检索到的 SessionID: ${sessionId || 'null'}`)
@@ -615,11 +649,11 @@ class UnifiedServer {
 
       // ⭐ 设置 sessionId 更新回调（用于 Claude 和 IFlow）
       connector.onSessionIdUpdate((realSessionId) => {
-        this.dingtalk.setSessionId(conversationId, realSessionId)
+        this.dingtalk.setSession(conversationId, realSessionId, provider)
         this.logger.success('SESSION', '✅ 通过回调保存 SessionID', {
           conversationId,
           sessionId: realSessionId,
-          sessionMapSize: this.dingtalk.sessionMap.size
+          sessionMapSize: this.dingtalk.conversations.size
         })
       })
 
@@ -698,11 +732,11 @@ class UnifiedServer {
             // 捕获 sessionId
             if (!isResume && event.type === 'system' && event.extra?.session_id) {
               sessionId = event.extra.session_id
-              this.dingtalk.setSessionId(conversationId, sessionId)
+              this.dingtalk.setSession(conversationId, sessionId, provider)
               this.logger.success('SESSION', '✅ 保存 SessionID 到 SessionMap', {
                 conversationId,
                 sessionId,
-                sessionMapSize: this.dingtalk.sessionMap.size
+                sessionMapSize: this.dingtalk.conversations.size
               })
             }
 

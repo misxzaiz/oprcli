@@ -11,7 +11,11 @@ class DingTalkIntegration {
     this.logger = logger
     this.rateLimiter = rateLimiter
     this.client = null
-    this.sessionMap = new Map()
+
+    // 统一的会话状态管理（替代原来的 sessionMap）
+    // conversationId -> { sessionId, provider, startTime }
+    this.conversations = new Map()
+
     // 使用 Map + 时间戳来正确删除最旧的消息（Set 是无序的）
     this.processedMessages = new Map() // messageId -> timestamp
     this.maxProcessedMessages = 1000
@@ -154,6 +158,89 @@ class DingTalkIntegration {
         this.processedMessages.delete(oldestMessageId)
       }
     }
+  }
+
+  // ==================== 会话状态管理 ====================
+
+  /**
+   * 开始或更新会话
+   * @param {string} conversationId - 会话 ID
+   * @param {string} sessionId - AI 会话 ID
+   * @param {string} provider - 提供商（claude/iflow）
+   */
+  setSession(conversationId, sessionId, provider) {
+    this.conversations.set(conversationId, {
+      sessionId,
+      provider,
+      startTime: Date.now()
+    })
+  }
+
+  /**
+   * 获取会话信息
+   * @param {string} conversationId - 会话 ID
+   * @returns {Object|null} { sessionId, provider, startTime }
+   */
+  getSession(conversationId) {
+    return this.conversations.get(conversationId) || null
+  }
+
+  /**
+   * 获取会话 ID
+   * @param {string} conversationId - 会话 ID
+   * @returns {string|null}
+   */
+  getSessionId(conversationId) {
+    const session = this.conversations.get(conversationId)
+    return session ? session.sessionId : null
+  }
+
+  /**
+   * 获取提供商
+   * @param {string} conversationId - 会话 ID
+   * @returns {string|null}
+   */
+  getProvider(conversationId) {
+    const session = this.conversations.get(conversationId)
+    return session ? session.provider : null
+  }
+
+  /**
+   * 删除会话
+   * @param {string} conversationId - 会话 ID
+   * @returns {boolean}
+   */
+  deleteSession(conversationId) {
+    return this.conversations.delete(conversationId)
+  }
+
+  /**
+   * 检查是否有活动会话
+   * @param {string} conversationId - 会话 ID
+   * @returns {boolean}
+   */
+  hasSession(conversationId) {
+    return this.conversations.has(conversationId)
+  }
+
+  /**
+   * 获取所有活动会话
+   * @returns {Array}
+   */
+  getActiveSessions() {
+    return Array.from(this.conversations.entries()).map(([convId, session]) => ({
+      conversationId: convId,
+      sessionId: session.sessionId,
+      provider: session.provider,
+      startTime: session.startTime
+    }))
+  }
+
+  /**
+   * 清除所有会话
+   */
+  clearSessions() {
+    this.conversations.clear()
   }
 
   async close() {
