@@ -24,6 +24,7 @@ const MessageFormatter = require('./utils/message-formatter')
 const ClaudeConnector = require('./connectors/claude-connector')
 const IFlowConnector = require('./connectors/iflow-connector')
 const { simpleHash } = require('./utils/string-helper')
+const SchedulerModule = require('./scheduler')
 
 class UnifiedServer {
   // 命令配置表
@@ -36,7 +37,15 @@ class UnifiedServer {
     'status': { type: 'status' },
     '状态': { type: 'status' },
     'help': { type: 'help' },
-    '帮助': { type: 'help' }
+    '帮助': { type: 'help' },
+
+    // 定时任务命令
+    'tasks': { type: 'tasks_list' },
+    'tasks status': { type: 'tasks_status' },
+    'tasks reload': { type: 'tasks_reload' },
+    'tasks run': { type: 'tasks_run', hasArg: true },
+    'tasks enable': { type: 'tasks_enable', hasArg: true },
+    'tasks disable': { type: 'tasks_disable', hasArg: true }
   }
 
   constructor() {
@@ -49,6 +58,9 @@ class UnifiedServer {
     // 多模型支持
     this.connectors = new Map()  // 'claude' | 'iflow' -> connector instance
     this.defaultProvider = config.provider
+
+    // 定时任务模块
+    this.scheduler = null
 
     this._setupMiddleware()
     this._setupRoutes()
@@ -311,12 +323,33 @@ class UnifiedServer {
 
   /**
    * 解析用户命令
+   * 支持多词命令，使用最长匹配原则
    * @param {string} content - 用户输入内容
-   * @returns {Object|null} 命令对象 { type, provider? }
+   * @returns {Object|null} 命令对象 { type, provider?, arg? }
    */
   _parseCommand(content) {
-    const trimmed = content.trim().toLowerCase()
-    return UnifiedServer.COMMANDS[trimmed] || null
+    const trimmed = content.trim()
+    const parts = trimmed.split(/\s+/)
+
+    // 🔥 从最长到最短尝试匹配（最长匹配原则）
+    // 例如：'tasks run 1' -> 先尝试 'tasks run'，再尝试 'tasks'
+    for (let i = Math.min(parts.length, 3); i >= 1; i--) {
+      const candidate = parts.slice(0, i).join(' ').toLowerCase()
+      const cmdConfig = UnifiedServer.COMMANDS[candidate]
+
+      if (cmdConfig) {
+        // 提取参数（剩余部分）
+        const arg = parts.length > i ? parts.slice(i).join(' ') : null
+
+        return {
+          ...cmdConfig,
+          original: candidate,
+          arg
+        }
+      }
+    }
+
+    return null
   }
 
   async _handleCommand(command, conversationId, sessionWebhook) {
@@ -332,6 +365,25 @@ class UnifiedServer {
 
       case 'help':
         return await this._handleHelp(sessionWebhook)
+
+      // 定时任务命令
+      case 'tasks_list':
+        return await this._handleTasksList(conversationId, sessionWebhook)
+
+      case 'tasks_status':
+        return await this._handleTasksStatus(conversationId, sessionWebhook)
+
+      case 'tasks_reload':
+        return await this._handleTasksReload(conversationId, sessionWebhook)
+
+      case 'tasks_run':
+        return await this._handleTasksRun(command.arg, conversationId, sessionWebhook)
+
+      case 'tasks_enable':
+        return await this._handleTasksEnable(command.arg, conversationId, sessionWebhook)
+
+      case 'tasks_disable':
+        return await this._handleTasksDisable(command.arg, conversationId, sessionWebhook)
 
       default:
         this.logger.warning('COMMAND', `未知命令类型: ${command.type}`)
@@ -423,6 +475,8 @@ class UnifiedServer {
       .map(([p, _]) => p.toUpperCase())
       .join(', ')
 
+    const schedulerEnabled = this.scheduler?.enabled || false
+
     const help = `📖 命令帮助
 
 🤖 模型切换：
@@ -431,6 +485,14 @@ class UnifiedServer {
 
 🛑 任务控制：
   • end / 停止 / stop  - 中断当前任务
+
+📅 定时任务${schedulerEnabled ? '' : ' (未启用)'}：
+  • tasks  - 查看任务列表
+  • tasks status  - 查看任务状态
+  • tasks reload  - 重载任务配置
+  • tasks run <id>  - 手动执行任务
+  • tasks enable <id>  - 启用任务
+  • tasks disable <id>  - 禁用任务
 
 ℹ️ 信息查询：
   • status / 状态  - 查看当前状态
@@ -454,6 +516,153 @@ class UnifiedServer {
     } catch (error) {
       this.logger.error('DINGTALK', '回复发送失败', { error: error.message })
     }
+  }
+
+  // ==================== 定时任务命令处理 ====================
+
+  async _handleTasksList(conversationId, sessionWebhook) {
+    if (!this.scheduler || !this.scheduler.enabled) {
+      await this._sendReply(sessionWebhook, '⚠️ 定时任务功能未启用')
+      return { status: 'SUCCESS' }
+    }
+
+    const status = this.scheduler.getStatus()
+
+    if (status.tasks.length === 0) {
+      await this._sendReply(sessionWebhook, '📋 暂无定时任务')
+      return { status: 'SUCCESS' }
+    }
+
+    const lines = ['📋 定时任务列表\n']
+    status.tasks.forEach(task => {
+      const enabled = task.enabled ? '✅' : '❌'
+      const scheduled = task.scheduled ? '运行中' : '已停止'
+      lines.push(`\n${enabled} ${task.name}`)
+      lines.push(`   ID: ${task.id}`)
+      lines.push(`   调度: ${task.schedule}`)
+      lines.push(`   模型: ${task.provider}`)
+      lines.push(`   状态: ${scheduled}`)
+    })
+
+    lines.push('\n💡 命令：')
+    lines.push('• tasks status - 查看详细状态')
+    lines.push('• tasks run <id> - 手动执行任务')
+    lines.push('• tasks enable <id> - 启用任务')
+    lines.push('• tasks disable <id> - 禁用任务')
+
+    await this._sendReply(sessionWebhook, lines.join('\n'))
+    return { status: 'SUCCESS' }
+  }
+
+  async _handleTasksStatus(conversationId, sessionWebhook) {
+    if (!this.scheduler) {
+      await this._sendReply(sessionWebhook, '⚠️ 定时任务管理器未初始化')
+      return { status: 'SUCCESS' }
+    }
+
+    const status = this.scheduler.getStatus()
+
+    const lines = [
+      '📊 定时任务状态',
+      `\n功能状态: ${status.enabled ? '✅ 已启用' : '❌ 已禁用'}`,
+      `配置文件: ${status.configPath}`,
+      `总任务数: ${status.totalTasks}`,
+      `启用任务: ${status.enabledTasks}`,
+      `运行中任务: ${status.scheduledJobs}`
+    ]
+
+    await this._sendReply(sessionWebhook, lines.join('\n'))
+    return { status: 'SUCCESS' }
+  }
+
+  async _handleTasksReload(conversationId, sessionWebhook) {
+    if (!this.scheduler) {
+      await this._sendReply(sessionWebhook, '⚠️ 定时任务管理器未初始化')
+      return { status: 'SUCCESS' }
+    }
+
+    try {
+      await this.scheduler.taskManager.reload()
+      await this._sendReply(sessionWebhook, '✅ 任务配置已重载')
+    } catch (error) {
+      await this._sendReply(sessionWebhook, `❌ 重载失败: ${error.message}`)
+    }
+
+    return { status: 'SUCCESS' }
+  }
+
+  async _handleTasksRun(taskId, conversationId, sessionWebhook) {
+    if (!this.scheduler || !this.scheduler.enabled) {
+      await this._sendReply(sessionWebhook, '⚠️ 定时任务功能未启用')
+      return { status: 'SUCCESS' }
+    }
+
+    if (!taskId) {
+      await this._sendReply(sessionWebhook, '❌ 请指定任务 ID：tasks run <id>')
+      return { status: 'SUCCESS' }
+    }
+
+    try {
+      const result = await this.scheduler.taskManager.runTask(taskId)
+
+      if (result.success) {
+        await this._sendReply(sessionWebhook,
+          `✅ 任务执行完成\n耗时: ${result.elapsed}s`
+        )
+      } else {
+        await this._sendReply(sessionWebhook,
+          `❌ 任务执行失败: ${result.error}`
+        )
+      }
+    } catch (error) {
+      await this._sendReply(sessionWebhook,
+        `❌ 执行失败: ${error.message}`
+      )
+    }
+
+    return { status: 'SUCCESS' }
+  }
+
+  async _handleTasksEnable(taskId, conversationId, sessionWebhook) {
+    if (!this.scheduler || !this.scheduler.enabled) {
+      await this._sendReply(sessionWebhook, '⚠️ 定时任务功能未启用')
+      return { status: 'SUCCESS' }
+    }
+
+    if (!taskId) {
+      await this._sendReply(sessionWebhook, '❌ 请指定任务 ID：tasks enable <id>')
+      return { status: 'SUCCESS' }
+    }
+
+    try {
+      this.scheduler.taskManager.enableTask(taskId)
+      await this._sendReply(sessionWebhook, `✅ 任务已启用: ${taskId}`)
+    } catch (error) {
+      await this._sendReply(sessionWebhook, `❌ 启用失败: ${error.message}`)
+    }
+
+    return { status: 'SUCCESS' }
+  }
+
+  async _handleTasksDisable(taskId, conversationId, sessionWebhook) {
+    if (!this.scheduler || !this.scheduler.enabled) {
+      await this._sendReply(sessionWebhook, '⚠️ 定时任务功能未启用')
+      return { status: 'SUCCESS' }
+    }
+
+    if (!taskId) {
+      await this._sendReply(sessionWebhook, '❌ 请指定任务 ID：tasks disable <id>')
+      return { status: 'SUCCESS' }
+    }
+
+    try {
+      this.scheduler.taskManager.disableTask(taskId)
+      await this._sendReply(sessionWebhook, `✅ 任务已禁用: ${taskId}`)
+    } catch (error) {
+      await this._sendReply(sessionWebhook, `❌ 禁用失败: ${error.message}`)
+    }
+
+    return { status: 'SUCCESS' }
   }
 
   /**
@@ -496,6 +705,10 @@ class UnifiedServer {
     if (dingtalkEnabled) {
       this.logger.success('DINGTALK', '钉钉集成已启动')
     }
+
+    // 启动定时任务模块
+    this.scheduler = new SchedulerModule(this, this.logger)
+    await this.scheduler.start()
 
     // 启动 HTTP 服务器（仅在端口配置时）
     if (config.port) {
@@ -789,6 +1002,11 @@ class UnifiedServer {
 
   async shutdown() {
     this.logger.info('SERVER', '正在关闭...')
+
+    // 停止定时任务
+    if (this.scheduler) {
+      this.scheduler.stop()
+    }
 
     if (this.connector) {
       const sessions = this.connector.getActiveSessions()
