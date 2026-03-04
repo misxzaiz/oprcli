@@ -24,8 +24,22 @@ const DingTalkIntegration = require('./integrations/dingtalk')
 const MessageFormatter = require('./utils/message-formatter')
 const ClaudeConnector = require('./connectors/claude-connector')
 const IFlowConnector = require('./connectors/iflow-connector')
+const { simpleHash } = require('./utils/string-helper')
 
 class UnifiedServer {
+  // 命令配置表
+  static COMMANDS = {
+    'claude': { type: 'switch', provider: 'claude' },
+    'iflow': { type: 'switch', provider: 'iflow' },
+    'end': { type: 'interrupt' },
+    '停止': { type: 'interrupt' },
+    'stop': { type: 'interrupt' },
+    'status': { type: 'status' },
+    '状态': { type: 'status' },
+    'help': { type: 'help' },
+    '帮助': { type: 'help' }
+  }
+
   constructor() {
     this.app = express()
     this.logger = new Logger(config.logging)
@@ -225,12 +239,12 @@ class UnifiedServer {
 
     // 准备 Claude 初始化任务
     if (config.claude.cmdPath && config.claude.workDir) {
-      initTasks.push(this._initClaude())
+      initTasks.push(this._initConnector('claude', ClaudeConnector))
     }
 
     // 准备 IFlow 初始化任务
     if (config.iflow.workDir) {
-      initTasks.push(this._initIFlow())
+      initTasks.push(this._initConnector('iflow', IFlowConnector))
     }
 
     // 并行执行所有初始化任务
@@ -258,93 +272,51 @@ class UnifiedServer {
     return availableProviders
   }
 
-  async _initClaude() {
+  /**
+   * 通用连接器初始化方法
+   * @param {string} provider - 提供商名称 ('claude' | 'iflow')
+   * @param {class} ConnectorClass - 连接器类
+   * @returns {Promise<Object>} { success, provider, connector?, version?, error? }
+   */
+  async _initConnector(provider, ConnectorClass) {
+    const providerName = provider.toUpperCase()
     try {
-      this.logger.info('CONNECTOR', '正在初始化 Claude...')
-      const claudeOptions = config.getConnectorOptions('claude')
-      const claudeConnector = new ClaudeConnector(claudeOptions)
-      const result = await claudeConnector.connect()
+      this.logger.info('CONNECTOR', `正在初始化 ${providerName}...`)
+      const options = config.getConnectorOptions(provider)
+      const connector = new ConnectorClass(options)
+      const result = await connector.connect()
 
       if (result.success) {
         return {
           success: true,
-          provider: 'claude',
-          connector: claudeConnector,
+          provider,
+          connector,
           version: result.version
         }
-      } else {
-        return {
-          success: false,
-          error: `Claude: ${result.error}`
-        }
       }
-    } catch (error) {
-      this.logger.warning('CONNECTOR', 'Claude 初始化失败', { error: error.message })
       return {
         success: false,
-        error: `Claude: ${error.message}`
-      }
-    }
-  }
-
-  async _initIFlow() {
-    try {
-      this.logger.info('CONNECTOR', '正在初始化 IFlow...')
-      const iflowOptions = config.getConnectorOptions('iflow')
-      const iflowConnector = new IFlowConnector(iflowOptions)
-      const result = await iflowConnector.connect()
-
-      if (result.success) {
-        return {
-          success: true,
-          provider: 'iflow',
-          connector: iflowConnector,
-          version: result.version
-        }
-      } else {
-        return {
-          success: false,
-          error: `IFlow: ${result.error}`
-        }
+        error: `${providerName}: ${result.error}`
       }
     } catch (error) {
-      this.logger.warning('CONNECTOR', 'IFlow 初始化失败', { error: error.message })
+      this.logger.warning('CONNECTOR', `${providerName} 初始化失败`, { error: error.message })
       return {
         success: false,
-        error: `IFlow: ${error.message}`
+        error: `${providerName}: ${error.message}`
       }
     }
   }
 
   // ==================== 命令处理 ====================
 
+  /**
+   * 解析用户命令
+   * @param {string} content - 用户输入内容
+   * @returns {Object|null} 命令对象 { type, provider? }
+   */
   _parseCommand(content) {
     const trimmed = content.trim().toLowerCase()
-
-    // 模型切换命令
-    if (trimmed === 'claude') {
-      return { type: 'switch', provider: 'claude' }
-    }
-    if (trimmed === 'iflow') {
-      return { type: 'switch', provider: 'iflow' }
-    }
-
-    // 中断命令
-    if (trimmed === 'end' || trimmed === '停止' || trimmed === 'stop') {
-      return { type: 'interrupt' }
-    }
-
-    // 状态查询
-    if (trimmed === 'status' || trimmed === '状态') {
-      return { type: 'status' }
-    }
-
-    // 帮助命令
-    if (trimmed === 'help' || trimmed === '帮助') {
-      return { type: 'help' }
-    }
-
-    return null
+    return UnifiedServer.COMMANDS[trimmed] || null
   }
 
   async _handleCommand(command, conversationId, sessionWebhook) {
@@ -486,18 +458,12 @@ class UnifiedServer {
 
   /**
    * 计算内容哈希，用于检测重复
-   * 使用简单的哈希算法，无需加密级别
+   * 使用统一的哈希工具函数
+   * @param {string} content - 要哈希的内容
+   * @returns {string|null} 哈希值
    */
   _hashContent(content) {
-    if (!content) return null
-
-    let hash = 0
-    for (let i = 0; i < content.length; i++) {
-      const char = content.charCodeAt(i)
-      hash = ((hash << 5) - hash) + char
-      hash = hash & hash // Convert to 32bit integer
-    }
-    return hash.toString(16)
+    return simpleHash(content)
   }
 
   async start() {

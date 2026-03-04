@@ -126,14 +126,6 @@ class DingTalkIntegration {
     }
   }
 
-  getSessionId(conversationId) {
-    return this.sessionMap.get(conversationId)
-  }
-
-  setSessionId(conversationId, sessionId) {
-    this.sessionMap.set(conversationId, sessionId)
-  }
-
   isProcessed(messageId) {
     return this.processedMessages.has(messageId)
   }
