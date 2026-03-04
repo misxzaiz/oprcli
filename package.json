@@ -5,8 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js",
-    "diagnose": "node diagnose-dingtalk.js"
+    "dev": "node server.js"
   },
   "keywords": [
     "claude",
