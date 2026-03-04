@@ -71,6 +71,22 @@ class Config {
       global: process.env.SYSTEM_PROMPT,
       promptsDir: process.env.SYSTEM_PROMPTS_DIR || path.join(__dirname, '../system-prompts')
     }
+
+    // 通知配置
+    this.notification = {
+      enabled: process.env.NOTIFICATION_ENABLED === 'true',
+      type: process.env.NOTIFICATION_TYPE || 'dingtalk',
+
+      dingtalk: {
+        webhook: process.env.NOTIFICATION_DINGTALK_WEBHOOK,
+        secret: process.env.NOTIFICATION_DINGTALK_SECRET
+      },
+
+      defaultType: process.env.NOTIFICATION_DEFAULT_TYPE || 'text',
+
+      logEnabled: process.env.NOTIFICATION_LOG_ENABLED === 'true',
+      logFile: process.env.NOTIFICATION_LOG_FILE || 'logs/notifications.log'
+    }
   }
 
   _parseList(str) {
