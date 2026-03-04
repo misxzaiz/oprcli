@@ -17,6 +17,10 @@
 3. **[通知功能](./notification.md)** - 钉钉消息通知
    - 发送通知、签名验证、最佳实践
 
+4. **[插件系统](./plugin-system.md)** - 可扩展插件架构 ⭐
+   - 插件管理、配置管理、上下文记忆
+   - [快速开始](./plugin-quickstart.md)
+
 ### 参考文档
 - **[项目架构](./architecture.md)** - 项目结构和设计
 - **[约束条件](./constraints.md)** - 重要规则和限制

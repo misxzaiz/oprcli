@@ -26,6 +26,11 @@ const IFlowConnector = require('./connectors/iflow-connector')
 const { simpleHash } = require('./utils/string-helper')
 const SchedulerModule = require('./scheduler')
 
+// 🆕 核心插件系统
+const PluginManager = require('./plugins/core/plugin-manager')
+const ConfigManager = require('./plugins/core/config-manager')
+const ContextMemory = require('./plugins/core/context-memory')
+
 class UnifiedServer {
   // 命令配置表
   static COMMANDS = {
@@ -62,6 +67,11 @@ class UnifiedServer {
     // 定时任务模块
     this.scheduler = null
 
+    // 🆕 核心插件系统
+    this.configManager = new ConfigManager(this.logger)
+    this.pluginManager = new PluginManager(this, this.logger)
+    this.contextMemory = new ContextMemory(this.logger)
+
     this._setupMiddleware()
     this._setupRoutes()
   }
@@ -81,6 +91,123 @@ class UnifiedServer {
 
     // 内部 API：定时任务管理（仅允许本地访问）
     this.app.post('/api/tasks/reload', this.handleTasksReload.bind(this))
+    this.app.post('/api/tasks/run/:taskId', this.handleTasksRunApi.bind(this))
+
+    // 🆕 插件系统 API
+    this.app.get('/api/plugins', this.handleListPlugins.bind(this))
+    this.app.get('/api/config', this.handleGetConfig.bind(this))
+    this.app.post('/api/config', this.handleSetConfig.bind(this))
+    this.app.get('/api/memory/stats', this.handleMemoryStats.bind(this))
+  }
+
+  // ==================== 🆕 插件系统 ====================
+
+  /**
+   * 注册核心插件
+   */
+  async registerCorePlugins() {
+    // 注册配置管理器
+    await this.pluginManager.registerPlugin({
+      name: 'config-manager',
+      version: '1.0.0',
+      description: '配置管理系统',
+      author: 'OPRCLI Team',
+      init: async (server) => {
+        server.logger.info('PLUGIN', '✓ 配置管理器已初始化')
+      },
+      api: {
+        get: (key) => server.configManager.get(key),
+        set: async (key, value) => await server.configManager.set(key, value),
+        addTool: async (config) => await server.configManager.addTool(config)
+      }
+    })
+
+    // 注册上下文记忆
+    await this.pluginManager.registerPlugin({
+      name: 'context-memory',
+      version: '1.0.0',
+      description: '上下文记忆系统',
+      author: 'OPRCLI Team',
+      init: async (server) => {
+        server.logger.info('PLUGIN', '✓ 上下文记忆已初始化')
+      },
+      api: {
+        set: async (key, value) => await server.contextMemory.set(key, value),
+        get: async (key) => await server.contextMemory.get(key),
+        saveSession: async (id, ctx) => await server.contextMemory.saveSession(id, ctx)
+      }
+    })
+
+    // 加载用户自定义插件
+    const path = require('path')
+    const customPluginDir = path.join(__dirname, 'plugins/custom')
+
+    const fs = require('fs')
+    if (fs.existsSync(customPluginDir)) {
+      await this.pluginManager.loadPluginsFromDir(customPluginDir)
+    }
+  }
+
+  /**
+   * API: 列出所有插件
+   */
+  async handleListPlugins(req, res) {
+    const plugins = this.pluginManager.listPlugins()
+
+    res.json({
+      success: true,
+      plugins,
+      stats: this.pluginManager.getStats()
+    })
+  }
+
+  /**
+   * API: 获取配置
+   */
+  async handleGetConfig(req, res) {
+    const { key } = req.query
+
+    try {
+      if (key) {
+        const value = this.configManager.get(key)
+        res.json({ success: true, key, value })
+      } else {
+        const all = this.configManager.getAll()
+        res.json({ success: true, config: all })
+      }
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message })
+    }
+  }
+
+  /**
+   * API: 设置配置
+   */
+  async handleSetConfig(req, res) {
+    const { key, value } = req.body
+
+    if (!key) {
+      return res.status(400).json({ success: false, error: '缺少 key 参数' })
+    }
+
+    try {
+      await this.configManager.set(key, value)
+      res.json({ success: true, message: `配置已更新: ${key}` })
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message })
+    }
+  }
+
+  /**
+   * API: 获取记忆统计
+   */
+  async handleMemoryStats(req, res) {
+    try {
+      const stats = this.contextMemory.getStats()
+      res.json({ success: true, stats })
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message })
+    }
   }
 
   async handleConnect(req, res) {
@@ -278,6 +405,54 @@ class UnifiedServer {
       })
     } catch (error) {
       this.logger.error('API', '重新加载失败', { error: error.message })
+      res.status(500).json({
+        success: false,
+        error: error.message
+      })
+    }
+  }
+
+  /**
+   * API: 手动执行定时任务
+   */
+  async handleTasksRunApi(req, res) {
+    const clientIp = req.ip || req.connection.remoteAddress
+    const isLocalhost = clientIp === '127.0.0.1' ||
+      clientIp === '::1' ||
+      clientIp === '::ffff:127.0.0.1'
+
+    if (!isLocalhost) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: 仅允许本地访问'
+      })
+    }
+
+    const taskId = req.params.taskId
+    if (!taskId) {
+      return res.status(400).json({
+        success: false,
+        error: '请指定任务 ID'
+      })
+    }
+
+    if (!this.scheduler || !this.scheduler.taskManager) {
+      return res.status(503).json({
+        success: false,
+        error: '定时任务管理器未初始化'
+      })
+    }
+
+    try {
+      this.logger.info('API', `手动执行任务: ${taskId}`)
+      const result = await this.scheduler.taskManager.runTask(taskId)
+      res.json({
+        success: result.success,
+        elapsed: result.elapsed,
+        error: result.error
+      })
+    } catch (error) {
+      this.logger.error('API', '执行任务失败', { error: error.message })
       res.status(500).json({
         success: false,
         error: error.message
@@ -735,6 +910,25 @@ class UnifiedServer {
     if (!validation.valid) {
       console.error('❌ 配置错误:')
       validation.errors.forEach(err => console.error(`  - ${err}`))
+      process.exit(1)
+    }
+
+    // 🆕 初始化核心插件系统
+    try {
+      this.logger.info('SERVER', '正在初始化核心插件系统...')
+
+      // 初始化配置管理器
+      await this.configManager.init()
+
+      // 初始化上下文记忆
+      await this.contextMemory.init()
+
+      // 注册核心插件
+      await this.registerCorePlugins()
+
+      this.logger.success('SERVER', '✓ 核心插件系统初始化完成')
+    } catch (error) {
+      this.logger.error('SERVER', `核心插件系统初始化失败: ${error.message}`)
       process.exit(1)
     }
 

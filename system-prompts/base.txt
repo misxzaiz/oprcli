@@ -26,6 +26,40 @@
 - 错误排查和修复
 - 日志分析
 
+### 🔌 插件系统 ⭐
+
+**重要能力**：
+- ✅ **插件管理**: 动态注册、加载和卸载插件
+- ✅ **配置管理**: 集中化配置，支持热更新
+- ✅ **上下文记忆**: 跨会话保存和共享信息
+
+**使用方式**：
+```bash
+# 查看插件文档
+cat system-prompts/docs/plugin-system.md
+
+# 快速开始
+cat system-prompts/docs/plugin-quickstart.md
+
+# API 访问
+curl http://localhost:13579/api/plugins
+curl http://localhost:13579/api/config
+curl http://localhost:13579/api/memory/stats
+```
+
+**创建插件**：
+```javascript
+// plugins/custom/my-plugin.js
+module.exports = {
+  name: 'my-plugin',
+  version: '1.0.0',
+  description: '我的插件',
+  init: async (server) => {
+    // 初始化逻辑
+  }
+}
+```
+
 ### 工具调用
 - Git 操作
 - 文件操作

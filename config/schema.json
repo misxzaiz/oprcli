@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OPRCLI Configuration Schema",
+  "type": "object",
+  "properties": {
+    "server": {
+      "type": "object",
+      "description": "服务器配置",
+      "properties": {
+        "port": {
+          "type": "number",
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "服务器端口号"
+        },
+        "host": {
+          "type": "string",
+          "description": "服务器监听地址"
+        }
+      },
+      "required": ["port"]
+    },
+    "connectors": {
+      "type": "object",
+      "description": "连接器配置",
+      "properties": {
+        "default": {
+          "type": "string",
+          "description": "默认连接器类型"
+        },
+        "timeout": {
+          "type": "number",
+          "minimum": 1000,
+          "description": "连接超时时间（毫秒）"
+        }
+      }
+    },
+    "plugins": {
+      "type": "object",
+      "description": "插件配置",
+      "properties": {
+        "enabled": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "启用的插件列表"
+        },
+        "config": {
+          "type": "object",
+          "description": "插件特定配置"
+        }
+      }
+    },
+    "tasks": {
+      "type": "object",
+      "description": "任务配置",
+      "properties": {
+        "concurrent": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "并发任务数"
+        },
+        "retryTimes": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "重试次数"
+        },
+        "timeout": {
+          "type": "number",
+          "minimum": 1000,
+          "description": "任务超时时间（毫秒）"
+        }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "description": "工具列表",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "description": "记忆系统配置",
+      "properties": {
+        "maxSize": {
+          "type": "number",
+          "minimum": 100,
+          "description": "最大记忆条数"
+        },
+        "defaultTTL": {
+          "type": "number",
+          "minimum": 60000,
+          "description": "默认过期时间（毫秒）"
+        }
+      }
+    }
+  }
+}
