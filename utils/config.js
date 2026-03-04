@@ -16,6 +16,9 @@ class Config {
     this.provider = process.env.PROVIDER || 'claude'
     this.port = process.env.PORT ? parseInt(process.env.PORT) : null
 
+    // 提示词模式
+    this.promptMode = process.env.PROMPT_MODE || 'full'
+
     // Claude 配置
     this.claude = {
       cmdPath: process.env.CLAUDE_CMD_PATH,
@@ -114,6 +117,7 @@ class Config {
   /**
    * 获取指定模型的系统提示词
    * 优先级：模型专用环境变量 > 全局环境变量 > 模型专用文件 > 默认文件
+   * 支持 PROMPT_MODE: slim 使用精简版提示词（节省 token）
    * @param {string} provider - 模型名称 (claude/iflow)
    * @returns {string|null} - 系统提示词
    */
@@ -123,6 +127,15 @@ class Config {
     const providerEnvKey = `${providerUpper}_SYSTEM_PROMPT`
     if (process.env[providerEnvKey]) {
       return this._processEscapedNewlines(process.env[providerEnvKey])
+    }
+
+    // 1.5. 检查是否使用精简模式
+    if (this.promptMode === 'slim') {
+      const slimFile = `${provider}-slim.txt`
+      const slimPrompt = this._loadSystemPromptFromFile(slimFile)
+      if (slimPrompt) {
+        return slimPrompt
+      }
     }
 
     // 2. 检查全局环境变量
