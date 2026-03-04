@@ -78,8 +78,9 @@ class IFlowConnector extends BaseConnector {
     console.log(`[IFlowConnector] 启动会话: ${tempSessionId}`);
     console.log(`[IFlowConnector] 消息长度: ${message.length} 字符`);
 
+    const fullMessage = this._buildFullMessage(message, false);
     const args = this._buildCommandArgs(message, false);
-    const child = this._spawnProcess(args);
+    const child = this._spawnProcess(args, fullMessage);
 
     this._registerSession(tempSessionId, { process: child });
 
@@ -106,8 +107,9 @@ class IFlowConnector extends BaseConnector {
       this.jsonlMonitors.delete(sessionId);
     }
 
+    const fullMessage = this._buildFullMessage(message, true);
     const args = this._buildCommandArgs(message, true, sessionId);
-    const child = this._spawnProcess(args);
+    const child = this._spawnProcess(args, fullMessage);
 
     this._registerSession(sessionId, { process: child });
     this.currentSessionId = sessionId;
@@ -133,13 +135,6 @@ class IFlowConnector extends BaseConnector {
   // ==================== 辅助方法 ====================
 
   _buildCommandArgs(message, isResume, sessionId = null) {
-    // 只在第一次会话时添加系统提示词
-    let finalMessage = message;
-    if (!isResume && this.systemPrompt && this.systemPrompt.trim()) {
-      finalMessage = `${this.systemPrompt}\n\n${message}`;
-      console.log('[IFlowConnector] 已添加系统提示词到 prompt（首次会话）');
-    }
-
     // 构建命令字符串（用于 shell 模式）
     let cmdStr = '--yolo';
 
@@ -153,16 +148,30 @@ class IFlowConnector extends BaseConnector {
       cmdStr += ` --resume ${sessionId}`;
     }
 
-    // 给 prompt 参数加引号以处理空格
-    cmdStr += ` --prompt "${finalMessage.replace(/"/g, '\\"')}"`;
+    // 🔧 修复：不再通过命令行参数传递消息，改用 stdin
+    // 原因：命令行参数在处理换行符、引号、特殊字符时容易截断
+    // iflow 支持 stdin 输入，通过 -p 参数附加到 stdin
 
     return cmdStr;
   }
 
-  _spawnProcess(cmdStr) {
+  /**
+   * 构建完整的消息内容（包含系统提示词）
+   */
+  _buildFullMessage(message, isResume) {
+    let finalMessage = message;
+    if (!isResume && this.systemPrompt && this.systemPrompt.trim()) {
+      finalMessage = `${this.systemPrompt}\n\n${message}`;
+      console.log('[IFlowConnector] 已添加系统提示词到 prompt（首次会话）');
+    }
+    return finalMessage;
+  }
+
+  _spawnProcess(cmdStr, stdinMessage = null) {
     const spawnOptions = {
       cwd: this.workDir,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      // 🔧 修复：使用 pipe 作为 stdin，支持传递长消息
+      stdio: stdinMessage ? ['pipe', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
       shell: this._isWindows()
     };
@@ -170,9 +179,21 @@ class IFlowConnector extends BaseConnector {
     // 构建完整的命令
     const fullCommand = `"${this.iflowPath}" ${cmdStr}`;
     console.log(`[IFlowConnector] 执行命令: ${fullCommand}`);
+    if (stdinMessage) {
+      console.log(`[IFlowConnector] 通过 stdin 传递消息: ${stdinMessage.length} 字符`);
+    }
 
     // 使用命令字符串而不是数组，让 shell 正确解析带引号的参数
-    return spawn(fullCommand, [], spawnOptions);
+    const child = spawn(fullCommand, [], spawnOptions);
+
+    // 🔧 通过 stdin 传递消息，避免命令行参数截断
+    if (stdinMessage && child.stdin) {
+      child.stdin.write(stdinMessage);
+      child.stdin.end();
+      console.log('[IFlowConnector] 消息已写入 stdin');
+    }
+
+    return child;
   }
 
   _setupEventHandlers(child, sessionId, options) {
