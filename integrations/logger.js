@@ -45,6 +45,7 @@ class Logger {
       event: 0,
       success: 0,
       warning: 0,
+      warn: 0, // 🔥 新增：与 warning 共享计数
       error: 0,
       total: 0
     }
@@ -89,6 +90,10 @@ class Logger {
   event(category, message, data) { this.log(this.levels.EVENT, category, message, data) }
   success(category, message, data) { this.log(this.levels.SUCCESS, category, message, data) }
   warning(category, message, data) { this.log(this.levels.WARNING, category, message, data) }
+  warn(category, message, data) {
+    this.warning(category, message, data); // 调用 warning 方法
+    this.stats.warn++; // 🔥 额外增加 warn 计数
+  }
   error(category, message, data) { this.log(this.levels.ERROR, category, message, data) }
 
   /**
@@ -103,6 +108,7 @@ class Logger {
         event: ((this.stats.event / this.stats.total) * 100).toFixed(1) + '%',
         success: ((this.stats.success / this.stats.total) * 100).toFixed(1) + '%',
         warning: ((this.stats.warning / this.stats.total) * 100).toFixed(1) + '%',
+        warn: ((this.stats.warn / this.stats.total) * 100).toFixed(1) + '%', // 🔥 新增
         error: ((this.stats.error / this.stats.total) * 100).toFixed(1) + '%'
       },
       activeCategories: Array.from(this.categoryTimings.keys()).length
@@ -119,6 +125,7 @@ class Logger {
       event: 0,
       success: 0,
       warning: 0,
+      warn: 0, // 🔥 新增
       error: 0,
       total: 0
     }

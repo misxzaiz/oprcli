@@ -4,6 +4,7 @@
  */
 
 const axios = require('axios')
+const BoundedMap = require('../utils/bounded-map')
 
 class DingTalkIntegration {
   constructor(config, logger, rateLimiter) {
@@ -16,8 +17,14 @@ class DingTalkIntegration {
     // conversationId -> { sessionId, provider, startTime }
     this.conversations = new Map()
 
-    // 使用 Map + 时间戳来正确删除最旧的消息（Set 是无序的）
-    this.processedMessages = new Map() // messageId -> timestamp
+    // 🔥 使用 BoundedMap 限制 processedMessages 大小，防止内存泄漏
+    // FIFO 策略：当超过最大容量时，自动删除最旧的消息
+    this.processedMessages = new BoundedMap(1000, {
+      evictionPolicy: 'fifo', // 先进先出
+      onEvict: (key) => {
+        this.logger.debug('DINGTALK', `Processed message evicted: ${key}`)
+      }
+    })
     this.maxProcessedMessages = 1000
 
     // 🆕 自动清理配置
