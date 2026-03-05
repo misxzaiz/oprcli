@@ -32,7 +32,17 @@ const ConfigManager = require('./plugins/core/config-manager')
 const ContextMemory = require('./plugins/core/context-memory')
 
 // 🆕 自定义中间件和启动检查
-const { requestIdMiddleware, errorHandlerMiddleware, notFoundMiddleware } = require('./utils/middleware')
+const {
+  requestIdMiddleware,
+  errorHandlerMiddleware,
+  notFoundMiddleware,
+  securityHeadersMiddleware,
+  corsMiddleware,
+  requestTimeoutMiddleware,
+  cacheControlMiddleware,
+  performanceMonitorMiddleware,
+  getPerformanceStats
+} = require('./utils/middleware')
 const StartupCheck = require('./utils/startup-check')
 
 class UnifiedServer {
@@ -76,13 +86,37 @@ class UnifiedServer {
     this.pluginManager = new PluginManager(this, this.logger)
     this.contextMemory = new ContextMemory(this.logger)
 
+    // 🆕 性能统计（2026-03-05 新增）
+    this.performanceStats = null  // 将在中间件中初始化
+
     this._setupMiddleware()
     this._setupRoutes()
+    this._setupErrorHandlers()  // 必须在路由之后
   }
 
   _setupMiddleware() {
     // 🆕 请求 ID 中间件（必须在其他中间件之前）
     this.app.use(requestIdMiddleware)
+
+    // 🔒 安全头中间件（2026-03-05 新增）
+    this.app.use(securityHeadersMiddleware)
+    this.logger.info('SERVER', '✓ 安全头已配置')
+
+    // 🌐 CORS 中间件（根据环境变量启用，2026-03-05 新增）
+    if (process.env.CORS_ENABLED === 'true') {
+      const corsOrigin = process.env.CORS_ORIGIN || '*'
+      const corsMethods = process.env.CORS_METHODS ? process.env.CORS_METHODS.split(',') : ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+      const corsHeaders = process.env.CORS_HEADERS ? process.env.CORS_HEADERS.split(',') : ['Content-Type', 'Authorization']
+      const corsCredentials = process.env.CORS_CREDENTIALS === 'true'
+
+      this.app.use(corsMiddleware({
+        origin: corsOrigin === '*' ? '*' : corsOrigin,
+        methods: corsMethods,
+        allowedHeaders: corsHeaders,
+        credentials: corsCredentials
+      }))
+      this.logger.info('SERVER', `✓ CORS 已启用 (来源: ${corsOrigin})`)
+    }
 
     // 安全配置：限制请求大小（防止DoS攻击）
     this.app.use(express.json({ limit: '10mb' }))
@@ -105,6 +139,23 @@ class UnifiedServer {
       this.logger.debug('SERVER', 'compression模块不可用，跳过')
     }
 
+    // ⏱️ 请求超时中间件（2026-03-05 新增）
+    const timeoutMs = parseInt(process.env.REQUEST_TIMEOUT || '30000', 10)
+    this.app.use(requestTimeoutMiddleware(timeoutMs))
+    this.logger.info('SERVER', `✓ 请求超时已设置: ${timeoutMs}ms`)
+
+    // 📊 性能监控中间件（2026-03-05 新增）
+    const perfMiddleware = performanceMonitorMiddleware(this.logger)
+    this.app.use(perfMiddleware)
+    // 保存性能统计对象的引用（通过闭包访问）
+    this.app.use((req, res, next) => {
+      if (!this.performanceStats && req.performanceStats) {
+        this.performanceStats = req.performanceStats
+      }
+      next()
+    })
+    this.logger.info('SERVER', '✓ 性能监控已启用')
+
     // 🆕 请求日志中间件（增强版，包含请求ID）
     if (process.env.NODE_ENV === 'production') {
       this.app.use((req, res, next) => {
@@ -116,7 +167,13 @@ class UnifiedServer {
         next()
       })
     }
+    // 注意：404 和错误处理中间件在 _setupErrorHandlers() 中设置（路由之后）
+  }
 
+  /**
+   * 设置错误处理中间件（必须在所有路由之后）
+   */
+  _setupErrorHandlers() {
     // 🆕 404 处理中间件（必须在所有路由之后）
     this.app.use(notFoundMiddleware)
 
@@ -591,7 +648,16 @@ class UnifiedServer {
         plugins: this.pluginManager?.getStats() || { loaded: 0 },
 
         // 上下文记忆统计
-        memory: this.contextMemory?.getStats() || { sessions: 0 }
+        memory: this.contextMemory?.getStats() || { sessions: 0 },
+
+        // 🆕 HTTP 性能统计（2026-03-05 新增）
+        http: this.performanceStats ? getPerformanceStats(this.performanceStats) : {
+          totalRequests: 0,
+          totalErrors: 0,
+          errorRate: '0%',
+          avgResponseTime: '0ms',
+          routes: []
+        }
       }
 
       // 收集每个 connector 的详细信息
