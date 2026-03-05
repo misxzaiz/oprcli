@@ -146,12 +146,16 @@ class GracefulShutdown {
           this.logger.warning('SHUTDOWN', '等待请求超时，继续关闭流程')
           clearInterval(checkInterval)
           resolve()
-        } else {
-          // 简单处理：等待一小段时间让请求完成
-          clearInterval(checkInterval)
-          setTimeout(resolve, 1000)
         }
       }, 500)
+
+      // 超时保护：确保在超时后清理定时器
+      setTimeout(() => {
+        if (checkInterval) {
+          clearInterval(checkInterval)
+        }
+        resolve()
+      }, timeout + 100)
     })
   }
 

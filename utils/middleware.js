@@ -273,7 +273,30 @@ function performanceMonitorMiddleware(logger) {
     totalRequests: 0,
     totalErrors: 0,
     avgResponseTime: 0,
-    routes: {}
+    routes: {},
+    maxRoutes: 1000, // 最大路由统计数（防止内存泄漏）
+    lastCleanup: Date.now()
+  }
+
+  /**
+   * 清理旧的路由统计（防止内存泄漏）
+   * @private
+   */
+  function cleanupOldRoutes() {
+    const routes = Object.entries(stats.routes)
+    if (routes.length > stats.maxRoutes) {
+      // 按请求数排序，保留最常访问的路由
+      routes.sort((a, b) => b[1].count - a[1].count)
+
+      // 删除最少访问的路由
+      const toDelete = routes.slice(stats.maxRoutes)
+      for (const [route] of toDelete) {
+        delete stats.routes[route]
+      }
+
+      stats.lastCleanup = Date.now()
+      logger?.debug('PERF', `已清理路由统计: ${toDelete.length} 条`)
+    }
   }
 
   return (req, res, next) => {
@@ -308,12 +331,18 @@ function performanceMonitorMiddleware(logger) {
       // 记录路由统计
       const routeKey = `${req.method} ${req.path}`
       if (!stats.routes[routeKey]) {
-        stats.routes[routeKey] = { count: 0, totalTime: 0, errors: 0 }
+        stats.routes[routeKey] = { count: 0, totalTime: 0, errors: 0, lastAccess: Date.now() }
       }
       stats.routes[routeKey].count++
       stats.routes[routeKey].totalTime += duration
+      stats.routes[routeKey].lastAccess = Date.now()
       if (res.statusCode >= 400) {
         stats.routes[routeKey].errors++
+      }
+
+      // 定期清理旧路由（每1000次请求检查一次）
+      if (stats.totalRequests % 1000 === 0) {
+        cleanupOldRoutes()
       }
 
       // 记录慢请求

@@ -52,6 +52,9 @@ class NotificationQueue {
     this.isProcessing = false
     this.processInterval = null
 
+    // 重试定时器跟踪（防止内存泄漏）
+    this.retryTimers = new Map()
+
     // 确保缓存目录存在
     this._ensureCacheDir()
 
@@ -240,11 +243,20 @@ class NotificationQueue {
 
     // 如果未达到最大重试次数，重新加入队列
     if (item.attempts < this.maxRetries) {
-      setTimeout(() => {
+      // 清除之前的重试定时器（如果存在）
+      if (this.retryTimers.has(item.id)) {
+        clearTimeout(this.retryTimers.get(item.id))
+      }
+
+      // 创建新的重试定时器并跟踪
+      const timerId = setTimeout(() => {
+        this.retryTimers.delete(item.id)
         this.queues[item.priority].push(item)
         this.stats.retried++
         this.logger.debug('NOTIFICATION_QUEUE', `通知重试: ${item.type} (${item.attempts}/${this.maxRetries})`)
       }, this.retryDelay * item.attempts) // 递增延迟
+
+      this.retryTimers.set(item.id, timerId)
     } else {
       // 达到最大重试次数，保存到失败缓存
       this.failedCache.push(item)
@@ -296,6 +308,12 @@ class NotificationQueue {
    * 清空队列
    */
   clear() {
+    // 清除所有重试定时器
+    for (const timerId of this.retryTimers.values()) {
+      clearTimeout(timerId)
+    }
+    this.retryTimers.clear()
+
     this.queues.urgent = []
     this.queues.normal = []
     this.queues.low = []

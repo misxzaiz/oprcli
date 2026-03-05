@@ -374,12 +374,28 @@ class ContextMemory {
    * 启动定期清理任务
    */
   startCleanupTask() {
+    // 避免重复启动
+    if (this._cleanupTimer) {
+      clearInterval(this._cleanupTimer);
+    }
+
     // 每小时清理一次
-    setInterval(async () => {
+    this._cleanupTimer = setInterval(async () => {
       await this.cleanup();
     }, 60 * 60 * 1000);
 
     this.logger.debug('MEMORY', '✓ 定期清理任务已启动');
+  }
+
+  /**
+   * 停止定期清理任务
+   */
+  stopCleanupTask() {
+    if (this._cleanupTimer) {
+      clearInterval(this._cleanupTimer);
+      this._cleanupTimer = null;
+      this.logger.debug('MEMORY', '✓ 定期清理任务已停止');
+    }
   }
 
   /**
