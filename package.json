@@ -12,7 +12,8 @@
     "view-logs": "node scripts/view-logs.js",
     "audit": "npm audit",
     "audit:fix": "npm audit fix",
-    "outdated": "npm outdated"
+    "outdated": "npm outdated",
+    "analyze": "node scripts/performance-analyzer.js"
   },
   "keywords": [
     "claude",
