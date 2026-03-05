@@ -19,6 +19,26 @@ class DingTalkIntegration {
     // 使用 Map + 时间戳来正确删除最旧的消息（Set 是无序的）
     this.processedMessages = new Map() // messageId -> timestamp
     this.maxProcessedMessages = 1000
+
+    // 🆕 自动清理配置
+    this.cleanupConfig = {
+      enabled: true,
+      interval: 5 * 60 * 1000, // 5分钟
+      messageAgeLimit: 60 * 60 * 1000, // 1小时
+      sessionAgeLimit: 24 * 60 * 60 * 1000 // 24小时
+    }
+
+    // 🆕 清理定时器
+    this.cleanupTimer = null
+
+    // 🆕 清理统计信息
+    this.cleanupStats = {
+      totalRuns: 0,
+      messagesCleaned: 0,
+      sessionsCleaned: 0,
+      lastCleanupTime: null,
+      lastCleanupDuration: 0
+    }
   }
 
   async init(messageHandler = null) {
@@ -81,6 +101,13 @@ class DingTalkIntegration {
       this.logger.info('DINGTALK', '正在连接到钉钉服务器...')
       await this.client.connect()
       this.logger.success('DINGTALK', '初始化成功，客户端已连接')
+
+      // 🆕 启动自动清理
+      if (this.cleanupConfig.enabled) {
+        this.startAutoCleanup()
+        this.logger.info('DINGTALK', '自动内存清理已启用')
+      }
+
       return true
     } catch (error) {
       this.logger.error('DINGTALK', '初始化失败', {
@@ -284,10 +311,181 @@ class DingTalkIntegration {
   }
 
   async close() {
+    // 🆕 停止自动清理定时器
+    this.stopAutoCleanup()
+
     if (this.client) {
       await this.client.close()
       this.logger.info('DINGTALK', 'Stream 客户端已关闭')
     }
+  }
+
+  // ==================== 🆕 自动内存清理功能 ====================
+
+  /**
+   * 启动自动清理定时器
+   */
+  startAutoCleanup() {
+    if (this.cleanupTimer) {
+      this.logger.warning('DINGTALK', '自动清理定时器已在运行')
+      return
+    }
+
+    this.cleanupTimer = setInterval(() => {
+      this.performCleanup().catch(error => {
+        this.logger.error('DINGTALK', '自动清理失败', { error: error.message })
+      })
+    }, this.cleanupConfig.interval)
+
+    this.logger.debug('DINGTALK', `自动清理定时器已启动（间隔：${this.cleanupConfig.interval / 1000}秒）`)
+  }
+
+  /**
+   * 停止自动清理定时器
+   */
+  stopAutoCleanup() {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer)
+      this.cleanupTimer = null
+      this.logger.debug('DINGTALK', '自动清理定时器已停止')
+    }
+  }
+
+  /**
+   * 执行清理操作
+   */
+  async performCleanup() {
+    const startTime = Date.now()
+    const stats = {
+      messagesCleaned: 0,
+      sessionsCleaned: 0
+    }
+
+    try {
+      // 清理过期的已处理消息
+      stats.messagesCleaned = this.cleanExpiredMessages()
+
+      // 清理过期的会话
+      stats.sessionsCleaned = this.cleanExpiredSessions()
+
+      // 更新统计信息
+      this.cleanupStats.totalRuns++
+      this.cleanupStats.messagesCleaned += stats.messagesCleaned
+      this.cleanupStats.sessionsCleaned += stats.sessionsCleaned
+      this.cleanupStats.lastCleanupTime = new Date().toISOString()
+      this.cleanupStats.lastCleanupDuration = Date.now() - startTime
+
+      // 如果清理了内容，记录日志
+      if (stats.messagesCleaned > 0 || stats.sessionsCleaned > 0) {
+        this.logger.info('DINGTALK', '内存清理完成', {
+          messagesCleaned: stats.messagesCleaned,
+          sessionsCleaned: stats.sessionsCleaned,
+          duration: `${this.cleanupStats.lastCleanupDuration}ms`,
+          processedMessagesCount: this.processedMessages.size,
+          conversationsCount: this.conversations.size
+        })
+      }
+
+      return stats
+    } catch (error) {
+      this.logger.error('DINGTALK', '清理过程出错', { error: error.message })
+      throw error
+    }
+  }
+
+  /**
+   * 清理过期的已处理消息
+   * @returns {number} 清理的消息数量
+   */
+  cleanExpiredMessages() {
+    const now = Date.now()
+    const messageAgeLimit = this.cleanupConfig.messageAgeLimit
+    let cleanedCount = 0
+
+    for (const [messageId, timestamp] of this.processedMessages.entries()) {
+      if (now - timestamp > messageAgeLimit) {
+        this.processedMessages.delete(messageId)
+        cleanedCount++
+      }
+    }
+
+    return cleanedCount
+  }
+
+  /**
+   * 清理过期的会话
+   * @returns {number} 清理的会话数量
+   */
+  cleanExpiredSessions() {
+    const now = Date.now()
+    const sessionAgeLimit = this.cleanupConfig.sessionAgeLimit
+    let cleanedCount = 0
+
+    for (const [conversationId, session] of this.conversations.entries()) {
+      if (now - session.startTime > sessionAgeLimit) {
+        this.conversations.delete(conversationId)
+        cleanedCount++
+        this.logger.debug('DINGTALK', `清理过期会话: ${conversationId}`)
+      }
+    }
+
+    return cleanedCount
+  }
+
+  /**
+   * 手动触发清理
+   * @returns {Promise<Object>} 清理统计信息
+   */
+  async manualCleanup() {
+    this.logger.info('DINGTALK', '手动触发内存清理')
+    return await this.performCleanup()
+  }
+
+  /**
+   * 获取清理统计信息
+   * @returns {Object} 统计信息
+   */
+  getCleanupStats() {
+    return {
+      ...this.cleanupStats,
+      currentProcessedMessages: this.processedMessages.size,
+      currentConversations: this.conversations.size,
+      maxProcessedMessages: this.maxProcessedMessages,
+      cleanupInterval: this.cleanupConfig.interval,
+      messageAgeLimit: this.cleanupConfig.messageAgeLimit,
+      sessionAgeLimit: this.cleanupConfig.sessionAgeLimit,
+      isAutoCleanupEnabled: this.cleanupConfig.enabled,
+      isAutoCleanupRunning: this.cleanupTimer !== null
+    }
+  }
+
+  /**
+   * 更新清理配置
+   * @param {Object} newConfig - 新的配置
+   */
+  updateCleanupConfig(newConfig) {
+    const oldConfig = { ...this.cleanupConfig }
+
+    // 更新配置
+    if (newConfig.enabled !== undefined) this.cleanupConfig.enabled = newConfig.enabled
+    if (newConfig.interval !== undefined) this.cleanupConfig.interval = newConfig.interval
+    if (newConfig.messageAgeLimit !== undefined) this.cleanupConfig.messageAgeLimit = newConfig.messageAgeLimit
+    if (newConfig.sessionAgeLimit !== undefined) this.cleanupConfig.sessionAgeLimit = newConfig.sessionAgeLimit
+
+    // 如果定时器间隔改变了，重启定时器
+    if (newConfig.interval !== undefined && newConfig.interval !== oldConfig.interval) {
+      if (this.cleanupTimer) {
+        this.stopAutoCleanup()
+        if (this.cleanupConfig.enabled) {
+          this.startAutoCleanup()
+        }
+      }
+    }
+
+    this.logger.info('DINGTALK', '清理配置已更新', {
+      oldConfig,
+      newConfig: this.cleanupConfig
+    })
   }
 }
 
