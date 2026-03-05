@@ -1,120 +1,98 @@
 {
-  "lastScan": "2026-03-06T00:00:00Z",
+  "lastScan": "2026-03-06T12:00:00Z",
   "version": "2.0.7",
   "files": {
     "server.js": {
       "path": "server.js",
-      "size": 71400,
-      "lastModified": "2026-03-05",
+      "size": 1921,
+      "lastModified": "2026-03-06",
       "complexity": "high",
       "risk": "low"
     },
-    "utils/memory-monitor.js": {
-      "path": "utils/memory-monitor.js",
-      "size": 0,
-      "lastModified": "unknown",
-      "complexity": "medium",
-      "risk": "medium"
+    "plugins/core/config-manager.js": {
+      "path": "plugins/core/config-manager.js",
+      "size": 995,
+      "lastModified": "2026-03-06",
+      "complexity": "high",
+      "risk": "low"
     },
-    "utils/memory-monitor-enhanced.js": {
-      "path": "utils/memory-monitor-enhanced.js",
-      "size": 0,
-      "lastModified": "unknown",
+    "utils/cache-manager.js": {
+      "path": "utils/cache-manager.js",
+      "size": 620,
+      "lastModified": "2026-03-06",
       "complexity": "medium",
-      "risk": "medium"
+      "risk": "low"
+    },
+    "connectors/iflow-connector.js": {
+      "path": "connectors/iflow-connector.js",
+      "size": 612,
+      "lastModified": "2026-03-06",
+      "complexity": "high",
+      "risk": "low"
+    },
+    "utils/health-check.js": {
+      "path": "utils/health-check.js",
+      "size": 494,
+      "lastModified": "2026-03-06",
+      "complexity": "medium",
+      "risk": "low"
+    },
+    "utils/health-enhanced.js": {
+      "path": "utils/health-enhanced.js",
+      "size": 298,
+      "lastModified": "2026-03-06",
+      "complexity": "medium",
+      "risk": "low"
     },
     "utils/message-rate-limiter.js": {
       "path": "utils/message-rate-limiter.js",
-      "size": 0,
+      "size": 120,
       "lastModified": "2026-03-06",
       "complexity": "medium",
       "risk": "low"
     },
     "utils/rate-limit.js": {
       "path": "utils/rate-limit.js",
-      "size": 0,
-      "lastModified": "unknown",
-      "complexity": "medium",
-      "risk": "medium"
-    },
-    "utils/rate-limiter-memory.js": {
-      "path": "utils/rate-limiter-memory.js",
-      "size": 0,
-      "lastModified": "unknown",
-      "complexity": "medium",
-      "risk": "medium"
-    },
-    "utils/health-check.js": {
-      "path": "utils/health-check.js",
-      "size": 0,
-      "lastModified": "unknown",
-      "complexity": "low",
-      "risk": "low"
-    },
-    "utils/health-enhanced.js": {
-      "path": "utils/health-enhanced.js",
-      "size": 0,
-      "lastModified": "unknown",
+      "size": 85,
+      "lastModified": "2026-03-06",
       "complexity": "medium",
       "risk": "low"
     },
-    "integrations/logger.js": {
-      "path": "integrations/logger.js",
-      "size": 0,
-      "lastModified": "unknown",
-      "complexity": "low",
-      "risk": "low"
-    },
-    "integrations/dingtalk.js": {
-      "path": "integrations/dingtalk.js",
-      "size": 0,
-      "lastModified": "unknown",
-      "complexity": "high",
-      "risk": "low"
-    },
-    "connectors/claude-connector.js": {
-      "path": "connectors/claude-connector.js",
-      "size": 0,
-      "lastModified": "unknown",
-      "complexity": "high",
-      "risk": "low"
-    },
-    "connectors/iflow-connector.js": {
-      "path": "connectors/iflow-connector.js",
-      "size": 0,
-      "lastModified": "unknown",
-      "complexity": "high",
-      "risk": "low"
-    },
-    "plugins/core/plugin-manager.js": {
-      "path": "plugins/core/plugin-manager.js",
-      "size": 0,
-      "lastModified": "unknown",
-      "complexity": "medium",
-      "risk": "low"
-    },
-    "plugins/core/config-manager.js": {
-      "path": "plugins/core/config-manager.js",
-      "size": 0,
-      "lastModified": "unknown",
-      "complexity": "medium",
-      "risk": "low"
-    },
-    "plugins/core/context-memory.js": {
-      "path": "plugins/core/context-memory.js",
-      "size": 0,
-      "lastModified": "unknown",
+    "utils/memory-monitor-enhanced.js": {
+      "path": "utils/memory-monitor-enhanced.js",
+      "size": 398,
+      "lastModified": "2026-03-06",
       "complexity": "medium",
       "risk": "low"
     }
   },
   "summary": {
     "totalFiles": 58,
-    "highComplexity": 4,
-    "mediumComplexity": 8,
-    "lowComplexity": 46,
+    "highComplexity": 5,
+    "mediumComplexity": 10,
+    "lowComplexity": 43,
     "highRisk": 0,
-    "mediumRisk": 6,
-    "lowRisk": 52
-  }
+    "mediumRisk": 4,
+    "lowRisk": 54
+  },
+  "issues": [
+    {
+      "id": "ISS-002",
+      "title": "健康检查模块重复",
+      "severity": "high",
+      "status": "open"
+    },
+    {
+      "id": "ISS-007",
+      "title": "server.js 文件过大",
+      "severity": "medium",
+      "status": "open"
+    },
+    {
+      "id": "ISS-008",
+      "title": "config-manager.js 复杂度高",
+      "severity": "medium",
+      "status": "open"
+    }
+  ]
 }

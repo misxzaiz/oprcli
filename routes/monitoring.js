@@ -93,7 +93,7 @@ function setupMonitoringRoutes(server) {
    */
   router.get('/diagnostics', (req, res) => {
     try {
-      const DiagnosticsCollector = require('../utils/health-check').DiagnosticsCollector
+      const { DiagnosticsCollector } = require('../utils/health-enhanced')
       const report = DiagnosticsCollector.generateDiagnosticsReport(config)
 
       res.json(report)

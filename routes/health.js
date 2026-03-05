@@ -6,7 +6,7 @@
  */
 
 const os = require('os')
-const EnhancedHealthChecker = require('../utils/health-enhanced')
+const { EnhancedHealthChecker } = require('../utils/health-enhanced')
 
 /**
  * 创建健康检查路由
