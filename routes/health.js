@@ -2,10 +2,11 @@
  * 健康检查路由
  * 提供服务健康状态监控端点
  *
- * @version 1.0.0
+ * @version 2.0.0 - 增强版
  */
 
 const os = require('os')
+const EnhancedHealthChecker = require('../utils/health-enhanced')
 
 /**
  * 创建健康检查路由
@@ -18,6 +19,79 @@ function createHealthRoutes(serverInstance) {
 
   // 获取服务器启动时间
   const startTime = Date.now()
+
+  // 🆕 初始化增强健康检查器（2026-03-05 第三轮优化）
+  const enhancedChecker = new EnhancedHealthChecker(
+    serverInstance?.logger || console,
+    {
+      cacheTimeout: parseInt(process.env.HEALTH_CACHE_TIMEOUT || '30000', 10),
+      historyLimit: parseInt(process.env.HEALTH_HISTORY_LIMIT || '100', 10)
+    }
+  )
+
+  // 🆕 注册默认健康检查项
+  if (serverInstance) {
+    // 检查钉钉连接
+    enhancedChecker.registerCheck('dingtalk_connection', async () => {
+      if (!serverInstance.dingtalk || !serverInstance.dingtalk.client) {
+        return { healthy: false, message: '钉钉客户端未初始化' }
+      }
+      // 简单检查：如果客户端存在就认为健康
+      return { healthy: true, message: '钉钉客户端已连接' }
+    })
+
+    // 检查默认连接器
+    enhancedChecker.registerCheck('default_connector', async () => {
+      const defaultConnector = serverInstance.connectors.get(serverInstance.defaultProvider)
+      if (!defaultConnector) {
+        return { healthy: false, message: '默认连接器未初始化' }
+      }
+      if (!defaultConnector.connected) {
+        return { healthy: false, message: '默认连接器未连接', details: { provider: serverInstance.defaultProvider } }
+      }
+      return { healthy: true, message: '默认连接器就绪', details: { provider: serverInstance.defaultProvider } }
+    })
+
+    // 检查内存使用
+    enhancedChecker.registerCheck('memory_usage', async () => {
+      const memoryUsage = process.memoryUsage()
+      const heapUsedPercent = (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100
+      const threshold = 90 // 90% 阈值
+
+      if (heapUsedPercent > threshold) {
+        return {
+          healthy: false,
+          message: `内存使用过高: ${heapUsedPercent.toFixed(2)}%`,
+          details: { heapUsedPercent, threshold }
+        }
+      }
+      return {
+        healthy: true,
+        message: `内存使用正常: ${heapUsedPercent.toFixed(2)}%`,
+        details: { heapUsedPercent }
+      }
+    })
+
+    // 检查事件循环延迟（简化版）
+    enhancedChecker.registerCheck('event_loop', async () => {
+      const start = process.hrtime.bigint()
+      await new Promise(resolve => setImmediate(resolve))
+      const delay = Number(process.hrtime.bigint() - start) / 1000000 // 转换为毫秒
+
+      if (delay > 100) { // 100ms 阈值
+        return {
+          healthy: false,
+          message: `事件循环延迟过高: ${delay.toFixed(2)}ms`,
+          details: { delay }
+        }
+      }
+      return {
+        healthy: true,
+        message: `事件循环正常: ${delay.toFixed(2)}ms`,
+        details: { delay }
+      }
+    })
+  }
 
   /**
    * GET /health
@@ -245,6 +319,181 @@ function createHealthRoutes(serverInstance) {
           message: 'Logger not initialized'
         })
       }
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        message: error.message
+      })
+    }
+  })
+
+  // 🆕 增强功能（2026-03-05 第三轮优化）
+
+  /**
+   * GET /health/enhanced
+   * 增强健康检查（包含所有注册的检查项）
+   */
+  router.get('/health/enhanced', async (req, res) => {
+    try {
+      const forceRefresh = req.query.refresh === 'true'
+      const results = await enhancedChecker.checkAll(forceRefresh)
+      res.status(results.status === 'healthy' ? 200 : 503).json(results)
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        message: error.message
+      })
+    }
+  })
+
+  /**
+   * GET /health/dependencies/status
+   * 依赖服务状态（钉钉、连接器等）
+   */
+  router.get('/health/dependencies/status', async (req, res) => {
+    try {
+      const status = await enhancedChecker.getDependenciesStatus(serverInstance)
+      const allHealthy = status.healthy === status.total
+
+      res.status(allHealthy ? 200 : 503).json({
+        status: allHealthy ? 'ok' : 'degraded',
+        ...status
+      })
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        message: error.message
+      })
+    }
+  })
+
+  /**
+   * GET /health/resources/status
+   * 系统资源状态（内存、CPU等）
+   */
+  router.get('/health/resources/status', (req, res) => {
+    try {
+      const resources = enhancedChecker.getResourcesStatus()
+
+      // 检查是否有资源使用过高
+      const memoryHigh = resources.memory.usagePercent > 90
+      const loadHigh = resources.cpu.cores > 0 &&
+        parseFloat(resources.cpu.loadAverage['1min']) > resources.cpu.cores
+
+      const status = (memoryHigh || loadHigh) ? 'warning' : 'ok'
+
+      res.status(status === 'ok' ? 200 : 503).json({
+        status,
+        resources
+      })
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        message: error.message
+      })
+    }
+  })
+
+  /**
+   * GET /health/trends
+   * 健康趋势数据
+   */
+  router.get('/health/trends', (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit || '20', 10)
+      const trends = enhancedChecker.getHealthTrends(limit)
+
+      res.status(200).json({
+        status: 'ok',
+        count: trends.length,
+        trends
+      })
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        message: error.message
+      })
+    }
+  })
+
+  /**
+   * POST /health/check
+   * 手动触发健康检查
+   */
+  router.post('/health/check', async (req, res) => {
+    try {
+      const results = await enhancedChecker.checkAll(true) // 强制刷新
+      res.status(results.status === 'healthy' ? 200 : 503).json(results)
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        message: error.message
+      })
+    }
+  })
+
+  /**
+   * POST /health/cache/clear
+   * 清除健康检查缓存
+   */
+  router.post('/health/cache/clear', (req, res) => {
+    try {
+      enhancedChecker.clearCache()
+      res.status(200).json({
+        status: 'ok',
+        message: '缓存已清除'
+      })
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        message: error.message
+      })
+    }
+  })
+
+  /**
+   * GET /health/cache/stats
+   * 缓存统计信息
+   */
+  router.get('/health/cache/stats', (req, res) => {
+    try {
+      const stats = enhancedChecker.getCacheStats()
+      res.status(200).json({
+        status: 'ok',
+        stats
+      })
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        message: error.message
+      })
+    }
+  })
+
+  /**
+   * GET /health/all
+   * 综合健康状态（包含所有信息）
+   */
+  router.get('/health/all', async (req, res) => {
+    try {
+      const [enhanced, dependencies, resources, trends] = await Promise.all([
+        enhancedChecker.checkAll(req.query.refresh === 'true'),
+        enhancedChecker.getDependenciesStatus(serverInstance),
+        Promise.resolve(enhancedChecker.getResourcesStatus()),
+        Promise.resolve(enhancedChecker.getHealthTrends(10))
+      ])
+
+      const allHealthy = enhanced.status === 'healthy' &&
+        dependencies.healthy === dependencies.total
+
+      res.status(allHealthy ? 200 : 503).json({
+        status: allHealthy ? 'ok' : 'degraded',
+        timestamp: new Date().toISOString(),
+        enhanced,
+        dependencies,
+        resources,
+        trends: trends.slice(-5) // 最近5条
+      })
     } catch (error) {
       res.status(500).json({
         status: 'error',
