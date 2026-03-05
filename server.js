@@ -1231,6 +1231,14 @@ class UnifiedServer {
       // 初始化配置管理器
       await this.configManager.init()
 
+      // 🆕 启动配置热重载（2026-03-05 自动升级优化）
+      this.configManager.startWatch()
+
+      // 🆕 添加配置变更监听器
+      this.configManager.addChangeListener((changeInfo) => {
+        this.handleConfigChange(changeInfo)
+      })
+
       // 初始化上下文记忆
       await this.contextMemory.init()
 
@@ -1702,6 +1710,84 @@ class UnifiedServer {
     } catch (error) {
       this.logger.error('SERVER', `关闭过程中出错: ${error.message}`)
       process.exit(1)
+    }
+  }
+
+  // ==================== 🆕 配置变更处理（2026-03-05 自动升级优化）====================
+
+  /**
+   * 处理配置变更
+   * @param {Object} changeInfo - 变更信息
+   */
+  async handleConfigChange(changeInfo) {
+    try {
+      if (changeInfo.error) {
+        // 重载失败
+        this.logger.error('CONFIG', `配置重载失败: ${changeInfo.error}`)
+        await this.sendConfigChangeNotification({
+          success: false,
+          error: changeInfo.error,
+          timestamp: changeInfo.timestamp
+        })
+        return
+      }
+
+      if (!changeInfo.hasChanged) {
+        // 配置未变化
+        this.logger.debug('CONFIG', '配置内容未变化')
+        return
+      }
+
+      // 配置成功重载
+      this.logger.success('CONFIG', '✓ 配置已自动更新')
+
+      // 发送通知到钉钉
+      await this.sendConfigChangeNotification({
+        success: true,
+        reloadCount: changeInfo.reloadCount,
+        fileInfo: changeInfo.fileInfo,
+        timestamp: changeInfo.timestamp
+      })
+
+      // 🆕 可以在这里添加更多配置变更后的处理逻辑
+      // 例如：重新加载某些模块、更新连接器配置等
+    } catch (error) {
+      this.logger.error('CONFIG', '处理配置变更失败', error)
+    }
+  }
+
+  /**
+   * 发送配置变更通知到钉钉
+   * @param {Object} data - 通知数据
+   */
+  async sendConfigChangeNotification(data) {
+    try {
+      const timestamp = data.timestamp ? new Date(data.timestamp).toLocaleString('zh-CN') : new Date().toLocaleString('zh-CN')
+
+      let message = ''
+
+      if (data.success) {
+        message = `🔄 **配置自动更新**\n\n`
+        message += `✅ 配置已成功重载\n`
+        message += `📅 时间: ${timestamp}\n`
+        message += `🔢 重载次数: ${data.reloadCount}\n`
+
+        if (data.fileInfo) {
+          message += `📄 文件大小: ${Math.round(data.fileInfo.size / 1024)} KB\n`
+        }
+      } else {
+        message = `⚠️ **配置重载失败**\n\n`
+        message += `❌ 错误: ${data.error}\n`
+        message += `📅 时间: ${timestamp}\n`
+        message += `\n请检查配置文件格式是否正确`
+      }
+
+      // 通过钉钉发送通知
+      await this.dingtalk.sendMarkdown(message)
+
+      this.logger.debug('CONFIG', '配置变更通知已发送')
+    } catch (error) {
+      this.logger.error('CONFIG', '发送配置变更通知失败', error)
     }
   }
 }

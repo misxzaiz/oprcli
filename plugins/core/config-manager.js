@@ -1,9 +1,15 @@
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 
 /**
  * 配置管理器
  * 负责系统配置的加载、保存、热更新和验证
+ *
+ * 🆕 新增功能（2026-03-05 自动升级优化）：
+ * - 文件监听和自动重载
+ * - 防抖机制避免频繁重载
+ * - 配置变更通知
  */
 class ConfigManager {
   constructor(logger) {
@@ -15,6 +21,15 @@ class ConfigManager {
     this.config = null;
     this.watchers = new Map();
     this.defaultConfig = null;
+
+    // 🆕 热重载相关
+    this.fileWatcher = null;
+    this.reloadTimer = null;
+    this.reloadDebounceMs = 1000; // 防抖延迟 1 秒
+    this.isReloading = false;
+    this.reloadCount = 0;
+    this.lastReloadTime = null;
+    this.changeListeners = []; // 🆕 配置变更监听器
   }
 
   /**
@@ -466,6 +481,220 @@ class ConfigManager {
       }
     }
     return count;
+  }
+
+  // ==================== 🆕 热重载功能 ====================
+
+  /**
+   * 启动文件监听（热重载）
+   */
+  startWatch() {
+    try {
+      // 先检查文件是否存在
+      if (!fsSync.existsSync(this.configPath)) {
+        this.logger.warning('CONFIG', '配置文件不存在，将在创建后启动监听');
+        // 延迟启动，等待文件创建
+        setTimeout(() => this.startWatch(), 5000);
+        return;
+      }
+
+      // 使用 fs.watch 监听文件变化
+      this.fileWatcher = fsSync.watch(this.configPath, (eventType, filename) => {
+        if (eventType === 'change') {
+          this.handleFileChange();
+        }
+      });
+
+      this.logger.success('CONFIG', '✓ 配置文件监听已启动（支持热重载）');
+    } catch (error) {
+      this.logger.error('CONFIG', '启动文件监听失败', error);
+      // 降级方案：使用定时轮询
+      this.startPolling();
+    }
+  }
+
+  /**
+   * 停止文件监听
+   */
+  stopWatch() {
+    try {
+      if (this.fileWatcher) {
+        this.fileWatcher.close();
+        this.fileWatcher = null;
+        this.logger.info('CONFIG', '配置文件监听已停止');
+      }
+
+      // 清除防抖定时器
+      if (this.reloadTimer) {
+        clearTimeout(this.reloadTimer);
+        this.reloadTimer = null;
+      }
+
+      // 停止轮询（如果正在使用）
+      if (this.pollingTimer) {
+        clearInterval(this.pollingTimer);
+        this.pollingTimer = null;
+      }
+    } catch (error) {
+      this.logger.error('CONFIG', '停止监听失败', error);
+    }
+  }
+
+  /**
+   * 处理文件变化（带防抖）
+   */
+  handleFileChange() {
+    // 清除之前的定时器（防抖）
+    if (this.reloadTimer) {
+      clearTimeout(this.reloadTimer);
+    }
+
+    // 设置新的定时器
+    this.reloadTimer = setTimeout(() => {
+      this.debouncedReload();
+    }, this.reloadDebounceMs);
+
+    this.logger.debug('CONFIG', '检测到配置文件变化，准备重载...');
+  }
+
+  /**
+   * 防抖重载配置
+   */
+  async debouncedReload() {
+    // 防止重载中重复触发
+    if (this.isReloading) {
+      this.logger.warning('CONFIG', '配置重载中，跳过本次重载');
+      return;
+    }
+
+    this.isReloading = true;
+    const oldConfig = JSON.stringify(this.config);
+
+    try {
+      this.logger.info('CONFIG', '🔄 正在自动重载配置...');
+
+      // 读取文件修改时间和大小
+      const stats = await fs.stat(this.configPath);
+      const fileInfo = {
+        size: stats.size,
+        modifiedTime: stats.mtime,
+        modifiedTimeISO: stats.mtime.toISOString()
+      };
+
+      // 执行重载
+      await this.reload();
+
+      // 记录统计
+      this.reloadCount++;
+      this.lastReloadTime = new Date();
+
+      const newConfig = JSON.stringify(this.config);
+      const hasChanged = oldConfig !== newConfig;
+
+      // 通知监听器
+      this.notifyConfigChange({
+        hasChanged,
+        fileInfo,
+        reloadCount: this.reloadCount,
+        timestamp: this.lastReloadTime
+      });
+
+      if (hasChanged) {
+        this.logger.success('CONFIG', `✓ 配置自动重载成功（第 ${this.reloadCount} 次）`);
+      } else {
+        this.logger.info('CONFIG', '配置内容未变化，跳过更新');
+      }
+    } catch (error) {
+      this.logger.error('CONFIG', '自动重载配置失败', error);
+      // 通知监听器重载失败
+      this.notifyConfigChange({
+        hasChanged: false,
+        error: error.message,
+        timestamp: new Date()
+      });
+    } finally {
+      this.isReloading = false;
+      this.reloadTimer = null;
+    }
+  }
+
+  /**
+   * 启动轮询模式（降级方案）
+   */
+  startPolling() {
+    this.logger.warning('CONFIG', '使用轮询模式（降级方案）');
+
+    let lastMtime = null;
+
+    this.pollingTimer = setInterval(async () => {
+      try {
+        const stats = await fs.stat(this.configPath);
+
+        if (lastMtime && stats.mtime > lastMtime) {
+          this.handleFileChange();
+        }
+
+        lastMtime = stats.mtime;
+      } catch (error) {
+        // 文件不存在，忽略
+      }
+    }, 5000); // 每 5 秒检查一次
+  }
+
+  /**
+   * 添加配置变更监听器
+   * @param {Function} callback - 回调函数，接收变更信息对象
+   */
+  addChangeListener(callback) {
+    if (typeof callback === 'function') {
+      this.changeListeners.push(callback);
+      this.logger.debug('CONFIG', '✓ 已添加配置变更监听器');
+    }
+  }
+
+  /**
+   * 移除配置变更监听器
+   */
+  removeChangeListener(callback) {
+    const index = this.changeListeners.indexOf(callback);
+    if (index >= 0) {
+      this.changeListeners.splice(index, 1);
+      this.logger.debug('CONFIG', '✓ 已移除配置变更监听器');
+    }
+  }
+
+  /**
+   * 通知配置变更
+   */
+  notifyConfigChange(changeInfo) {
+    for (const listener of this.changeListeners) {
+      try {
+        listener(changeInfo);
+      } catch (error) {
+        this.logger.error('CONFIG', '配置变更监听器执行失败', error);
+      }
+    }
+  }
+
+  /**
+   * 获取重载统计信息
+   */
+  getReloadStats() {
+    return {
+      reloadCount: this.reloadCount,
+      lastReloadTime: this.lastReloadTime,
+      isReloading: this.isReloading,
+      isWatching: !!this.fileWatcher || !!this.pollingTimer,
+      changeListeners: this.changeListeners.length
+    };
+  }
+
+  /**
+   * 手动触发重载（用于测试）
+   */
+  async triggerReload() {
+    this.logger.info('CONFIG', '手动触发配置重载');
+    await this.debouncedReload();
   }
 }
 
