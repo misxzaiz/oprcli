@@ -1,0 +1,1760 @@
+{
+  "timestamp": "2026-03-05T16:02:09.656Z",
+  "files": [
+    {
+      "path": "D:\\space\\oprcli\\utils\\app-errors.js",
+      "category": "Utils",
+      "name": "app-errors.js",
+      "size": 4662,
+      "lines": 205,
+      "functions": [
+        "constructor",
+        "recordError",
+        "getStats",
+        "getRecentErrors",
+        "reset",
+        "toJSON"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 7
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\batch-logger.js",
+      "category": "Utils",
+      "name": "batch-logger.js",
+      "size": 7315,
+      "lines": 318,
+      "functions": [
+        "createBatchLoggerMiddleware",
+        "constructor",
+        "_initLogFile",
+        "_startFlushTimer",
+        "log",
+        "_formatLogEntry",
+        "flush",
+        "_writeToFile",
+        "_rotateLogFile",
+        "flushSync",
+        "getStats",
+        "clear",
+        "stop",
+        "destroy"
+      ],
+      "imports": [
+        "fs",
+        "path"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 24
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\cache-manager.js",
+      "category": "Utils",
+      "name": "cache-manager.js",
+      "size": 14020,
+      "lines": 586,
+      "functions": [
+        "createCacheMiddleware",
+        "constructor",
+        "set",
+        "get",
+        "delete",
+        "has",
+        "clear",
+        "cleanup",
+        "getStats",
+        "getDetails",
+        "disable",
+        "enable",
+        "destroy",
+        "_estimateSize",
+        "_calculateMemoryUsage",
+        "smartCleanup",
+        "warmup",
+        "registerLoader",
+        "smartWarmup",
+        "getHotKeys",
+        "getHitRate",
+        "getDetailedStats",
+        "_trackAccess",
+        "_startAutoWarmup",
+        "predictNextKeys",
+        "clearHotKeys",
+        "function"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 55
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\config.js",
+      "category": "Utils",
+      "name": "config.js",
+      "size": 14854,
+      "lines": 499,
+      "functions": [
+        "constructor",
+        "load",
+        "_parseList",
+        "_loadSystemPromptFromFile",
+        "getSystemPrompt",
+        "_processEscapedNewlines",
+        "validate",
+        "_checkFileExists",
+        "_checkDirectoryExists",
+        "getConnectorOptions",
+        "getSafeConfig",
+        "getSensitiveFields",
+        "addSensitiveFields",
+        "getCacheStats",
+        "clearPromptCache"
+      ],
+      "imports": [
+        "fs",
+        "path",
+        "./sanitizer"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 49
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\deduplication-middleware.js",
+      "category": "Utils",
+      "name": "deduplication-middleware.js",
+      "size": 6348,
+      "lines": 212,
+      "functions": [
+        "deduplicationMiddleware",
+        "deduplication",
+        "generateFingerprint",
+        "createIpBasedDeduplication",
+        "createUserBasedDeduplication",
+        "getStats"
+      ],
+      "imports": [
+        "./deduplication-middleware",
+        "crypto"
+      ],
+      "exports": [
+        "createIpBasedDeduplication",
+        "createUserBasedDeduplication",
+        "getStats"
+      ],
+      "hasJSDoc": true,
+      "complexity": 15
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\env-manager.js",
+      "category": "Utils",
+      "name": "env-manager.js",
+      "size": 12930,
+      "lines": 492,
+      "functions": [
+        "constructor",
+        "_registerDefinitions",
+        "define",
+        "get",
+        "_convertType",
+        "validate",
+        "getAll",
+        "_maskValue",
+        "generateDocs",
+        "getSummary"
+      ],
+      "imports": [],
+      "exports": [
+        "default"
+      ],
+      "hasJSDoc": true,
+      "complexity": 37
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\error-handler.js",
+      "category": "Utils",
+      "name": "error-handler.js",
+      "size": 10341,
+      "lines": 399,
+      "functions": [
+        "constructor",
+        "createErrorResponse",
+        "sanitizeErrorMessage",
+        "classifyError",
+        "includes",
+        "logError",
+        "updateErrorStats",
+        "getErrorStats",
+        "resetErrorStats",
+        "handleCriticalError",
+        "sendCriticalErrorAlert",
+        "createErrorMiddleware",
+        "asyncHandler",
+        "createErrorClass"
+      ],
+      "imports": [
+        "../integrations/logger"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 30
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\error-recovery.js",
+      "category": "Utils",
+      "name": "error-recovery.js",
+      "size": 8765,
+      "lines": 390,
+      "functions": [
+        "withRetry",
+        "withCircuitBreaker",
+        "constructor",
+        "calculateDelay",
+        "isRetryableError",
+        "execute",
+        "sleep",
+        "reset",
+        "onSuccess",
+        "onFailure",
+        "transitionTo",
+        "getState",
+        "createRetryer",
+        "createCircuitBreaker",
+        "registerFallback",
+        "getStatus"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 30
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\graceful-shutdown.js",
+      "category": "Utils",
+      "name": "graceful-shutdown.js",
+      "size": 5502,
+      "lines": 203,
+      "functions": [
+        "constructor",
+        "setup",
+        "registerCleanupTask",
+        "shutdown",
+        "_stopAcceptingConnections",
+        "_waitForRequests",
+        "_executeCleanupTasks",
+        "_closeServer",
+        "triggerShutdown"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 14
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\health-check.js",
+      "category": "Utils",
+      "name": "health-check.js",
+      "size": 11776,
+      "lines": 494,
+      "functions": [
+        "createDefaultHealthChecker",
+        "constructor",
+        "isHealthy",
+        "isDegraded",
+        "isUnhealthy",
+        "toJSON",
+        "registerCheck",
+        "executeCheck",
+        "checkAll",
+        "addToHistory",
+        "getHistory",
+        "collectSystemInfo",
+        "collectProcessInfo",
+        "collectAppInfo",
+        "collectFileSystemInfo",
+        "generateDiagnosticsReport",
+        "recordRequest",
+        "recordOperation",
+        "recordMemorySample",
+        "getPerformanceReport",
+        "reset"
+      ],
+      "imports": [
+        "os",
+        "perf_hooks",
+        "fs",
+        "path"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 23
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\health-enhanced.js",
+      "category": "Utils",
+      "name": "health-enhanced.js",
+      "size": 7549,
+      "lines": 298,
+      "functions": [
+        "constructor",
+        "registerCheck",
+        "performCheck",
+        "checkAll",
+        "getDependenciesStatus",
+        "getResourcesStatus",
+        "getHealthTrends",
+        "addToHistory",
+        "clearCache",
+        "getCacheStats"
+      ],
+      "imports": [
+        "os"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 21
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\input-validator-middleware.js",
+      "category": "Utils",
+      "name": "input-validator-middleware.js",
+      "size": 10400,
+      "lines": 447,
+      "functions": [
+        "detectMaliciousInput",
+        "securityCheck",
+        "validateString",
+        "validateRequest",
+        "quickSecurityCheck",
+        "checkObjectForThreats"
+      ],
+      "imports": [
+        "./app-errors"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 49
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\input-validator.js",
+      "category": "Utils",
+      "name": "input-validator.js",
+      "size": 9117,
+      "lines": 371,
+      "functions": [
+        "constructor",
+        "validateLength",
+        "validateMessage",
+        "validateSessionId",
+        "validateConfigKey",
+        "validateProvider",
+        "sanitizeHtml",
+        "validateRequestBody",
+        "validatePathParam",
+        "detectSqlInjection",
+        "detectCommandInjection",
+        "performSecurityCheck",
+        "validateMultiple"
+      ],
+      "imports": [
+        "../integrations/logger"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 46
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\memory-cleaner.js",
+      "category": "Utils",
+      "name": "memory-cleaner.js",
+      "size": 7822,
+      "lines": 293,
+      "functions": [
+        "getGlobalMemoryCleaner",
+        "memoryCheckMiddleware",
+        "constructor",
+        "start",
+        "stop",
+        "checkAndClean",
+        "performCleanup",
+        "registerCleanupTask",
+        "getStats",
+        "forceCleanup",
+        "resetStats"
+      ],
+      "imports": [
+        "../integrations/logger"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 16
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\memory-monitor-enhanced.js",
+      "category": "Utils",
+      "name": "memory-monitor-enhanced.js",
+      "size": 10473,
+      "lines": 398,
+      "functions": [
+        "constructor",
+        "start",
+        "stop",
+        "check",
+        "getMemoryInfo",
+        "addToHistory",
+        "updateStats",
+        "checkThresholds",
+        "detectLeak",
+        "formatMemoryInfo",
+        "formatBytes",
+        "triggerGC",
+        "trackGC",
+        "getTrend",
+        "getReport",
+        "getHealthStatus",
+        "dispose"
+      ],
+      "imports": [
+        "os",
+        "v8"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 36
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\memory-monitor.js",
+      "category": "Utils",
+      "name": "memory-monitor.js",
+      "size": 7501,
+      "lines": 293,
+      "functions": [
+        "constructor",
+        "start",
+        "stop",
+        "_collect",
+        "_checkThreshold",
+        "getStats",
+        "getHistory",
+        "setThreshold",
+        "setInterval",
+        "forceGC",
+        "_formatBytes",
+        "_formatDuration",
+        "destroy"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 23
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\message-formatter.js",
+      "category": "Utils",
+      "name": "message-formatter.js",
+      "size": 6895,
+      "lines": 229,
+      "functions": [
+        "constructor",
+        "formatEvent",
+        "_formatThinking",
+        "_formatToolStart",
+        "_formatToolOutput",
+        "_formatToolEnd",
+        "_formatAssistant",
+        "_formatError",
+        "_formatResult",
+        "_formatSessionEnd",
+        "_formatThinkingFromAssistant",
+        "_buildMessage",
+        "_getToolIcon"
+      ],
+      "imports": [
+        "./string-helper"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 29
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\middleware.js",
+      "category": "Utils",
+      "name": "middleware.js",
+      "size": 12912,
+      "lines": 482,
+      "functions": [
+        "requestIdMiddleware",
+        "securityHeadersMiddleware",
+        "corsMiddleware",
+        "requestTimeoutMiddleware",
+        "cacheControlMiddleware",
+        "requestSizeLimitMiddleware",
+        "performanceMonitorMiddleware",
+        "getPerformanceStats",
+        "errorHandlerMiddleware",
+        "notFoundMiddleware",
+        "validateEnv",
+        "asyncHandler"
+      ],
+      "imports": [
+        "crypto",
+        "./request-stats"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 33
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\notification-queue.js",
+      "category": "Utils",
+      "name": "notification-queue.js",
+      "size": 10331,
+      "lines": 395,
+      "functions": [
+        "constructor",
+        "_ensureCacheDir",
+        "_loadFailedCache",
+        "_saveFailedCache",
+        "add",
+        "_tryAggregate",
+        "_cleanupAggregationWindow",
+        "process",
+        "_handleFailedItem",
+        "retryFailed",
+        "clear",
+        "getStats",
+        "getStatus",
+        "_generateId",
+        "startAutoProcess",
+        "stopAutoProcess"
+      ],
+      "imports": [
+        "fs",
+        "path"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 30
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\performance-tracker.js",
+      "category": "Utils",
+      "name": "performance-tracker.js",
+      "size": 9269,
+      "lines": 372,
+      "functions": [
+        "constructor",
+        "middleware",
+        "_recordRequest",
+        "getSummary",
+        "getRouteReport",
+        "getStatusDistribution",
+        "getSlowRequests",
+        "getPerformanceAdvice",
+        "generateReport",
+        "reset",
+        "enable",
+        "disable",
+        "exportData"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 20
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\platform.js",
+      "category": "Utils",
+      "name": "platform.js",
+      "size": 930,
+      "lines": 54,
+      "functions": [
+        "isWindows",
+        "isMac",
+        "isLinux",
+        "getKillCommand"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 4
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\rate-limit.js",
+      "category": "Utils",
+      "name": "rate-limit.js",
+      "size": 3597,
+      "lines": 131,
+      "functions": [
+        "createRateLimit",
+        "getClientIP",
+        "createStrictRateLimit",
+        "createMediumRateLimit",
+        "createLooseRateLimit"
+      ],
+      "imports": [
+        "./rate-limiter-memory"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 8
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\rate-limiter-memory.js",
+      "category": "Utils",
+      "name": "rate-limiter-memory.js",
+      "size": 2145,
+      "lines": 110,
+      "functions": [
+        "constructor",
+        "increment",
+        "reset",
+        "cleanup",
+        "getStats",
+        "clear",
+        "destroy"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 8
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\rate-limiter.js",
+      "category": "Utils",
+      "name": "rate-limiter.js",
+      "size": 2487,
+      "lines": 95,
+      "functions": [
+        "constructor",
+        "waitForSlot",
+        "sleep",
+        "getStats",
+        "resetStats"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 7
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\request-deduplication.js",
+      "category": "Utils",
+      "name": "request-deduplication.js",
+      "size": 3519,
+      "lines": 171,
+      "functions": [
+        "requestDeduplication",
+        "constructor",
+        "generateFingerprint",
+        "isDuplicate",
+        "cleanup",
+        "clear",
+        "getStats"
+      ],
+      "imports": [
+        "crypto"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 14
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\request-stats.js",
+      "category": "Utils",
+      "name": "request-stats.js",
+      "size": 7451,
+      "lines": 255,
+      "functions": [
+        "constructor",
+        "recordRequest",
+        "getStats",
+        "getEndpointStats",
+        "getRecentRequests",
+        "getWindowStats",
+        "reset",
+        "getPerformanceReport"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 12
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\response-cache.js",
+      "category": "Utils",
+      "name": "response-cache.js",
+      "size": 8101,
+      "lines": 374,
+      "functions": [
+        "responseCache",
+        "clearCache",
+        "constructor",
+        "generateKey",
+        "set",
+        "get",
+        "delete",
+        "clear",
+        "startCleanup",
+        "stopCleanup",
+        "getStats",
+        "function"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 28
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\response-formatter.js",
+      "category": "Utils",
+      "name": "response-formatter.js",
+      "size": 8047,
+      "lines": 291,
+      "functions": [
+        "constructor",
+        "success",
+        "error",
+        "paginated",
+        "validationError",
+        "unauthorized",
+        "forbidden",
+        "notFound",
+        "badRequest",
+        "serverError",
+        "serviceUnavailable",
+        "timeout",
+        "batchResult",
+        "fromError",
+        "_addCommonFields",
+        "_getErrorCode",
+        "middleware",
+        "function"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 12
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\response-optimizer.js",
+      "category": "Utils",
+      "name": "response-optimizer.js",
+      "size": 7429,
+      "lines": 311,
+      "functions": [
+        "createResponseOptimizer",
+        "constructor",
+        "middleware",
+        "batchMiddleware",
+        "_handleBatchRequest",
+        "_minifyData",
+        "_calculateSize",
+        "optimizeErrorResponse",
+        "createPaginatedResponse",
+        "createSuccessResponse",
+        "createErrorResponse",
+        "getStats",
+        "resetStats",
+        "enable",
+        "disable"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 17
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\retry-helper.js",
+      "category": "Utils",
+      "name": "retry-helper.js",
+      "size": 5629,
+      "lines": 209,
+      "functions": [
+        "createAxiosRetryInterceptor",
+        "withRetry",
+        "constructor",
+        "execute",
+        "_shouldRetry",
+        "_calculateDelay",
+        "_sleep",
+        "function"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 14
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\sanitizer.js",
+      "category": "Utils",
+      "name": "sanitizer.js",
+      "size": 6332,
+      "lines": 237,
+      "functions": [
+        "constructor",
+        "isSensitiveField",
+        "isSensitiveValue",
+        "sanitizeValue",
+        "sanitizeObject",
+        "sanitizeConfig",
+        "sanitizeMessage",
+        "addSensitivePattern",
+        "getSensitivePatterns"
+      ],
+      "imports": [],
+      "exports": [
+        "SanitizerClass"
+      ],
+      "hasJSDoc": true,
+      "complexity": 28
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\security-enhancer.js",
+      "category": "Utils",
+      "name": "security-enhancer.js",
+      "size": 10528,
+      "lines": 443,
+      "functions": [
+        "constructor",
+        "createEnhancedSecurityHeaders",
+        "buildCSP",
+        "buildPermissionsPolicy",
+        "createCSPMiddleware",
+        "createSecurityHeadersMiddleware",
+        "generateNonce",
+        "validateOrigin",
+        "detectPathTraversal",
+        "sanitizePath",
+        "detectSSRF",
+        "detectMaliciousUserAgent",
+        "createSizeLimitMiddleware",
+        "parseSize",
+        "generateSecureToken",
+        "validateToken"
+      ],
+      "imports": [
+        "../integrations/logger",
+        "crypto"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 35
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\startup-check.js",
+      "category": "Utils",
+      "name": "startup-check.js",
+      "size": 8170,
+      "lines": 314,
+      "functions": [
+        "constructor",
+        "checkEnvVars",
+        "checkNodeVersion",
+        "ensureDir",
+        "checkFile",
+        "checkPort",
+        "getResult",
+        "checkSystemResources",
+        "checkDependencies",
+        "checkConfig",
+        "checkGit",
+        "printResult",
+        "generateReport"
+      ],
+      "imports": [
+        "fs",
+        "path",
+        "os",
+        "net",
+        "child_process"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 35
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\string-helper.js",
+      "category": "Utils",
+      "name": "string-helper.js",
+      "size": 1824,
+      "lines": 81,
+      "functions": [
+        "truncate",
+        "preview",
+        "safeTrim",
+        "isEmpty",
+        "isNonEmpty",
+        "simpleHash"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 7
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\task-queue.js",
+      "category": "Utils",
+      "name": "task-queue.js",
+      "size": 6510,
+      "lines": 266,
+      "functions": [
+        "constructor",
+        "add",
+        "_processQueue",
+        "_executeWithTimeout",
+        "_generateId",
+        "getStats",
+        "getStatus",
+        "clear",
+        "pause",
+        "resume",
+        "onIdle",
+        "resetStats"
+      ],
+      "imports": [],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 10
+    },
+    {
+      "path": "D:\\space\\oprcli\\utils\\validators.js",
+      "category": "Utils",
+      "name": "validators.js",
+      "size": 9453,
+      "lines": 416,
+      "functions": [
+        "constructor",
+        "addError",
+        "addWarning",
+        "toJSON",
+        "validateString",
+        "validateNumber",
+        "validateObject",
+        "validateArray",
+        "validateCommand",
+        "sanitize",
+        "validateBody",
+        "checkPerformanceThreshold"
+      ],
+      "imports": [
+        "perf_hooks"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 57
+    },
+    {
+      "path": "D:\\space\\oprcli\\connectors\\base-connector.js",
+      "category": "Connectors",
+      "name": "base-connector.js",
+      "size": 10257,
+      "lines": 367,
+      "functions": [
+        "constructor",
+        "connect",
+        "startSession",
+        "continueSession",
+        "interruptSession",
+        "getActiveSessions",
+        "onSessionIdUpdate",
+        "_connectInternal",
+        "_startSessionInternal",
+        "_continueSessionInternal",
+        "_interruptSessionInternal",
+        "_ensureConnected",
+        "_registerSession",
+        "_unregisterSession",
+        "_getSession",
+        "_generateTempId",
+        "_terminateProcess",
+        "_isWindows",
+        "_testCommandGeneric",
+        "getSchedulerTools",
+        "handleSchedulerTool"
+      ],
+      "imports": [
+        "child_process"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 34
+    },
+    {
+      "path": "D:\\space\\oprcli\\connectors\\claude-connector.js",
+      "category": "Connectors",
+      "name": "claude-connector.js",
+      "size": 9993,
+      "lines": 351,
+      "functions": [
+        "constructor",
+        "_connectInternal",
+        "_validatePaths",
+        "_testCommand",
+        "_startSessionInternal",
+        "_continueSessionInternal",
+        "_interruptSessionInternal",
+        "_resolveNodeAndCli",
+        "_buildCommandArgs",
+        "_spawnProcess",
+        "_setupEventHandlers"
+      ],
+      "imports": [
+        "./base-connector",
+        "child_process",
+        "path",
+        "fs"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 42
+    },
+    {
+      "path": "D:\\space\\oprcli\\connectors\\iflow-connector.js",
+      "category": "Connectors",
+      "name": "iflow-connector.js",
+      "size": 16882,
+      "lines": 581,
+      "functions": [
+        "constructor",
+        "_connectInternal",
+        "_testCommand",
+        "_startSessionInternal",
+        "_continueSessionInternal",
+        "_interruptSessionInternal",
+        "_buildCommandArgs",
+        "_buildFullMessage",
+        "_spawnProcess",
+        "_setupEventHandlers",
+        "_startJsonlMonitor",
+        "_findLatestJsonl",
+        "_getIflowConfigDir",
+        "_encodeProjectPath",
+        "_getProjectSessionDir",
+        "_findSessionJsonl",
+        "_parseJsonlLine",
+        "_toStreamEvents",
+        "_toAssistantEvent",
+        "_parseContent",
+        "_extractToolResults",
+        "_extractToolOutput"
+      ],
+      "imports": [
+        "./base-connector",
+        "child_process",
+        "path",
+        "fs"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 79
+    },
+    {
+      "path": "D:\\space\\oprcli\\integrations\\dingtalk.js",
+      "category": "Integrations",
+      "name": "dingtalk.js",
+      "size": 14889,
+      "lines": 493,
+      "functions": [
+        "constructor",
+        "init",
+        "registerMessageHandler",
+        "send",
+        "sleep",
+        "isProcessed",
+        "markAsProcessed",
+        "setSession",
+        "getSession",
+        "getSessionId",
+        "getProvider",
+        "deleteSession",
+        "hasSession",
+        "getActiveSessions",
+        "clearSessions",
+        "close",
+        "startAutoCleanup",
+        "stopAutoCleanup",
+        "performCleanup",
+        "cleanExpiredMessages",
+        "cleanExpiredSessions",
+        "manualCleanup",
+        "getCleanupStats",
+        "updateCleanupConfig"
+      ],
+      "imports": [
+        "axios",
+        "dingtalk-stream"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 39
+    },
+    {
+      "path": "D:\\space\\oprcli\\integrations\\logger.js",
+      "category": "Integrations",
+      "name": "logger.js",
+      "size": 4535,
+      "lines": 156,
+      "functions": [
+        "constructor",
+        "log",
+        "debug",
+        "info",
+        "event",
+        "success",
+        "warning",
+        "error",
+        "getStats",
+        "resetStats",
+        "getLastActiveTime",
+        "_logStructured"
+      ],
+      "imports": [
+        "os"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 6
+    },
+    {
+      "path": "D:\\space\\oprcli\\plugins\\core\\config-manager.js",
+      "category": "Plugins",
+      "name": "config-manager.js",
+      "size": 26524,
+      "lines": 995,
+      "functions": [
+        "constructor",
+        "init",
+        "loadDefaultConfig",
+        "loadUserConfig",
+        "getDefaultConfig",
+        "mergeConfig",
+        "validateConfig",
+        "get",
+        "set",
+        "setMultiple",
+        "save",
+        "reload",
+        "reset",
+        "watch",
+        "unwatch",
+        "notifyChange",
+        "addTool",
+        "removeTool",
+        "addPluginConfig",
+        "getPluginConfig",
+        "getAll",
+        "export",
+        "import",
+        "getStats",
+        "countKeys",
+        "startWatch",
+        "stopWatch",
+        "handleFileChange",
+        "debouncedReload",
+        "startPolling",
+        "addChangeListener",
+        "removeChangeListener",
+        "notifyConfigChange",
+        "getReloadStats",
+        "triggerReload",
+        "backup",
+        "listBackups",
+        "restoreBackup",
+        "deleteBackup",
+        "cleanOldBackups",
+        "validateConfigDeep",
+        "getSummary"
+      ],
+      "imports": [
+        "fs",
+        "path"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 101
+    },
+    {
+      "path": "D:\\space\\oprcli\\plugins\\core\\context-memory.js",
+      "category": "Plugins",
+      "name": "context-memory.js",
+      "size": 10790,
+      "lines": 452,
+      "functions": [
+        "constructor",
+        "init",
+        "load",
+        "save",
+        "set",
+        "get",
+        "has",
+        "delete",
+        "clear",
+        "saveSession",
+        "getSession",
+        "deleteSession",
+        "saveSharedContext",
+        "getSharedContext",
+        "saveUserPreference",
+        "getUserPreference",
+        "search",
+        "list",
+        "listByType",
+        "cleanup",
+        "startCleanupTask",
+        "generateId",
+        "getStats",
+        "export",
+        "import"
+      ],
+      "imports": [
+        "fs",
+        "path",
+        "crypto"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 33
+    },
+    {
+      "path": "D:\\space\\oprcli\\plugins\\core\\plugin-manager.js",
+      "category": "Plugins",
+      "name": "plugin-manager.js",
+      "size": 8360,
+      "lines": 339,
+      "functions": [
+        "constructor",
+        "registerPlugin",
+        "unregisterPlugin",
+        "loadPluginsFromDir",
+        "getPlugin",
+        "hasPlugin",
+        "listPlugins",
+        "registerHook",
+        "executeHook",
+        "validatePlugin",
+        "generatePluginDoc",
+        "formatAPI",
+        "formatConfig",
+        "updatePluginIndex",
+        "getStats"
+      ],
+      "imports": [
+        "fs",
+        "path"
+      ],
+      "exports": [],
+      "hasJSDoc": true,
+      "complexity": 35
+    }
+  ],
+  "duplicates": [
+    {
+      "pattern": "input-validator",
+      "files": [
+        {
+          "name": "input-validator-middleware.js",
+          "size": 10400
+        },
+        {
+          "name": "input-validator.js",
+          "size": 9117
+        }
+      ],
+      "totalSize": 19517,
+      "recommendation": {
+        "action": "review",
+        "reason": "功能相似，建议审查是否可以合并",
+        "priority": "low"
+      }
+    },
+    {
+      "pattern": "memory-monitor",
+      "files": [
+        {
+          "name": "memory-monitor-enhanced.js",
+          "size": 10473
+        },
+        {
+          "name": "memory-monitor.js",
+          "size": 7501
+        }
+      ],
+      "totalSize": 17974,
+      "recommendation": {
+        "action": "merge",
+        "reason": "存在增强版本，建议合并或移除旧版本",
+        "priority": "medium"
+      }
+    },
+    {
+      "pattern": "错误处理模式",
+      "file": "batch-logger.js",
+      "count": 5,
+      "description": "Try-catch 错误处理",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "配置读取模式",
+      "file": "deduplication-middleware.js",
+      "count": 13,
+      "description": "配置对象访问",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "日志记录模式",
+      "file": "error-handler.js",
+      "count": 8,
+      "description": "日志记录调用",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "日志记录模式",
+      "file": "graceful-shutdown.js",
+      "count": 11,
+      "description": "日志记录调用",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "错误处理模式",
+      "file": "health-check.js",
+      "count": 4,
+      "description": "Try-catch 错误处理",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "配置读取模式",
+      "file": "health-check.js",
+      "count": 12,
+      "description": "配置对象访问",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "日志记录模式",
+      "file": "memory-cleaner.js",
+      "count": 9,
+      "description": "日志记录调用",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "日志记录模式",
+      "file": "memory-monitor-enhanced.js",
+      "count": 9,
+      "description": "日志记录调用",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "日志记录模式",
+      "file": "memory-monitor.js",
+      "count": 7,
+      "description": "日志记录调用",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "配置读取模式",
+      "file": "message-formatter.js",
+      "count": 13,
+      "description": "配置对象访问",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "错误处理模式",
+      "file": "notification-queue.js",
+      "count": 4,
+      "description": "Try-catch 错误处理",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "日志记录模式",
+      "file": "notification-queue.js",
+      "count": 14,
+      "description": "日志记录调用",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "配置读取模式",
+      "file": "retry-helper.js",
+      "count": 19,
+      "description": "配置对象访问",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "配置读取模式",
+      "file": "startup-check.js",
+      "count": 10,
+      "description": "配置对象访问",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "错误处理模式",
+      "file": "claude-connector.js",
+      "count": 5,
+      "description": "Try-catch 错误处理",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "日志记录模式",
+      "file": "dingtalk.js",
+      "count": 24,
+      "description": "日志记录调用",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "配置读取模式",
+      "file": "dingtalk.js",
+      "count": 5,
+      "description": "配置对象访问",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "错误处理模式",
+      "file": "config-manager.js",
+      "count": 26,
+      "description": "Try-catch 错误处理",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "日志记录模式",
+      "file": "config-manager.js",
+      "count": 40,
+      "description": "日志记录调用",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "配置读取模式",
+      "file": "config-manager.js",
+      "count": 35,
+      "description": "配置对象访问",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "错误处理模式",
+      "file": "context-memory.js",
+      "count": 15,
+      "description": "Try-catch 错误处理",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "日志记录模式",
+      "file": "context-memory.js",
+      "count": 23,
+      "description": "日志记录调用",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "错误处理模式",
+      "file": "plugin-manager.js",
+      "count": 6,
+      "description": "Try-catch 错误处理",
+      "type": "code_pattern"
+    },
+    {
+      "pattern": "日志记录模式",
+      "file": "plugin-manager.js",
+      "count": 7,
+      "description": "日志记录调用",
+      "type": "code_pattern"
+    }
+  ],
+  "complexity": [],
+  "naming": [],
+  "summary": {
+    "totalFiles": 44,
+    "totalLines": 14868,
+    "totalSize": 374,
+    "avgComplexity": 28.5,
+    "highComplexityFiles": 27,
+    "jsdocCoverage": 100,
+    "duplicatePatterns": 26,
+    "avgFileSize": 8.5
+  },
+  "recommendations": [
+    {
+      "category": "重复代码",
+      "priority": "medium",
+      "title": "合并重复文件: input-validator",
+      "description": "发现 2 个相似文件，总大小 19KB",
+      "action": "review_and_merge",
+      "files": [
+        "input-validator-middleware.js",
+        "input-validator.js"
+      ]
+    },
+    {
+      "category": "重复代码",
+      "priority": "medium",
+      "title": "合并重复文件: memory-monitor",
+      "description": "发现 2 个相似文件，总大小 18KB",
+      "action": "review_and_merge",
+      "files": [
+        "memory-monitor-enhanced.js",
+        "memory-monitor.js"
+      ]
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: batch-logger.js",
+      "description": "复杂度为 24，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "batch-logger.js",
+      "currentComplexity": 24
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: cache-manager.js",
+      "description": "复杂度为 55，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "cache-manager.js",
+      "currentComplexity": 55
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: config.js",
+      "description": "复杂度为 49，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "config.js",
+      "currentComplexity": 49
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: env-manager.js",
+      "description": "复杂度为 37，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "env-manager.js",
+      "currentComplexity": 37
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: error-handler.js",
+      "description": "复杂度为 30，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "error-handler.js",
+      "currentComplexity": 30
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: error-recovery.js",
+      "description": "复杂度为 30，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "error-recovery.js",
+      "currentComplexity": 30
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: health-check.js",
+      "description": "复杂度为 23，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "health-check.js",
+      "currentComplexity": 23
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: health-enhanced.js",
+      "description": "复杂度为 21，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "health-enhanced.js",
+      "currentComplexity": 21
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: input-validator-middleware.js",
+      "description": "复杂度为 49，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "input-validator-middleware.js",
+      "currentComplexity": 49
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: input-validator.js",
+      "description": "复杂度为 46，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "input-validator.js",
+      "currentComplexity": 46
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: memory-monitor-enhanced.js",
+      "description": "复杂度为 36，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "memory-monitor-enhanced.js",
+      "currentComplexity": 36
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: memory-monitor.js",
+      "description": "复杂度为 23，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "memory-monitor.js",
+      "currentComplexity": 23
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: message-formatter.js",
+      "description": "复杂度为 29，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "message-formatter.js",
+      "currentComplexity": 29
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: middleware.js",
+      "description": "复杂度为 33，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "middleware.js",
+      "currentComplexity": 33
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: notification-queue.js",
+      "description": "复杂度为 30，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "notification-queue.js",
+      "currentComplexity": 30
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: response-cache.js",
+      "description": "复杂度为 28，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "response-cache.js",
+      "currentComplexity": 28
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: sanitizer.js",
+      "description": "复杂度为 28，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "sanitizer.js",
+      "currentComplexity": 28
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: security-enhancer.js",
+      "description": "复杂度为 35，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "security-enhancer.js",
+      "currentComplexity": 35
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: startup-check.js",
+      "description": "复杂度为 35，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "startup-check.js",
+      "currentComplexity": 35
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: validators.js",
+      "description": "复杂度为 57，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "validators.js",
+      "currentComplexity": 57
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: base-connector.js",
+      "description": "复杂度为 34，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "base-connector.js",
+      "currentComplexity": 34
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: claude-connector.js",
+      "description": "复杂度为 42，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "claude-connector.js",
+      "currentComplexity": 42
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: iflow-connector.js",
+      "description": "复杂度为 79，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "iflow-connector.js",
+      "currentComplexity": 79
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: dingtalk.js",
+      "description": "复杂度为 39，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "dingtalk.js",
+      "currentComplexity": 39
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: config-manager.js",
+      "description": "复杂度为 101，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "config-manager.js",
+      "currentComplexity": 101
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: context-memory.js",
+      "description": "复杂度为 33，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "context-memory.js",
+      "currentComplexity": 33
+    },
+    {
+      "category": "代码复杂度",
+      "priority": "high",
+      "title": "降低复杂度: plugin-manager.js",
+      "description": "复杂度为 35，建议重构为更小的函数",
+      "action": "refactor",
+      "file": "plugin-manager.js",
+      "currentComplexity": 35
+    },
+    {
+      "category": "文件大小",
+      "priority": "medium",
+      "title": "拆分大文件: iflow-connector.js",
+      "description": "文件大小为 16KB，建议拆分",
+      "action": "split",
+      "file": "iflow-connector.js",
+      "currentSize": 16
+    },
+    {
+      "category": "文件大小",
+      "priority": "medium",
+      "title": "拆分大文件: config-manager.js",
+      "description": "文件大小为 26KB，建议拆分",
+      "action": "split",
+      "file": "config-manager.js",
+      "currentSize": 26
+    }
+  ],
+  "generatedAt": "2026/3/6 00:02:09"
+}

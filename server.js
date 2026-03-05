@@ -54,7 +54,7 @@ const { AppError } = require('./utils/app-errors')
 // 🆕 性能和稳定性增强（2026-03-05 第二轮优化）
 const { CacheManager, createCacheMiddleware } = require('./utils/cache-manager')
 const GracefulShutdown = require('./utils/graceful-shutdown')
-const MemoryMonitor = require('./utils/memory-monitor')
+const MemoryMonitorEnhanced = require('./utils/memory-monitor-enhanced')
 const { createAxiosRetryInterceptor } = require('./utils/retry-helper')
 
 // 🆕 安全增强（2026-03-05 第三轮优化）
@@ -129,11 +129,14 @@ class UnifiedServer {
       maxEntries: parseInt(process.env.CACHE_MAX_ENTRIES || '1000', 10)
     })
 
-    // 🆕 内存监控器（2026-03-05 第二轮优化）
-    this.memoryMonitor = new MemoryMonitor(this.logger, {
-      interval: parseInt(process.env.MEMORY_MONITOR_INTERVAL || '60000', 10),
-      threshold: parseInt(process.env.MEMORY_THRESHOLD || '524288000', 10), // 500MB
-      alertCooldown: parseInt(process.env.MEMORY_ALERT_COOLDOWN || '300000', 10) // 5 分钟
+    // 🆕 增强型内存监控器（2026-03-06 优化）
+    this.memoryMonitor = new MemoryMonitorEnhanced(this.logger, {
+      intervalMs: parseInt(process.env.MEMORY_MONITOR_INTERVAL || '60000', 10),
+      warningThreshold: parseFloat(process.env.MEMORY_WARNING_THRESHOLD || '0.7'), // 70%
+      criticalThreshold: parseFloat(process.env.MEMORY_CRITICAL_THRESHOLD || '0.85'), // 85%
+      maxHistorySize: parseInt(process.env.MEMORY_HISTORY_SIZE || '60', 10),
+      leakDetectionEnabled: process.env.MEMORY_LEAK_DETECTION !== 'false',
+      trackGC: process.env.MEMORY_TRACK_GC === 'true'
     })
 
     // 🆕 优雅关闭处理器（2026-03-05 第二轮优化）

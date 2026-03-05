@@ -1,0 +1,410 @@
+{
+  "timestamp": "2026-03-05T16:01:30.911Z",
+  "tests": [
+    {
+      "category": "连接",
+      "name": "服务器健康检查",
+      "status": "FAIL",
+      "details": "请求超时",
+      "time": "2026-03-05T16:01:35.956Z"
+    },
+    {
+      "category": "结构",
+      "name": "Server 主模块",
+      "status": "PASS",
+      "details": "大小: 66.53KB",
+      "time": "2026-03-05T16:01:35.963Z"
+    },
+    {
+      "category": "结构",
+      "name": "Base Connector",
+      "status": "PASS",
+      "details": "大小: 10.02KB",
+      "time": "2026-03-05T16:01:35.963Z"
+    },
+    {
+      "category": "结构",
+      "name": "Claude Connector",
+      "status": "PASS",
+      "details": "大小: 9.76KB",
+      "time": "2026-03-05T16:01:35.964Z"
+    },
+    {
+      "category": "结构",
+      "name": "IFlow Connector",
+      "status": "PASS",
+      "details": "大小: 16.49KB",
+      "time": "2026-03-05T16:01:35.964Z"
+    },
+    {
+      "category": "结构",
+      "name": "DingTalk 集成",
+      "status": "PASS",
+      "details": "大小: 14.54KB",
+      "time": "2026-03-05T16:01:35.965Z"
+    },
+    {
+      "category": "结构",
+      "name": "Config 模块",
+      "status": "PASS",
+      "details": "大小: 14.51KB",
+      "time": "2026-03-05T16:01:35.968Z"
+    },
+    {
+      "category": "结构",
+      "name": "Plugin Manager",
+      "status": "PASS",
+      "details": "大小: 8.16KB",
+      "time": "2026-03-05T16:01:35.968Z"
+    },
+    {
+      "category": "结构",
+      "name": "Task Manager",
+      "status": "PASS",
+      "details": "大小: 13.15KB",
+      "time": "2026-03-05T16:01:35.968Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/app-errors.js",
+      "status": "PASS",
+      "details": "大小: 4.55KB",
+      "time": "2026-03-05T16:01:35.971Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/batch-logger.js",
+      "status": "PASS",
+      "details": "大小: 7.14KB",
+      "time": "2026-03-05T16:01:35.972Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/cache-manager.js",
+      "status": "PASS",
+      "details": "大小: 13.69KB",
+      "time": "2026-03-05T16:01:35.973Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/config.js",
+      "status": "PASS",
+      "details": "大小: 14.51KB",
+      "time": "2026-03-05T16:01:35.973Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/deduplication-middleware.js",
+      "status": "PASS",
+      "details": "大小: 6.20KB",
+      "time": "2026-03-05T16:01:35.974Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/env-manager.js",
+      "status": "PASS",
+      "details": "大小: 12.63KB",
+      "time": "2026-03-05T16:01:35.974Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/error-handler.js",
+      "status": "PASS",
+      "details": "大小: 10.10KB",
+      "time": "2026-03-05T16:01:35.974Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/error-recovery.js",
+      "status": "PASS",
+      "details": "大小: 8.56KB",
+      "time": "2026-03-05T16:01:35.974Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/graceful-shutdown.js",
+      "status": "PASS",
+      "details": "大小: 5.37KB",
+      "time": "2026-03-05T16:01:35.974Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/health-check.js",
+      "status": "PASS",
+      "details": "大小: 11.50KB",
+      "time": "2026-03-05T16:01:35.974Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/health-enhanced.js",
+      "status": "PASS",
+      "details": "大小: 7.37KB",
+      "time": "2026-03-05T16:01:35.974Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/input-validator-middleware.js",
+      "status": "PASS",
+      "details": "大小: 10.16KB",
+      "time": "2026-03-05T16:01:35.975Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/input-validator.js",
+      "status": "PASS",
+      "details": "大小: 8.90KB",
+      "time": "2026-03-05T16:01:35.975Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/memory-cleaner.js",
+      "status": "PASS",
+      "details": "大小: 7.64KB",
+      "time": "2026-03-05T16:01:35.975Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/memory-monitor-enhanced.js",
+      "status": "PASS",
+      "details": "大小: 10.23KB",
+      "time": "2026-03-05T16:01:35.975Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/memory-monitor.js",
+      "status": "PASS",
+      "details": "大小: 7.33KB",
+      "time": "2026-03-05T16:01:35.975Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/message-formatter.js",
+      "status": "PASS",
+      "details": "大小: 6.73KB",
+      "time": "2026-03-05T16:01:35.976Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/middleware.js",
+      "status": "PASS",
+      "details": "大小: 12.61KB",
+      "time": "2026-03-05T16:01:35.976Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/notification-queue.js",
+      "status": "PASS",
+      "details": "大小: 10.09KB",
+      "time": "2026-03-05T16:01:35.976Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/performance-tracker.js",
+      "status": "PASS",
+      "details": "大小: 9.05KB",
+      "time": "2026-03-05T16:01:35.976Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/platform.js",
+      "status": "PASS",
+      "details": "大小: 0.91KB",
+      "time": "2026-03-05T16:01:35.976Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/rate-limit.js",
+      "status": "PASS",
+      "details": "大小: 3.51KB",
+      "time": "2026-03-05T16:01:35.976Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/rate-limiter-memory.js",
+      "status": "PASS",
+      "details": "大小: 2.09KB",
+      "time": "2026-03-05T16:01:35.976Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/rate-limiter.js",
+      "status": "PASS",
+      "details": "大小: 2.43KB",
+      "time": "2026-03-05T16:01:35.976Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/request-deduplication.js",
+      "status": "PASS",
+      "details": "大小: 3.44KB",
+      "time": "2026-03-05T16:01:35.976Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/request-stats.js",
+      "status": "PASS",
+      "details": "大小: 7.28KB",
+      "time": "2026-03-05T16:01:35.976Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/response-cache.js",
+      "status": "PASS",
+      "details": "大小: 7.91KB",
+      "time": "2026-03-05T16:01:35.977Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/response-formatter.js",
+      "status": "PASS",
+      "details": "大小: 7.86KB",
+      "time": "2026-03-05T16:01:35.977Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/response-optimizer.js",
+      "status": "PASS",
+      "details": "大小: 7.25KB",
+      "time": "2026-03-05T16:01:35.977Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/retry-helper.js",
+      "status": "PASS",
+      "details": "大小: 5.50KB",
+      "time": "2026-03-05T16:01:35.977Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/sanitizer.js",
+      "status": "PASS",
+      "details": "大小: 6.18KB",
+      "time": "2026-03-05T16:01:35.977Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/security-enhancer.js",
+      "status": "PASS",
+      "details": "大小: 10.28KB",
+      "time": "2026-03-05T16:01:35.977Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/startup-check.js",
+      "status": "PASS",
+      "details": "大小: 7.98KB",
+      "time": "2026-03-05T16:01:35.977Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/string-helper.js",
+      "status": "PASS",
+      "details": "大小: 1.78KB",
+      "time": "2026-03-05T16:01:35.977Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/task-queue.js",
+      "status": "PASS",
+      "details": "大小: 6.36KB",
+      "time": "2026-03-05T16:01:35.977Z"
+    },
+    {
+      "category": "质量",
+      "name": "Utils/validators.js",
+      "status": "PASS",
+      "details": "大小: 9.23KB",
+      "time": "2026-03-05T16:01:35.977Z"
+    },
+    {
+      "category": "质量",
+      "name": "重复模式: rate-limit",
+      "status": "WARN",
+      "details": "发现 3 个相似文件",
+      "time": "2026-03-05T16:01:35.978Z"
+    },
+    {
+      "category": "质量",
+      "name": "重复模式: rate-limiter",
+      "status": "WARN",
+      "details": "发现 2 个相似文件",
+      "time": "2026-03-05T16:01:35.978Z"
+    },
+    {
+      "category": "质量",
+      "name": "重复模式: memory-monitor",
+      "status": "WARN",
+      "details": "发现 2 个相似文件",
+      "time": "2026-03-05T16:01:35.978Z"
+    },
+    {
+      "category": "配置",
+      "name": "默认配置",
+      "status": "PASS",
+      "details": "",
+      "time": "2026-03-05T16:01:35.979Z"
+    },
+    {
+      "category": "配置",
+      "name": "用户配置",
+      "status": "PASS",
+      "details": "",
+      "time": "2026-03-05T16:01:35.979Z"
+    },
+    {
+      "category": "配置",
+      "name": "配置 Schema",
+      "status": "PASS",
+      "details": "",
+      "time": "2026-03-05T16:01:35.980Z"
+    },
+    {
+      "category": "依赖",
+      "name": "生产依赖",
+      "status": "PASS",
+      "details": "7 个依赖",
+      "time": "2026-03-05T16:01:35.981Z"
+    },
+    {
+      "category": "依赖",
+      "name": "express",
+      "status": "PASS",
+      "details": "版本: ^4.18.2",
+      "time": "2026-03-05T16:01:35.984Z"
+    },
+    {
+      "category": "依赖",
+      "name": "axios",
+      "status": "PASS",
+      "details": "版本: ^1.7.0",
+      "time": "2026-03-05T16:01:35.984Z"
+    },
+    {
+      "category": "依赖",
+      "name": "dotenv",
+      "status": "PASS",
+      "details": "版本: ^17.3.1",
+      "time": "2026-03-05T16:01:35.984Z"
+    },
+    {
+      "category": "性能",
+      "name": "堆内存使用",
+      "status": "PASS",
+      "details": "5.32MB / 6.46MB",
+      "time": "2026-03-05T16:01:35.985Z"
+    },
+    {
+      "category": "性能",
+      "name": "外部内存",
+      "status": "PASS",
+      "details": "1.67MB",
+      "time": "2026-03-05T16:01:35.985Z"
+    }
+  ],
+  "summary": {
+    "total": 57,
+    "passed": 53,
+    "failed": 1,
+    "warnings": 3
+  }
+}

@@ -3,6 +3,12 @@
   <component name="ChangeListManager">
     <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="移除无效内容">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/integrations/dingtalk.js" beforeDir="false" afterPath="$PROJECT_DIR$/integrations/dingtalk.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scheduler/tasks.json" beforeDir="false" afterPath="$PROJECT_DIR$/scheduler/tasks.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/docs/plugins/config-manager.md" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/docs/plugins/config-manager.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/docs/plugins/context-memory.md" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/docs/plugins/context-memory.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/cache-manager.js" beforeDir="false" afterPath="$PROJECT_DIR$/utils/cache-manager.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -10,6 +16,19 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="Git.Settings">
+    <excluded-from-favorite>
+      <branch-storage>
+        <map>
+          <entry type="LOCAL">
+            <value>
+              <list>
+                <branch-info repo="$PROJECT_DIR$" source="main" />
+              </list>
+            </value>
+          </entry>
+        </map>
+      </branch-storage>
+    </excluded-from-favorite>
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
         <entry key="$PROJECT_DIR$" value="master" />

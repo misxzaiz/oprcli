@@ -18,7 +18,9 @@
     "health:fix": "node scripts/dependency-health-check.js --fix",
     "version:check": "node scripts/version-manager.js --check",
     "version:bump": "node scripts/version-manager.js --bump",
-    "project:health": "node scripts/project-health.js"
+    "project:health": "node scripts/project-health.js",
+    "news:collect": "node scripts/news-collector.js",
+    "news:test": "node scripts/news-collector.js --test"
   },
   "keywords": [
     "claude",
