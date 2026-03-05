@@ -76,6 +76,11 @@ class Logger {
 
     // 🆕 性能监控：记录类别最后日志时间
     this.categoryTimings.set(category, Date.now())
+
+    // 🆕 结构化日志（当环境变量启用时）
+    if (process.env.STRUCTURED_LOGGING === 'true') {
+      this._logStructured(levelName, category, message, data)
+    }
   }
 
   debug(category, message, data) { this.log(this.levels.DEBUG, category, message, data) }
@@ -125,6 +130,24 @@ class Logger {
   getLastActiveTime(category) {
     const timestamp = this.categoryTimings.get(category)
     return timestamp ? new Date(timestamp).toISOString() : null
+  }
+
+  /**
+   * 🆕 输出结构化日志（JSON 格式）
+   * @private
+   */
+  _logStructured(level, category, message, data) {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      category,
+      message,
+      ...data,
+      pid: process.pid,
+      env: process.env.NODE_ENV || 'development',
+      hostname: require('os').hostname()
+    }
+    console.log(JSON.stringify(logEntry))
   }
 }
 

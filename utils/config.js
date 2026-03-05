@@ -28,6 +28,12 @@ class Config {
   constructor() {
     // 🆕 提示词缓存（避免重复读取文件）
     this._promptCache = new Map()
+    // 🆕 缓存大小限制（防止内存无限增长）
+    this._maxCacheSize = parseInt(process.env.CACHE_MAX_SIZE || '100', 10)
+    // 🆕 缓存统计
+    this._cacheHits = 0
+    this._cacheMisses = 0
+    this._cacheEvictions = 0
     // 🔐 标记敏感字段
     this._sensitiveFields = SENSITIVE_FIELDS
     this.load()
@@ -131,12 +137,22 @@ class Config {
   _loadSystemPromptFromFile(filename) {
     // 🆕 检查缓存
     if (this._promptCache.has(filename)) {
+      this._cacheHits++
       return this._promptCache.get(filename)
     }
+
+    this._cacheMisses++
 
     try {
       const filepath = path.join(this.systemPrompts.promptsDir, filename)
       const content = fs.readFileSync(filepath, 'utf-8').trim()
+
+      // 🆕 缓存淘汰策略：如果缓存已满，删除最旧的条目
+      if (this._promptCache.size >= this._maxCacheSize) {
+        const firstKey = this._promptCache.keys().next().value
+        this._promptCache.delete(firstKey)
+        this._cacheEvictions++
+      }
 
       // 🆕 缓存结果
       this._promptCache.set(filename, content)
@@ -444,6 +460,35 @@ class Config {
     } else if (typeof fields === 'string') {
       this._sensitiveFields.push(fields)
     }
+  }
+
+  /**
+   * 🆕 获取缓存统计信息
+   * @returns {Object} - 缓存统计数据
+   */
+  getCacheStats() {
+    const totalRequests = this._cacheHits + this._cacheMisses
+    return {
+      size: this._promptCache.size,
+      maxSize: this._maxCacheSize,
+      hits: this._cacheHits,
+      misses: this._cacheMisses,
+      evictions: this._cacheEvictions,
+      hitRate: totalRequests > 0
+        ? (this._cacheHits / totalRequests * 100).toFixed(2) + '%'
+        : '0%',
+      usageRate: (this._promptCache.size / this._maxCacheSize * 100).toFixed(2) + '%'
+    }
+  }
+
+  /**
+   * 🆕 清空提示词缓存
+   */
+  clearPromptCache() {
+    this._promptCache.clear()
+    this._cacheHits = 0
+    this._cacheMisses = 0
+    this._cacheEvictions = 0
   }
 }
 
