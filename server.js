@@ -61,6 +61,13 @@ const { createAxiosRetryInterceptor } = require('./utils/retry-helper')
 const InputValidator = require('./utils/input-validator')
 const SecurityEnhancer = require('./utils/security-enhancer')
 
+// 🆕 安全增强（2026-03-05 第四轮优化）
+const { quickSecurityCheck, validateRequest } = require('./utils/input-validator-middleware')
+const { requestSizeLimitMiddleware } = require('./utils/middleware')
+const { getGlobalMemoryCleaner, memoryCheckMiddleware } = require('./utils/memory-cleaner')
+const { requestDeduplication } = require('./utils/request-deduplication')
+const { responseCache, cacheStrategies } = require('./utils/response-cache')
+
 class UnifiedServer {
   // 命令配置表
   static COMMANDS = {
@@ -104,6 +111,16 @@ class UnifiedServer {
 
     // 🆕 性能统计（2026-03-05 新增）
     this.performanceStats = null  // 将在中间件中初始化
+
+    // 🆕 内存清理器（2026-03-05 第五轮优化）
+    this.memoryCleaner = getGlobalMemoryCleaner({
+      logger: this.logger,
+      enabled: process.env.MEMORY_CLEANER_ENABLED !== 'false',
+      heapUsedPercent: 80,
+      rssMemory: 500 * 1024 * 1024,
+      triggerCleanup: 70,
+      checkInterval: 60000
+    })
 
     // 🆕 缓存管理器（2026-03-05 第二轮优化）
     this.cacheManager = new CacheManager({
@@ -181,9 +198,50 @@ class UnifiedServer {
       this.logger.info('SERVER', `✓ CORS 已启用 (来源: ${corsOrigin})`)
     }
 
+    // 🆕 请求体大小限制中间件（2026-03-05 第五轮优化）
+    const maxBodySize = parseInt(process.env.MAX_BODY_SIZE || '10485760', 10) // 默认 10MB
+    this.app.use(requestSizeLimitMiddleware({
+      maxBodySize,
+      maxUrlLength: 2000,
+      throwOnLimit: true
+    }))
+    this.logger.info('SERVER', `✓ 请求体大小限制已配置 (最大: ${(maxBodySize / 1024 / 1024).toFixed(2)}MB)`)
+
+    // 🆕 快速安全检查中间件（2026-03-05 第五轮优化）
+    if (process.env.SECURITY_CHECK_ENABLED !== 'false') {
+      this.app.use(quickSecurityCheck({
+        checkBody: true,
+        checkQuery: true,
+        checkParams: false,
+        throwOnThreat: true,
+        logOnly: process.env.SECURITY_LOG_ONLY === 'true'
+      }))
+      this.logger.info('SERVER', '✓ 快速安全检查已启用')
+    }
+
     // 安全配置：限制请求大小（防止DoS攻击）
     this.app.use(express.json({ limit: '10mb' }))
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+
+    // 🆕 内存检查中间件（2026-03-05 第五轮优化）
+    const memoryThreshold = parseInt(process.env.MEMORY_THRESHOLD || '90', 10)
+    this.app.use(memoryCheckMiddleware({
+      threshold: memoryThreshold,
+      logger: this.logger,
+      rejectOnHighMemory: process.env.REJECT_ON_HIGH_MEMORY === 'true'
+    }))
+    this.logger.info('SERVER', `✓ 内存检查已配置 (阈值: ${memoryThreshold}%)`)
+
+    // 🆕 请求去重中间件（2026-03-05 第五轮优化）
+    if (process.env.REQUEST_DEDUPLICATION_ENABLED !== 'false') {
+      const dedupTTL = parseInt(process.env.DEDUP_TTL || '5000', 10)
+      this.app.use(requestDeduplication({
+        enabled: true,
+        excludePaths: ['/health', '/api/health'],
+        logDuplicates: true
+      }))
+      this.logger.info('SERVER', `✓ 请求去重已启用 (TTL: ${dedupTTL}ms)`)
+    }
 
     // 🆕 响应压缩中间件（如果可用）
     try {

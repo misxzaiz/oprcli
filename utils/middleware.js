@@ -21,19 +21,82 @@ function requestIdMiddleware(req, res, next) {
 }
 
 /**
- * 安全头中间件
+ * 安全头中间件（增强版）
  * 添加基本的安全响应头（如果 helmet 不可用）
+ * @version 2.0.0 - 添加 CSP 和 Permissions-Policy
  */
-function securityHeadersMiddleware(req, res, next) {
-  // 防止点击劫持
-  res.setHeader('X-Frame-Options', 'DENY')
-  // 防止 MIME 类型嗅探
-  res.setHeader('X-Content-Type-Options', 'nosniff')
-  // 启用浏览器 XSS 过滤
-  res.setHeader('X-XSS-Protection', '1; mode=block')
-  // 限制引用来源
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
-  next()
+function securityHeadersMiddleware(options = {}) {
+  const {
+    // CSP 配置
+    enableCSP = true,
+    cspDirectives = null,
+    // Permissions-Policy 配置
+    enablePermissionsPolicy = true,
+    permissionsPolicy = null,
+    // 其他安全头
+    frameOptions = 'DENY', // DENY | SAMEORIGIN | ALLOW-FROM
+    referrerPolicy = 'strict-origin-when-cross-origin'
+  } = options
+
+  return (req, res, next) => {
+    // 防止点击劫持
+    res.setHeader('X-Frame-Options', frameOptions)
+
+    // 防止 MIME 类型嗅探
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+
+    // 启用浏览器 XSS 过滤（虽然已被 CSP 弃用，但仍可使用）
+    res.setHeader('X-XSS-Protection', '1; mode=block')
+
+    // 限制引用来源
+    res.setHeader('Referrer-Policy', referrerPolicy)
+
+    // 🆕 Content-Security-Policy (CSP)
+    if (enableCSP) {
+      const defaultCSP = [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: https:",
+        "font-src 'self' data:",
+        "connect-src 'self'",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self'"
+      ].join('; ')
+
+      const csp = cspDirectives || defaultCSP
+      res.setHeader('Content-Security-Policy', csp)
+    }
+
+    // 🆕 Permissions-Policy (原 Feature-Policy)
+    if (enablePermissionsPolicy) {
+      const defaultPermissions = [
+        'geolocation=()',
+        'microphone=()',
+        'camera=()',
+        'payment=()',
+        'usb=()',
+        'magnetometer=()',
+        'gyroscope=()',
+        'accelerometer=()'
+      ].join(', ')
+
+      const permissions = permissionsPolicy || defaultPermissions
+      res.setHeader('Permissions-Policy', permissions)
+    }
+
+    // 🆕 Cross-Origin-Opener-Policy
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
+
+    // 🆕 Cross-Origin-Resource-Policy
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin')
+
+    // 🆕 Cross-Origin-Embedder-Policy
+    res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
+
+    next()
+  }
 }
 
 /**
@@ -131,6 +194,72 @@ function cacheControlMiddleware(options = {}) {
     cacheDirectives.push(`max-age=${maxAge}`)
 
     res.setHeader('Cache-Control', cacheDirectives.join(', '))
+    next()
+  }
+}
+
+/**
+ * 🆕 请求体大小限制中间件（2026-03-05）
+ * 防止大文件攻击和内存溢出
+ * @param {Object} options - 配置选项
+ * @returns {Function} Express 中间件
+ */
+function requestSizeLimitMiddleware(options = {}) {
+  const {
+    maxBodySize = 10 * 1024 * 1024, // 默认 10MB
+    maxUrlLength = 2000, // 默认 2000 字符
+    throwOnLimit = true // 是否抛出错误
+  } = options
+
+  return (req, res, next) => {
+    // 检查 URL 长度
+    const urlLength = req.originalUrl?.length || 0
+    if (urlLength > maxUrlLength) {
+      req.logger?.warn('SECURITY', `URL 长度超限 [${req.id}]`, {
+        urlLength,
+        maxUrlLength,
+        url: req.originalUrl.substring(0, 100)
+      })
+
+      if (throwOnLimit) {
+        return res.status(414).json({
+          success: false,
+          error: {
+            code: 'URI_TOO_LONG',
+            message: '请求 URL 过长',
+            maxLength: maxUrlLength
+          }
+        })
+      }
+    }
+
+    // 检查 Content-Length
+    const contentLength = parseInt(req.headers['content-length'] || '0', 10)
+    if (contentLength > maxBodySize) {
+      req.logger?.warn('SECURITY', `请求体大小超限 [${req.id}]`, {
+        contentLength,
+        maxBodySize,
+        contentType: req.headers['content-type']
+      })
+
+      if (throwOnLimit) {
+        return res.status(413).json({
+          success: false,
+          error: {
+            code: 'PAYLOAD_TOO_LARGE',
+            message: '请求体过大',
+            maxSize: `${(maxBodySize / 1024 / 1024).toFixed(2)}MB`,
+            receivedSize: `${(contentLength / 1024 / 1024).toFixed(2)}MB`
+          }
+        })
+      }
+    }
+
+    // 添加请求体大小监控
+    if (contentLength > 0) {
+      req.bodySize = contentLength
+    }
+
     next()
   }
 }
@@ -343,6 +472,9 @@ module.exports = {
   cacheControlMiddleware,
   performanceMonitorMiddleware,
   getPerformanceStats,
+
+  // 🆕 新增中间件（2026-03-05 安全增强）
+  requestSizeLimitMiddleware,
 
   // 🆕 导出请求统计工具（2026-03-05）
   globalRequestStats
