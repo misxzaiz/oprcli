@@ -26,15 +26,15 @@
 - **建议**: 合并功能，统一接口
 - **优化价值**: 高（提升 API 一致性）
 
-#### ISS-003: 速率限制模块命名混淆 ℹ️
-- **文件**: `utils/rate-limiter.js`, `utils/rate-limit.js`
+#### ISS-003: ~~速率限制模块命名混淆~~ ✅ 已修复
+- **文件**: ~~`utils/rate-limiter.js`~~ → `utils/message-rate-limiter.js`, `utils/rate-limit.js`
 - **问题**: 两个模块用途不同但命名相似，容易混淆
-  - `rate-limiter.js` - 钉钉消息发送限流（内部使用）
+  - ~~`rate-limiter.js`~~ → `message-rate-limiter.js` - 钉钉消息发送限流（内部使用）
   - `rate-limit.js` - HTTP API 请求限流（Express 中间件）
 - **严重程度**: 低
 - **影响**: 代码可读性
-- **建议**: 重命名使其用途更明确
-  - `rate-limiter.js` → `message-rate-limiter.js`
+- **建议**: ~~重命名使其用途更明确~~ ✅ 已完成
+  - ✅ `rate-limiter.js` → `message-rate-limiter.js`
   - `rate-limit.js` 保持不变（已符合 Express 中间件命名约定）
 - **优化价值**: 中（提升代码可读性）
 
@@ -61,6 +61,17 @@
 - **影响**: 测试
 
 ## 已修复问题
+
+### ✅ ISS-003: 速率限制模块命名混淆 (2026-03-06)
+- **修复内容**:
+  - 重命名 `utils/rate-limiter.js` → `utils/message-rate-limiter.js`
+  - 更新 `server.js` 中的模块引用
+  - 明确区分：消息发送限流 vs HTTP API 限流
+- **影响**:
+  - 提升代码可读性
+  - 减少模块命名混淆
+  - 降低维护成本
+- **测试结果**: ✅ 通过
 
 ### ✅ ISS-001: 内存监控模块重复 (2026-03-06)
 - **修复内容**:

@@ -1,5 +1,27 @@
 # OPRCLI 系统更新日志
 
+## 2026-03-06 - 模块重命名优化
+
+### 本次优化内容
+- ✅ 重命名速率限制器模块
+- ✅ `utils/rate-limiter.js` → `utils/message-rate-limiter.js`
+- ✅ 更新 server.js 中的模块引用
+- ✅ 明确区分消息发送限流和 HTTP API 限流
+
+### 影响模块
+- `server.js` - 更新速率限制器引用
+- `utils/rate-limiter.js` - 重命名为 `message-rate-limiter.js`
+- `utils/rate-limit.js` - 保持不变（HTTP API 限流）
+
+### 性能变化
+- 代码可读性：提升（命名更明确）
+- 维护成本：降低（减少混淆）
+- 功能影响：无（仅重命名）
+
+### 测试结果
+- ✅ 所有模块加载测试通过
+- ✅ 服务器启动测试通过
+
 ## 2026-03-06 - 优化完成
 
 ### 本次优化内容

@@ -23,12 +23,12 @@
       "complexity": "medium",
       "risk": "medium"
     },
-    "utils/rate-limiter.js": {
-      "path": "utils/rate-limiter.js",
+    "utils/message-rate-limiter.js": {
+      "path": "utils/message-rate-limiter.js",
       "size": 0,
-      "lastModified": "unknown",
+      "lastModified": "2026-03-06",
       "complexity": "medium",
-      "risk": "medium"
+      "risk": "low"
     },
     "utils/rate-limit.js": {
       "path": "utils/rate-limit.js",
