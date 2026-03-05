@@ -1216,6 +1216,9 @@ class UnifiedServer {
       console.log(`🌐 API: 未启用（未配置端口）`)
       console.log('\n按 Ctrl+C 停止服务器\n')
     }
+
+    // 🆕 启动内存监控（2026-03-05 新增）
+    this._startMemoryMonitor()
   }
 
   async handleDingTalkMessage(message) {
@@ -1486,10 +1489,61 @@ class UnifiedServer {
     }
   }
 
+  /**
+   * 启动内存监控
+   * 定期记录内存使用情况，帮助发现内存泄漏
+   * @private
+   */
+  _startMemoryMonitor() {
+    // 检查是否启用内存监控
+    const enabled = process.env.MEMORY_MONITOR_ENABLED !== 'false'
+    const intervalMs = parseInt(process.env.MEMORY_MONITOR_INTERVAL || '300000', 10) // 默认5分钟
+
+    if (!enabled) {
+      this.logger.debug('SERVER', '内存监控已禁用')
+      return
+    }
+
+    this.memoryMonitorInterval = setInterval(() => {
+      const memUsage = process.memoryUsage()
+      const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024)
+      const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024)
+      const rssMB = Math.round(memUsage.rss / 1024 / 1024)
+      const externalMB = Math.round(memUsage.external / 1024 / 1024)
+
+      // 计算堆内存使用率
+      const heapUsagePercent = ((heapUsedMB / heapTotalMB) * 100).toFixed(1)
+
+      // 记录内存使用情况
+      this.logger.info('MEMORY', `内存使用情况`, {
+        heap: `${heapUsedMB}MB / ${heapTotalMB}MB (${heapUsagePercent}%)`,
+        rss: `${rssMB}MB`,
+        external: `${externalMB}MB`,
+        arrayBuffers: `${Math.round(memUsage.arrayBuffers / 1024 / 1024)}MB`
+      })
+
+      // 内存使用率超过 80% 时发出警告
+      if (parseFloat(heapUsagePercent) > 80) {
+        this.logger.warning('MEMORY', `⚠️ 内存使用率过高: ${heapUsagePercent}%`, {
+          heap: `${heapUsedMB}MB / ${heapTotalMB}MB`,
+          recommendation: '建议检查内存泄漏或增加堆内存限制'
+        })
+      }
+    }, intervalMs)
+
+    this.logger.info('SERVER', `✓ 内存监控已启动 (间隔: ${intervalMs}ms)`)
+  }
+
   async shutdown() {
     this.logger.info('SERVER', '正在优雅关闭...')
 
     try {
+      // 🆕 停止内存监控
+      if (this.memoryMonitorInterval) {
+        clearInterval(this.memoryMonitorInterval)
+        this.logger.info('SERVER', '✓ 内存监控已停止')
+      }
+
       // 停止定时任务
       if (this.scheduler) {
         this.scheduler.stop()

@@ -14,6 +14,8 @@ const PROMPT_MODES = {
 
 class Config {
   constructor() {
+    // 🆕 提示词缓存（避免重复读取文件）
+    this._promptCache = new Map()
     this.load()
   }
 
@@ -108,14 +110,24 @@ class Config {
   }
 
   /**
-   * 从文件加载系统提示词
+   * 从文件加载系统提示词（带缓存）
    * @param {string} filename - 文件名
    * @returns {string|null} - 提示词内容或 null
    */
   _loadSystemPromptFromFile(filename) {
+    // 🆕 检查缓存
+    if (this._promptCache.has(filename)) {
+      return this._promptCache.get(filename)
+    }
+
     try {
       const filepath = path.join(this.systemPrompts.promptsDir, filename)
-      return fs.readFileSync(filepath, 'utf-8').trim()
+      const content = fs.readFileSync(filepath, 'utf-8').trim()
+
+      // 🆕 缓存结果
+      this._promptCache.set(filename, content)
+
+      return content
     } catch (err) {
       // 文件读取失败，静默忽略
     }
