@@ -1,6 +1,6 @@
 {
-  "lastScan": "2026-03-06T22:00:00Z",
-  "version": "2.0.10",
+  "lastScan": "2026-03-06T23:20:00Z",
+  "version": "2.0.11",
   "files": {
     "server.js": {
       "path": "server.js",
@@ -9,8 +9,11 @@
       "complexity": "high",
       "risk": "medium",
       "issues": [
-        {"id": "ISS-009", "type": "Promise错误处理", "line": "566-594"},
-        {"id": "ISS-014", "type": "重复逻辑", "occurrences": 5}
+        {"id": "ISS-009", "type": "Promise错误处理", "line": "566-594", "status": "fixed"},
+        {"id": "ISS-014", "type": "重复逻辑", "occurrences": 5, "status": "fixed"}
+      ],
+      "optimizations": [
+        {"id": "ISS-020", "type": "统一日志记录", "line": "1444-1459", "status": "fixed"}
       ]
     },
     "plugins/core/config-manager.js": {
@@ -123,6 +126,7 @@
     {"id": "ISS-016", "title": "同步文件操作阻塞", "severity": "medium", "status": "fixed"},
     {"id": "ISS-017", "title": "代码风格不一致", "severity": "medium", "status": "open"},
     {"id": "ISS-018", "title": "notification-queue.js同步文件操作", "severity": "medium", "status": "fixed"},
+    {"id": "ISS-020", "title": "server.js启动日志不统一", "severity": "low", "status": "fixed"},
     {"id": "ISS-019", "title": "config.js提示词读取阻塞", "severity": "medium", "status": "fixed"}
   ]
 }
