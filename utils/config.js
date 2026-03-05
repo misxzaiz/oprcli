@@ -5,6 +5,7 @@
 
 const fs = require('fs')
 const path = require('path')
+const sanitizer = require('./sanitizer')
 
 // 提示词模式常量
 const PROMPT_MODES = {
@@ -12,10 +13,23 @@ const PROMPT_MODES = {
   SLIM: 'slim'
 }
 
+// 🔐 敏感字段列表（用于脱敏）
+const SENSITIVE_FIELDS = [
+  'clientId',
+  'clientSecret',
+  'webhook',
+  'secret',
+  'systemPrompt',
+  'cmdPath',
+  'gitBinPath'
+]
+
 class Config {
   constructor() {
     // 🆕 提示词缓存（避免重复读取文件）
     this._promptCache = new Map()
+    // 🔐 标记敏感字段
+    this._sensitiveFields = SENSITIVE_FIELDS
     this.load()
   }
 
@@ -228,6 +242,65 @@ class Config {
       }
     }
     throw new Error(`Unknown provider: ${targetProvider}`)
+  }
+
+  /**
+   * 🔐 获取安全的配置对象（敏感信息已脱敏）
+   * 适用于日志输出和调试
+   * @returns {Object} - 脱敏后的配置对象
+   */
+  getSafeConfig() {
+    const config = {
+      provider: this.provider,
+      port: this.port,
+      promptMode: this.promptMode,
+      claude: {
+        ...this.claude,
+        cmdPath: this.claude.cmdPath ? sanitizer.sanitizeValue(this.claude.cmdPath, 'cmdPath') : null,
+        gitBinPath: this.claude.gitBinPath ? sanitizer.sanitizeValue(this.claude.gitBinPath, 'gitBinPath') : null,
+        systemPrompt: this.claude.systemPrompt ? '[SYSTEM PROMPT HIDDEN]' : null
+      },
+      iflow: {
+        ...this.iflow,
+        systemPrompt: this.iflow.systemPrompt ? '[SYSTEM PROMPT HIDDEN]' : null
+      },
+      dingtalk: {
+        ...this.dingtalk,
+        clientId: this.dingtalk.clientId ? sanitizer.sanitizeValue(this.dingtalk.clientId, 'clientId') : null,
+        clientSecret: this.dingtalk.clientSecret ? '[SECRET HIDDEN]' : null
+      },
+      streaming: this.streaming,
+      logging: this.logging,
+      notification: {
+        ...this.notification,
+        dingtalk: {
+          webhook: this.notification.dingtalk.webhook ? sanitizer.sanitizeValue(this.notification.dingtalk.webhook, 'webhook') : null,
+          secret: this.notification.dingtalk.secret ? '[SECRET HIDDEN]' : null
+        }
+      }
+    }
+
+    return config
+  }
+
+  /**
+   * 🔐 获取敏感字段列表
+   * @returns {Array<string>} - 敏感字段名数组
+   */
+  getSensitiveFields() {
+    return [...this._sensitiveFields]
+  }
+
+  /**
+   * 🔐 添加自定义敏感字段
+   * @param {string|Array<string>} fields - 字段名或字段名数组
+   */
+  addSensitiveFields(fields) {
+    if (Array.isArray(fields)) {
+      this._sensitiveFields.push(...fields)
+    } else if (typeof fields === 'string') {
+      this._sensitiveFields.push(fields)
+    }
   }
 }
 
