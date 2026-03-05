@@ -1,6 +1,11 @@
 /**
  * 统一日志系统
- * 提供分级日志、彩色输出等功能
+ * 提供分级日志、彩色输出、性能监控等功能
+ *
+ * 优化：
+ * - 添加日志统计功能
+ * - 添加性能监控（日志级别分布）
+ * - 改进时间格式
  */
 
 class Logger {
@@ -32,6 +37,20 @@ class Logger {
       WARNING: '⚠️',
       ERROR: '❌'
     }
+
+    // 🆕 统计信息
+    this.stats = {
+      debug: 0,
+      info: 0,
+      event: 0,
+      success: 0,
+      warning: 0,
+      error: 0,
+      total: 0
+    }
+
+    // 🆕 性能监控：记录每个类别的日志时间
+    this.categoryTimings = new Map()
   }
 
   log(level, category, message, data = null) {
@@ -50,6 +69,13 @@ class Logger {
     }
 
     console.log(logMsg)
+
+    // 🆕 更新统计
+    this.stats[levelName.toLowerCase()]++
+    this.stats.total++
+
+    // 🆕 性能监控：记录类别最后日志时间
+    this.categoryTimings.set(category, Date.now())
   }
 
   debug(category, message, data) { this.log(this.levels.DEBUG, category, message, data) }
@@ -58,6 +84,48 @@ class Logger {
   success(category, message, data) { this.log(this.levels.SUCCESS, category, message, data) }
   warning(category, message, data) { this.log(this.levels.WARNING, category, message, data) }
   error(category, message, data) { this.log(this.levels.ERROR, category, message, data) }
+
+  /**
+   * 🆕 获取日志统计信息
+   */
+  getStats() {
+    return {
+      ...this.stats,
+      levelDistribution: {
+        debug: ((this.stats.debug / this.stats.total) * 100).toFixed(1) + '%',
+        info: ((this.stats.info / this.stats.total) * 100).toFixed(1) + '%',
+        event: ((this.stats.event / this.stats.total) * 100).toFixed(1) + '%',
+        success: ((this.stats.success / this.stats.total) * 100).toFixed(1) + '%',
+        warning: ((this.stats.warning / this.stats.total) * 100).toFixed(1) + '%',
+        error: ((this.stats.error / this.stats.total) * 100).toFixed(1) + '%'
+      },
+      activeCategories: Array.from(this.categoryTimings.keys()).length
+    }
+  }
+
+  /**
+   * 🆕 重置统计信息
+   */
+  resetStats() {
+    this.stats = {
+      debug: 0,
+      info: 0,
+      event: 0,
+      success: 0,
+      warning: 0,
+      error: 0,
+      total: 0
+    }
+    this.categoryTimings.clear()
+  }
+
+  /**
+   * 🆕 获取某个类别的最后活跃时间
+   */
+  getLastActiveTime(category) {
+    const timestamp = this.categoryTimings.get(category)
+    return timestamp ? new Date(timestamp).toISOString() : null
+  }
 }
 
 module.exports = Logger

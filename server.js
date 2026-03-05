@@ -31,6 +31,10 @@ const PluginManager = require('./plugins/core/plugin-manager')
 const ConfigManager = require('./plugins/core/config-manager')
 const ContextMemory = require('./plugins/core/context-memory')
 
+// 🆕 自定义中间件和启动检查
+const { requestIdMiddleware, errorHandlerMiddleware, notFoundMiddleware } = require('./utils/middleware')
+const StartupCheck = require('./utils/startup-check')
+
 class UnifiedServer {
   // 命令配置表
   static COMMANDS = {
@@ -77,8 +81,47 @@ class UnifiedServer {
   }
 
   _setupMiddleware() {
-    this.app.use(express.json())
-    this.app.use(express.urlencoded({ extended: true }))
+    // 🆕 请求 ID 中间件（必须在其他中间件之前）
+    this.app.use(requestIdMiddleware)
+
+    // 安全配置：限制请求大小（防止DoS攻击）
+    this.app.use(express.json({ limit: '10mb' }))
+    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+
+    // 🆕 响应压缩中间件（如果可用）
+    try {
+      const compression = require('compression')
+      this.app.use(compression({
+        filter: (req, res) => {
+          if (req.headers['x-no-compression']) {
+            return false
+          }
+          return compression.filter(req, res)
+        },
+        threshold: 1024 // 只压缩大于1KB的响应
+      }))
+      this.logger.info('SERVER', '✓ 响应压缩已启用')
+    } catch (error) {
+      this.logger.debug('SERVER', 'compression模块不可用，跳过')
+    }
+
+    // 🆕 请求日志中间件（增强版，包含请求ID）
+    if (process.env.NODE_ENV === 'production') {
+      this.app.use((req, res, next) => {
+        const start = Date.now()
+        res.on('finish', () => {
+          const duration = Date.now() - start
+          this.logger.debug('HTTP', `[${req.id}] ${req.method} ${req.path} ${res.statusCode} ${duration}ms`)
+        })
+        next()
+      })
+    }
+
+    // 🆕 404 处理中间件（必须在所有路由之后）
+    this.app.use(notFoundMiddleware)
+
+    // 🆕 全局错误处理中间件（必须在最后）
+    this.app.use(errorHandlerMiddleware(this.logger))
   }
 
   _setupRoutes() {
@@ -98,6 +141,11 @@ class UnifiedServer {
     this.app.get('/api/config', this.handleGetConfig.bind(this))
     this.app.post('/api/config', this.handleSetConfig.bind(this))
     this.app.get('/api/memory/stats', this.handleMemoryStats.bind(this))
+
+    // 🆕 健康检查和监控 API
+    this.app.get('/health', this.handleHealthCheck.bind(this))
+    this.app.get('/api/health', this.handleHealthCheck.bind(this))
+    this.app.get('/api/metrics', this.handleMetrics.bind(this))
   }
 
   // ==================== 🆕 插件系统 ====================
@@ -453,6 +501,115 @@ class UnifiedServer {
       })
     } catch (error) {
       this.logger.error('API', '执行任务失败', { error: error.message })
+      res.status(500).json({
+        success: false,
+        error: error.message
+      })
+    }
+  }
+
+  /**
+   * 健康检查端点
+   * 用于负载均衡器、容器编排系统等监控系统状态
+   */
+  async handleHealthCheck(req, res) {
+    const health = {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: require('./package.json').version
+    }
+
+    // 检查 connectors 状态
+    const connectorHealth = {}
+    for (const [provider, connector] of this.connectors.entries()) {
+      connectorHealth[provider] = {
+        connected: connector?.connected || false,
+        activeSessions: connector?.getActiveSessions()?.length || 0
+      }
+    }
+
+    // 检查钉钉连接
+    const dingtalkHealth = {
+      enabled: config.dingtalk.enabled,
+      connected: this.dingtalk.client?.connected || false,
+      activeSessions: this.dingtalk.getActiveSessions()?.length || 0
+    }
+
+    // 如果有任何关键组件不可用，标记为 degraded
+    const hasActiveConnectors = Object.values(connectorHealth).some(c => c.connected)
+    if (!hasActiveConnectors) {
+      health.status = 'degraded'
+      health.connectors = connectorHealth
+      return res.status(503).json(health)
+    }
+
+    health.connectors = connectorHealth
+    health.dingtalk = dingtalkHealth
+
+    // 添加内存使用情况
+    health.memory = {
+      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+      rss: Math.round(process.memoryUsage().rss / 1024 / 1024)
+    }
+
+    res.json(health)
+  }
+
+  /**
+   * 系统指标端点
+   * 提供详细的性能和统计信息
+   */
+  async handleMetrics(req, res) {
+    try {
+      const metrics = {
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        cpu: process.cpuUsage(),
+
+        // Connectors 状态
+        connectors: {},
+        activeSessions: 0,
+
+        // 速率限制器统计
+        rateLimiter: this.rateLimiter.getStats(),
+
+        // 钉钉统计
+        dingtalk: {
+          enabled: config.dingtalk.enabled,
+          connected: this.dingtalk.client?.connected || false,
+          activeSessions: this.dingtalk.getActiveSessions()?.length || 0,
+          processedMessages: this.dingtalk.processedMessages?.size || 0
+        },
+
+        // 定时任务状态
+        scheduler: this.scheduler?.getStatus() || { enabled: false },
+
+        // 插件统计
+        plugins: this.pluginManager?.getStats() || { loaded: 0 },
+
+        // 上下文记忆统计
+        memory: this.contextMemory?.getStats() || { sessions: 0 }
+      }
+
+      // 收集每个 connector 的详细信息
+      for (const [provider, connector] of this.connectors.entries()) {
+        if (connector) {
+          const sessions = connector.getActiveSessions() || []
+          metrics.connectors[provider] = {
+            connected: connector.connected || false,
+            activeSessions: sessions.length,
+            sessionIds: sessions
+          }
+          metrics.activeSessions += sessions.length
+        }
+      }
+
+      res.json(metrics)
+    } catch (error) {
+      this.logger.error('API', '获取指标失败', { error: error.message })
       res.status(500).json({
         success: false,
         error: error.message
@@ -905,6 +1062,21 @@ class UnifiedServer {
   }
 
   async start() {
+    // 🆕 启动前检查
+    const startupCheck = new StartupCheck(this.logger)
+
+    // 检查 Node.js 版本
+    startupCheck.checkNodeVersion('14.0.0')
+
+    // 确保必要的目录存在
+    startupCheck.ensureDir('D:/space/tasks', '进化日志目录')
+    startupCheck.ensureDir('logs', '日志目录')
+
+    // 打印检查结果
+    if (!startupCheck.printResult()) {
+      process.exit(1)
+    }
+
     // 验证配置
     const validation = config.validate()
     if (!validation.valid) {
@@ -1249,21 +1421,63 @@ class UnifiedServer {
   }
 
   async shutdown() {
-    this.logger.info('SERVER', '正在关闭...')
+    this.logger.info('SERVER', '正在优雅关闭...')
 
-    // 停止定时任务
-    if (this.scheduler) {
-      this.scheduler.stop()
+    try {
+      // 停止定时任务
+      if (this.scheduler) {
+        this.scheduler.stop()
+        this.logger.info('SCHEDULER', '✓ 定时任务已停止')
+      }
+
+      // 中断所有活跃会话
+      if (this.connectors) {
+        for (const [provider, connector] of this.connectors.entries()) {
+          try {
+            const sessions = connector.getActiveSessions ? connector.getActiveSessions() : []
+            if (Array.isArray(sessions) && sessions.length > 0) {
+              sessions.forEach(sid => {
+                if (connector.interruptSession) {
+                  connector.interruptSession(sid)
+                }
+              })
+              this.logger.info('CONNECTOR', `✓ ${provider} 会话已中断: ${sessions.length} 个`)
+            }
+
+            // 关闭连接器
+            if (connector.close) {
+              await connector.close()
+            }
+          } catch (error) {
+            this.logger.warning('CONNECTOR', `${provider} 关闭失败: ${error.message}`)
+          }
+        }
+      }
+
+      // 关闭钉钉连接
+      await this.dingtalk.close()
+      this.logger.info('DINGTALK', '✓ 钉钉连接已关闭')
+
+      // 🆕 保存上下文记忆（如果有）
+      if (this.contextMemory) {
+        try {
+          await this.contextMemory.saveAll()
+          this.logger.info('MEMORY', '✓ 上下文记忆已保存')
+        } catch (error) {
+          this.logger.warning('MEMORY', `保存失败: ${error.message}`)
+        }
+      }
+
+      this.logger.success('SERVER', '✓ 服务器已安全关闭')
+
+      // 🆕 添加短暂延迟确保日志输出
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      process.exit(0)
+    } catch (error) {
+      this.logger.error('SERVER', `关闭过程中出错: ${error.message}`)
+      process.exit(1)
     }
-
-    if (this.connector) {
-      const sessions = this.connector.getActiveSessions()
-      sessions.forEach(sid => this.connector.interruptSession(sid))
-      this.logger.info('CONNECTOR', '所有会话已中断')
-    }
-
-    await this.dingtalk.close()
-    process.exit(0)
   }
 }
 

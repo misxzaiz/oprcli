@@ -110,20 +110,68 @@ class DingTalkIntegration {
     this.logger.success('DINGTALK', '消息处理器已注册')
   }
 
-  async send(sessionWebhook, message) {
+  /**
+   * 发送消息到钉钉（带重试机制）
+   * @param {string} sessionWebhook - Webhook URL
+   * @param {Object} message - 消息对象
+   * @param {number} maxRetries - 最大重试次数（默认3次）
+   */
+  async send(sessionWebhook, message, maxRetries = 3) {
     if (!sessionWebhook) {
       throw new Error('sessionWebhook is required')
     }
 
     await this.rateLimiter.waitForSlot()
 
-    try {
-      await axios.post(sessionWebhook, message)
-      this.logger.debug('DINGTALK', '消息已发送')
-    } catch (error) {
-      this.logger.error('DINGTALK', '发送失败', { error: error.message })
-      throw error
+    let lastError = null
+
+    // 🆕 重试机制
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await axios.post(sessionWebhook, message, {
+          timeout: 10000, // 10秒超时
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (attempt > 1) {
+          this.logger.success('DINGTALK', `消息发送成功（第${attempt}次尝试）`)
+        } else {
+          this.logger.debug('DINGTALK', '消息已发送')
+        }
+
+        return // 成功发送，退出
+      } catch (error) {
+        lastError = error
+        const isLastAttempt = attempt === maxRetries
+
+        if (!isLastAttempt) {
+          // 指数退避：等待时间随尝试次数增加
+          const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000)
+          this.logger.warning('DINGTALK',
+            `发送失败，${waitTime}ms后重试（${attempt}/${maxRetries}）`,
+            { error: error.message }
+          )
+          await this.sleep(waitTime)
+        } else {
+          this.logger.error('DINGTALK',
+            `发送失败，已达最大重试次数（${maxRetries}）`,
+            { error: error.message }
+          )
+        }
+      }
     }
+
+    // 所有重试都失败
+    throw lastError
+  }
+
+  /**
+   * 🆕 辅助方法：休眠指定毫秒数
+   */
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms))
   }
 
   isProcessed(messageId) {
