@@ -1,6 +1,6 @@
 {
   "name": "oprcli",
-  "version": "2.0.4",
+  "version": "2.0.7",
   "description": "统一 AI CLI 连接器服务器 - 支持 Claude Code 和 IFlow",
   "main": "server.js",
   "scripts": {
@@ -15,7 +15,10 @@
     "outdated": "npm outdated",
     "analyze": "node scripts/performance-analyzer.js",
     "health": "node scripts/dependency-health-check.js",
-    "health:fix": "node scripts/dependency-health-check.js --fix"
+    "health:fix": "node scripts/dependency-health-check.js --fix",
+    "version:check": "node scripts/version-manager.js --check",
+    "version:bump": "node scripts/version-manager.js --bump",
+    "project:health": "node scripts/project-health.js"
   },
   "keywords": [
     "claude",
