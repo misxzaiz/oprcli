@@ -5,7 +5,14 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "check-deps": "node scripts/check-deps.js",
+    "validate-env": "node scripts/validate-env.js",
+    "diagnose": "node scripts/diagnose.js",
+    "view-logs": "node scripts/view-logs.js",
+    "audit": "npm audit",
+    "audit:fix": "npm audit fix",
+    "outdated": "npm outdated"
   },
   "keywords": [
     "claude",

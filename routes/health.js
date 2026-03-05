@@ -109,8 +109,27 @@ function createHealthRoutes(serverInstance) {
     // 检查服务是否准备好接受请求
     const checks = {
       server: true,
-      database: false, // 如果有数据库连接
-      externalServices: false // 如果有外部服务依赖
+      dependencies: true, // 检查依赖是否已安装
+      configuration: true // 检查配置是否有效
+    }
+
+    // 检查依赖
+    try {
+      const fs = require('fs')
+      const path = require('path')
+      const nodeModulesPath = path.join(__dirname, '../node_modules')
+      checks.dependencies = fs.existsSync(nodeModulesPath)
+    } catch (error) {
+      checks.dependencies = false
+    }
+
+    // 检查配置
+    try {
+      const config = require('../utils/config')
+      const validation = config.validate()
+      checks.configuration = validation.valid
+    } catch (error) {
+      checks.configuration = false
     }
 
     const isReady = Object.values(checks).every(check => check === true)
@@ -119,6 +138,119 @@ function createHealthRoutes(serverInstance) {
       status: isReady ? 'ready' : 'not_ready',
       checks
     })
+  })
+
+  /**
+   * GET /health/dependencies
+   * 依赖健康检查
+   */
+  router.get('/health/dependencies', (req, res) => {
+    const fs = require('fs')
+    const path = require('path')
+
+    try {
+      const packageJson = require('../package.json')
+      const dependencies = {
+        ...packageJson.dependencies,
+        ...(packageJson.devDependencies || {})
+      }
+
+      const depStatus = []
+      let allInstalled = true
+
+      Object.entries(dependencies).forEach(([name, version]) => {
+        const modulePath = path.join(__dirname, '../node_modules', name)
+        const installed = fs.existsSync(modulePath)
+
+        depStatus.push({
+          name,
+          requested: version,
+          installed: installed ? 'yes' : 'no'
+        })
+
+        if (!installed) {
+          allInstalled = false
+        }
+      })
+
+      res.status(200).json({
+        status: allInstalled ? 'ok' : 'warning',
+        total: depStatus.length,
+        installed: depStatus.filter(d => d.installed === 'yes').length,
+        missing: depStatus.filter(d => d.installed === 'no').length,
+        dependencies: req.query.verbose === 'true' ? depStatus : undefined
+      })
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        message: error.message
+      })
+    }
+  })
+
+  /**
+   * GET /health/config
+   * 配置检查
+   */
+  router.get('/health/config', (req, res) => {
+    try {
+      const config = require('../utils/config')
+      const validation = config.validate()
+
+      res.status(validation.valid ? 200 : 503).json({
+        status: validation.valid ? 'ok' : 'invalid',
+        provider: config.provider,
+        promptMode: config.promptMode,
+        hasErrors: validation.errors.length > 0,
+        hasWarnings: validation.warnings.length > 0,
+        errors: req.query.verbose === 'true' ? validation.errors : undefined,
+        warnings: req.query.verbose === 'true' ? validation.warnings : undefined
+      })
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        message: error.message
+      })
+    }
+  })
+
+  /**
+   * GET /health/logs
+   * 日志统计
+   */
+  router.get('/health/logs', (req, res) => {
+    try {
+      if (serverInstance && serverInstance.logger) {
+        const stats = serverInstance.logger.getStats()
+
+        res.status(200).json({
+          status: 'ok',
+          stats: {
+            total: stats.total,
+            breakdown: {
+              debug: stats.debug,
+              info: stats.info,
+              event: stats.event,
+              success: stats.success,
+              warning: stats.warning,
+              error: stats.error
+            },
+            distribution: stats.levelDistribution,
+            activeCategories: stats.activeCategories
+          }
+        })
+      } else {
+        res.status(503).json({
+          status: 'unavailable',
+          message: 'Logger not initialized'
+        })
+      }
+    } catch (error) {
+      res.status(500).json({
+        status: 'error',
+        message: error.message
+      })
+    }
   })
 
   return router
