@@ -13,7 +13,8 @@
  * - 防抖和节流
  */
 
-const fs = require('fs')
+const fs = require('fs').promises
+const fsSync = require('fs')
 const path = require('path')
 
 class NotificationQueue {
@@ -55,50 +56,59 @@ class NotificationQueue {
     // 重试定时器跟踪（防止内存泄漏）
     this.retryTimers = new Map()
 
-    // 确保缓存目录存在
-    this._ensureCacheDir()
-
-    // 加载失败的缓存
-    this._loadFailedCache()
+    // 确保缓存目录存在并加载失败的缓存（异步，不阻塞构造函数）
+    this._initializeCache().catch(error => {
+      this.logger.warning('NOTIFICATION_QUEUE', '缓存初始化失败', { error: error.message })
+    })
   }
 
   /**
-   * 确保缓存目录存在
+   * 初始化缓存（确保目录存在并加载失败的缓存）
    * @private
+   * @async
    */
-  _ensureCacheDir() {
-    if (!fs.existsSync(this.cacheDir)) {
-      fs.mkdirSync(this.cacheDir, { recursive: true })
+  async _initializeCache() {
+    try {
+      // 确保缓存目录存在
+      await fs.mkdir(this.cacheDir, { recursive: true })
+
+      // 加载失败的缓存
+      await this._loadFailedCache()
+    } catch (error) {
+      this.logger.warning('NOTIFICATION_QUEUE', '缓存目录创建失败', { error: error.message })
     }
   }
 
   /**
    * 加载失败的缓存
    * @private
+   * @async
    */
-  _loadFailedCache() {
+  async _loadFailedCache() {
     const cacheFile = path.join(this.cacheDir, 'failed-cache.json')
     try {
-      if (fs.existsSync(cacheFile)) {
-        const data = fs.readFileSync(cacheFile, 'utf-8')
-        this.failedCache = JSON.parse(data)
-        this.logger.info('NOTIFICATION_QUEUE', `加载失败缓存: ${this.failedCache.length} 条`)
-      }
+      const data = await fs.readFile(cacheFile, 'utf-8')
+      this.failedCache = JSON.parse(data)
+      this.logger.info('NOTIFICATION_QUEUE', `加载失败缓存: ${this.failedCache.length} 条`)
     } catch (error) {
-      this.logger.warning('NOTIFICATION_QUEUE', '加载失败缓存失败', { error: error.message })
+      // 文件不存在是正常情况，忽略错误
+      if (error.code !== 'ENOENT') {
+        this.logger.warning('NOTIFICATION_QUEUE', '加载失败缓存失败', { error: error.message })
+      }
     }
   }
 
   /**
    * 保存失败的缓存
    * @private
+   * @async
    */
-  _saveFailedCache() {
+  async _saveFailedCache() {
     const cacheFile = path.join(this.cacheDir, 'failed-cache.json')
     try {
       // 限制缓存大小
       const toSave = this.failedCache.slice(-this.maxCacheSize)
-      fs.writeFileSync(cacheFile, JSON.stringify(toSave, null, 2))
+      await fs.writeFile(cacheFile, JSON.stringify(toSave, null, 2))
     } catch (error) {
       this.logger.error('NOTIFICATION_QUEUE', '保存失败缓存失败', { error: error.message })
     }
@@ -220,7 +230,7 @@ class NotificationQueue {
             this.stats.sent++
             this.logger.debug('NOTIFICATION_QUEUE', `通知发送成功: ${item.type}`)
           } catch (error) {
-            this._handleFailedItem(item, error)
+            await this._handleFailedItem(item, error)
           }
         }
       }
@@ -235,8 +245,9 @@ class NotificationQueue {
   /**
    * 处理发送失败的通知
    * @private
+   * @async
    */
-  _handleFailedItem(item, error) {
+  async _handleFailedItem(item, error) {
     item.attempts++
     item.lastError = error.message
     item.lastAttempt = Date.now()
@@ -269,7 +280,7 @@ class NotificationQueue {
       }
 
       // 保存到文件
-      this._saveFailedCache()
+      await this._saveFailedCache()
     }
   }
 
@@ -301,7 +312,7 @@ class NotificationQueue {
       }
     }
 
-    this._saveFailedCache()
+    await this._saveFailedCache()
   }
 
   /**

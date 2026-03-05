@@ -37,6 +37,11 @@ class Config {
     // 🔐 标记敏感字段
     this._sensitiveFields = SENSITIVE_FIELDS
     this.load()
+
+    // 🔥 异步预热提示词缓存（不阻塞构造函数）
+    this._warmupPromptCache().catch(error => {
+      // 静默失败，不影响主流程
+    })
   }
 
   load() {
@@ -162,6 +167,44 @@ class Config {
       // 文件读取失败，静默忽略
     }
     return null
+  }
+
+  /**
+   * 🔥 异步预热提示词缓存
+   * 在后台预加载常用提示词文件，避免首次访问时阻塞
+   * @private
+   * @async
+   */
+  async _warmupPromptCache() {
+    try {
+      const fsPromises = require('fs').promises
+
+      // 预加载常用提示词文件
+      const commonFiles = [
+        'default.txt',
+        `${this.provider}.txt`,
+        `${this.provider}-slim.txt`
+      ]
+
+      // 并行加载所有文件
+      await Promise.all(
+        commonFiles.map(async filename => {
+          try {
+            const filepath = path.join(this.systemPrompts.promptsDir, filename)
+            const content = await fsPromises.readFile(filepath, 'utf-8')
+
+            // 缓存结果
+            if (!this._promptCache.has(filename)) {
+              this._promptCache.set(filename, content.trim())
+            }
+          } catch (error) {
+            // 文件不存在是正常情况，忽略
+          }
+        })
+      )
+    } catch (error) {
+      // 静默失败，不影响主流程
+    }
   }
 
   /**
