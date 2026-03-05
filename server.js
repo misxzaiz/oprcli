@@ -50,6 +50,12 @@ const { createLooseRateLimit, createMediumRateLimit } = require('./utils/rate-li
 const createHealthRoutes = require('./routes/health')
 const { AppError } = require('./utils/app-errors')
 
+// 🆕 性能和稳定性增强（2026-03-05 第二轮优化）
+const { CacheManager, createCacheMiddleware } = require('./utils/cache-manager')
+const GracefulShutdown = require('./utils/graceful-shutdown')
+const MemoryMonitor = require('./utils/memory-monitor')
+const { createAxiosRetryInterceptor } = require('./utils/retry-helper')
+
 class UnifiedServer {
   // 命令配置表
   static COMMANDS = {
@@ -93,6 +99,23 @@ class UnifiedServer {
 
     // 🆕 性能统计（2026-03-05 新增）
     this.performanceStats = null  // 将在中间件中初始化
+
+    // 🆕 缓存管理器（2026-03-05 第二轮优化）
+    this.cacheManager = new CacheManager({
+      enabled: process.env.CACHE_ENABLED !== 'false',
+      defaultTTL: parseInt(process.env.CACHE_TTL || '60000', 10),
+      maxEntries: parseInt(process.env.CACHE_MAX_ENTRIES || '1000', 10)
+    })
+
+    // 🆕 内存监控器（2026-03-05 第二轮优化）
+    this.memoryMonitor = new MemoryMonitor(this.logger, {
+      interval: parseInt(process.env.MEMORY_MONITOR_INTERVAL || '60000', 10),
+      threshold: parseInt(process.env.MEMORY_THRESHOLD || '524288000', 10), // 500MB
+      alertCooldown: parseInt(process.env.MEMORY_ALERT_COOLDOWN || '300000', 10) // 5 分钟
+    })
+
+    // 🆕 优雅关闭处理器（2026-03-05 第二轮优化）
+    this.gracefulShutdown = null  // 将在 start() 中初始化
 
     this._setupMiddleware()
     this._setupRoutes()
@@ -183,6 +206,24 @@ class UnifiedServer {
         next()
       })
     }
+
+    // 🆕 缓存中间件（2026-03-05 第二轮优化）
+    if (this.cacheManager.enabled) {
+      const cacheMiddleware = createCacheMiddleware(this.cacheManager, {
+        keyGenerator: (req) => `${req.method}:${req.originalUrl}`,
+        ttl: parseInt(process.env.CACHE_TTL || '60000', 10),
+        shouldCache: (req) => {
+          // 只缓存 GET 请求
+          if (req.method !== 'GET') return false
+          // 不缓存包含特定路径的请求
+          const noCachePaths = ['/api/message', '/api/connect', '/api/interrupt']
+          return !noCachePaths.some(path => req.path.startsWith(path))
+        }
+      })
+      this.app.use(cacheMiddleware)
+      this.logger.info('SERVER', '✓ 响应缓存已启用')
+    }
+
     // 注意：404 和错误处理中间件在 _setupErrorHandlers() 中设置（路由之后）
   }
 
@@ -683,7 +724,13 @@ class UnifiedServer {
           errorRate: '0%',
           avgResponseTime: '0ms',
           routes: []
-        }
+        },
+
+        // 🆕 缓存统计（2026-03-05 第二轮优化）
+        cache: this.cacheManager.getStats(),
+
+        // 🆕 内存监控统计（2026-03-05 第二轮优化）
+        memoryMonitor: this.memoryMonitor.getStats()
       }
 
       // 收集每个 connector 的详细信息
@@ -1223,8 +1270,9 @@ class UnifiedServer {
     await this.scheduler.start()
 
     // 启动 HTTP 服务器（仅在端口配置时）
+    let server = null
     if (config.port) {
-      this.app.listen(config.port, () => {
+      server = this.app.listen(config.port, () => {
         console.log('\n========================================')
         console.log('  Unified AI CLI Connector Server')
         console.log('========================================')
@@ -1243,8 +1291,39 @@ class UnifiedServer {
       console.log('\n按 Ctrl+C 停止服务器\n')
     }
 
-    // 🆕 启动内存监控（2026-03-05 新增）
-    this._startMemoryMonitor()
+    // 🆕 设置优雅关闭（2026-03-05 第二轮优化）
+    if (server) {
+      this.gracefulShutdown = new GracefulShutdown(server, this.logger, {
+        timeout: parseInt(process.env.SHUTDOWN_TIMEOUT || '30000', 10)
+      })
+
+      // 注册清理任务
+      this.gracefulShutdown.registerCleanupTask(async () => {
+        this.logger.info('SHUTDOWN', '清理缓存...')
+        this.cacheManager.clear()
+      })
+
+      this.gracefulShutdown.registerCleanupTask(async () => {
+        this.logger.info('SHUTDOWN', '停止内存监控...')
+        this.memoryMonitor.stop()
+      })
+
+      this.gracefulShutdown.registerCleanupTask(async () => {
+        this.logger.info('SHUTDOWN', '停止定时任务...')
+        if (this.scheduler) {
+          this.scheduler.stop()
+        }
+      })
+
+      // 设置信号监听
+      this.gracefulShutdown.setup()
+      this.logger.info('SERVER', '✓ 优雅关闭处理器已设置')
+    }
+
+    // 🆕 启动内存监控（2026-03-05 新增，2026-03-05 第二轮优化）
+    if (process.env.MEMORY_MONITOR_ENABLED !== 'false') {
+      this.memoryMonitor.start()
+    }
   }
 
   async handleDingTalkMessage(message) {
