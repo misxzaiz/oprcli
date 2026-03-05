@@ -1,6 +1,6 @@
 {
-  "lastScan": "2026-03-06T16:00:00Z",
-  "version": "2.0.7",
+  "lastScan": "2026-03-06T20:00:00Z",
+  "version": "2.0.8",
   "files": {
     "server.js": {
       "path": "server.js",
@@ -35,13 +35,15 @@
     },
     "utils/cache-manager.js": {
       "path": "utils/cache-manager.js",
-      "size": 620,
+      "size": 625,
       "lastModified": "2026-03-06",
       "complexity": "medium",
-      "risk": "medium",
+      "risk": "low",
       "issues": [
-        {"id": "ISS-010", "type": "异步计数错误", "line": "359-369"},
-        {"id": "ISS-015", "type": "LRU效率低", "line": "71-78"}
+        {"id": "ISS-010", "type": "异步计数错误", "line": "359-369", "status": "fixed"}
+      ],
+      "optimizations": [
+        {"id": "ISS-015", "type": "LRU优化", "line": "71-82, 107-133", "status": "fixed"}
       ]
     },
     "connectors/iflow-connector.js": {
@@ -87,15 +89,15 @@
     "lowRisk": 44
   },
   "issues": [
-    {"id": "ISS-009", "title": "Promise错误处理缺陷", "severity": "high", "status": "open"},
-    {"id": "ISS-010", "title": "缓存预热异步计数错误", "severity": "high", "status": "open"},
-    {"id": "ISS-011", "title": "定时器泄漏风险", "severity": "high", "status": "open"},
-    {"id": "ISS-012", "title": "配置备份权限检查缺失", "severity": "high", "status": "open"},
-    {"id": "ISS-013", "title": "健康检查定时器泄漏", "severity": "high", "status": "open"},
+    {"id": "ISS-009", "title": "Promise错误处理缺陷", "severity": "high", "status": "fixed"},
+    {"id": "ISS-010", "title": "缓存预热异步计数错误", "severity": "high", "status": "fixed"},
+    {"id": "ISS-011", "title": "定时器泄漏风险", "severity": "high", "status": "fixed"},
+    {"id": "ISS-012", "title": "配置备份权限检查缺失", "severity": "high", "status": "fixed"},
+    {"id": "ISS-013", "title": "健康检查定时器泄漏", "severity": "high", "status": "fixed"},
+    {"id": "ISS-015", "title": "LRU缓存效率低", "severity": "medium", "status": "fixed"},
     {"id": "ISS-007", "title": "server.js文件过大", "severity": "medium", "status": "open"},
     {"id": "ISS-008", "title": "config-manager.js复杂度高", "severity": "medium", "status": "open"},
-    {"id": "ISS-014", "title": "重复的连接器遍历逻辑", "severity": "medium", "status": "open"},
-    {"id": "ISS-015", "title": "LRU缓存效率低", "severity": "medium", "status": "open"},
+    {"id": "ISS-014", "title": "重复的连接器遍历逻辑", "severity": "medium", "status": "fixed"},
     {"id": "ISS-016", "title": "同步文件操作阻塞", "severity": "medium", "status": "open"},
     {"id": "ISS-017", "title": "代码风格不一致", "severity": "medium", "status": "open"}
   ]
