@@ -69,11 +69,14 @@ class CacheManager {
 
     // 检查缓存大小限制
     if (this.cache.size >= this.maxEntries && !this.cache.has(key)) {
-      // 🆕 改进的 LRU 策略：删除最旧的多个条目以避免频繁清理
-      const cleanupCount = Math.floor(this.maxEntries * 0.1) // 清理 10%
-      const keysToDelete = Array.from(this.cache.keys()).slice(0, cleanupCount)
-      for (const k of keysToDelete) {
-        this.delete(k)
+      // 🆕 优化的 LRU 策略：O(cleanupCount) 清理最旧的条目
+      // 由于 get() 方法会将访问的条目移动到 Map 末尾，Map 开头的条目就是最近最少使用的
+      const cleanupCount = Math.max(1, Math.floor(this.maxEntries * 0.1)) // 清理 10%，至少1个
+      let count = 0
+      for (const keyToDelete of this.cache.keys()) {
+        if (count >= cleanupCount) break
+        this.delete(keyToDelete)
+        count++
       }
     }
 
@@ -107,9 +110,6 @@ class CacheManager {
   get(key) {
     if (!this.enabled) return null
 
-    // 🆕 记录访问
-    this._trackAccess(key)
-
     const item = this.cache.get(key)
 
     if (!item) {
@@ -123,6 +123,14 @@ class CacheManager {
       this.stats.misses++
       return null
     }
+
+    // 🆕 真正的 LRU：reinsert 将命中的条目移动到 Map 末尾（最新位置）
+    // Map 的迭代顺序基于插入顺序，这样可以将访问的条目标记为"最近使用"
+    this.cache.delete(key)
+    this.cache.set(key, item)
+
+    // 🆕 记录访问（用于热点分析）
+    this._trackAccess(key)
 
     this.stats.hits++
     return item.value
