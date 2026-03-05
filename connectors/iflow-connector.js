@@ -275,18 +275,24 @@ class IFlowConnector extends BaseConnector {
     let attempts = 0;
     const maxAttempts = 100;
 
-    const findAndMonitor = () => {
+    // 🔥 性能优化：指数退避策略
+    // 从 100ms 开始，逐步增加到最大 5000ms，减少 CPU 占用
+    let pollInterval = 100;
+    const maxPollInterval = 5000;
+    let currentMonitor = null;
+
+    const findAndMonitor = async () => {
       if (!jsonlPath) {
         try {
-          jsonlPath = this._findSessionJsonl(sessionDir, sessionId);
+          jsonlPath = await this._findSessionJsonl(sessionDir, sessionId);
           if (!jsonlPath) {
-            jsonlPath = this._findLatestJsonl(sessionDir);
+            jsonlPath = await this._findLatestJsonl(sessionDir);
           }
 
           if (jsonlPath) {
             console.log('[IFlowConnector] 找到 JSONL 文件:', jsonlPath);
             try {
-              const stats = fs.statSync(jsonlPath);
+              const stats = await fs.promises.stat(jsonlPath);
               lastSize = stats.size;
               lastPosition = 0;
               console.log('[IFlowConnector] JSONL 文件大小:', lastSize);
@@ -298,18 +304,18 @@ class IFlowConnector extends BaseConnector {
       // 使用增量读取代替完整文件重读
       if (jsonlPath) {
         try {
-          const stats = fs.statSync(jsonlPath);
+          const stats = await fs.promises.stat(jsonlPath);
           const currentSize = stats.size;
 
           // 文件有新内容
           if (currentSize > lastSize) {
             console.log(`[IFlowConnector] 检测到新内容: ${currentSize - lastSize} 字节`);
 
-            // 只读取新增的部分
-            const fd = fs.openSync(jsonlPath, 'r');
+            // 🔥 性能优化：使用异步文件操作，不阻塞事件循环
+            const fd = await fs.promises.open(jsonlPath, 'r');
             const buffer = Buffer.alloc(currentSize - lastSize);
-            fs.readSync(fd, buffer, 0, buffer.length, lastPosition);
-            fs.closeSync(fd);
+            await fd.read(buffer, 0, buffer.length, lastPosition);
+            await fd.close();
 
             const newContent = buffer.toString('utf-8');
             const lines = newContent.split('\n').filter(l => l.trim());
@@ -370,28 +376,52 @@ class IFlowConnector extends BaseConnector {
           clearInterval(monitor);
           this.jsonlMonitors.delete(sessionId);
         }
+        return;
+      }
+
+      // 🔥 性能优化：指数退避，减少不必要的轮询
+      if (currentMonitor && !jsonlPath) {
+        pollInterval = Math.min(Math.floor(pollInterval * 1.5), maxPollInterval);
+        if (pollInterval > 100) {
+          clearInterval(currentMonitor);
+          currentMonitor = setInterval(findAndMonitor, pollInterval);
+          this.jsonlMonitors.set(sessionId, currentMonitor);
+        }
       }
     };
 
-    const monitor = setInterval(findAndMonitor, 100);
-    this.jsonlMonitors.set(sessionId, monitor);
+    currentMonitor = setInterval(findAndMonitor, pollInterval);
+    this.jsonlMonitors.set(sessionId, currentMonitor);
   }
 
-  _findLatestJsonl(sessionDir) {
+  async _findLatestJsonl(sessionDir) {
     if (!fs.existsSync(sessionDir)) {
       return null;
     }
 
-    const files = fs.readdirSync(sessionDir)
-      .filter(f => f.startsWith('session-') && f.endsWith('.jsonl'))
-      .map(f => ({
-        name: f,
-        path: path.join(sessionDir, f),
-        time: fs.statSync(path.join(sessionDir, f)).mtime.getTime()
-      }))
-      .sort((a, b) => b.time - a.time);
+    // 🔥 性能优化：使用 Promise.all 并行获取文件状态，减少 I/O 等待时间
+    const fileNames = fs.readdirSync(sessionDir)
+      .filter(f => f.startsWith('session-') && f.endsWith('.jsonl'));
 
-    return files.length > 0 ? files[0].path : null;
+    if (fileNames.length === 0) {
+      return null;
+    }
+
+    try {
+      const files = await Promise.all(
+        fileNames.map(async f => {
+          const filePath = path.join(sessionDir, f);
+          const stat = await fs.promises.stat(filePath);
+          return { name: f, path: filePath, time: stat.mtime.getTime() };
+        })
+      );
+
+      files.sort((a, b) => b.time - a.time);
+      return files[0].path;
+    } catch (e) {
+      console.error('[IFlowConnector] 查找 JSONL 文件失败:', e.message);
+      return null;
+    }
   }
 
   _getIflowConfigDir() {
@@ -416,7 +446,7 @@ class IFlowConnector extends BaseConnector {
     return path.join(configDir, 'projects', encodedPath);
   }
 
-  _findSessionJsonl(sessionDir, sessionId) {
+  async _findSessionJsonl(sessionDir, sessionId) {
     if (!fs.existsSync(sessionDir)) {
       throw new Error(`会话目录不存在: ${sessionDir}`);
     }
@@ -427,7 +457,8 @@ class IFlowConnector extends BaseConnector {
     for (const file of files) {
       const filePath = path.join(sessionDir, file);
       try {
-        const content = fs.readFileSync(filePath, 'utf-8');
+        // 🔥 性能优化：使用异步文件读取
+        const content = await fs.promises.readFile(filePath, 'utf-8');
         const lines = content.split('\n').slice(0, 10);
 
         for (const line of lines) {
