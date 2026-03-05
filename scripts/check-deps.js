@@ -7,6 +7,7 @@
  * - 检查是否有可用的更新
  * - 检查依赖是否存在安全漏洞
  * - 生成依赖报告
+ * - 分析依赖大小和许可证
  *
  * 使用方法：
  * node scripts/check-deps.js                    # 检查所有依赖
@@ -14,6 +15,7 @@
  * node scripts/check-deps.js --updates          # 检查可用更新
  * node scripts/check-deps.js --audit            # 检查安全漏洞
  * node scripts/check-deps.js --report           # 生成详细报告
+ * node scripts/check-deps.js --analyze          # 分析依赖大小和许可证
  */
 
 const fs = require('fs')
@@ -49,6 +51,7 @@ function parseArgs() {
     updates: false,
     audit: false,
     report: false,
+    analyze: false,
     help: false
   }
 
@@ -71,6 +74,10 @@ function parseArgs() {
       case '--report':
         options.report = true
         break
+      case '-n':
+      case '--analyze':
+        options.analyze = true
+        break
       case '-h':
       case '--help':
         options.help = true
@@ -86,7 +93,7 @@ function parseArgs() {
  */
 function showHelp() {
   console.log(`
-🔍 依赖检查工具 v1.0.0
+🔍 依赖检查工具 v1.1.0
 
 使用方法：
   node scripts/check-deps.js [选项]
@@ -96,6 +103,7 @@ function showHelp() {
   -u, --updates           检查可用的依赖更新
   -a, --audit             运行 npm audit 检查安全漏洞
   -r, --report            生成详细的依赖报告到 logs/dependency-report.json
+  -n, --analyze           分析依赖大小和许可证信息
   -h, --help              显示此帮助信息
 
 示例：
@@ -104,6 +112,7 @@ function showHelp() {
   node scripts/check-deps.js --updates          # 检查可用更新
   node scripts/check-deps.js --audit            # 检查安全漏洞
   node scripts/check-deps.js --report           # 生成详细报告
+  node scripts/check-deps.js --analyze          # 分析依赖信息
 `)
 }
 
@@ -322,9 +331,120 @@ function displayAuditResults(audit) {
 }
 
 /**
+ * 分析依赖大小和许可证
+ */
+function analyzeDependencies(packageJson) {
+  console.log(`\n${COLORS.blue}📊 依赖分析${COLORS.reset}`)
+  console.log(`${COLORS.gray}${'─'.repeat(40)}${COLORS.reset}\n`)
+
+  const dependencies = {
+    ...packageJson.dependencies,
+    ...packageJson.devDependencies
+  }
+
+  const analysis = {
+    totalSize: 0,
+    licenses: {},
+    packages: []
+  }
+
+  Object.entries(dependencies).forEach(([name, version]) => {
+    const modulePath = path.join(CONFIG.nodeModulesPath, name)
+
+    if (!fs.existsSync(modulePath)) {
+      return
+    }
+
+    try {
+      const pkgPath = path.join(modulePath, 'package.json')
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
+
+      // 计算目录大小
+      const size = getDirectorySize(modulePath)
+      const license = pkg.license || 'Unknown'
+
+      analysis.totalSize += size
+      analysis.packages.push({
+        name,
+        version: pkg.version,
+        size,
+        license,
+        description: pkg.description || ''
+      })
+
+      // 统计许可证
+      analysis.licenses[license] = (analysis.licenses[license] || 0) + 1
+    } catch (error) {
+      // 忽略错误
+    }
+  })
+
+  // 按大小排序
+  analysis.packages.sort((a, b) => b.size - a.size)
+
+  // 显示最大的包
+  console.log(`${COLORS.cyan}最大的 10 个依赖包:${COLORS.reset}`)
+  analysis.packages.slice(0, 10).forEach((pkg, index) => {
+    const size = formatSize(pkg.size)
+    const license = pkg.license === 'Unknown' ? `${COLORS.yellow}${pkg.license}${COLORS.reset}` : pkg.license
+    console.log(`  ${index + 1}. ${COLORS.cyan}${pkg.name}${COLORS.reset} - ${size} (${license})`)
+  })
+
+  // 显示许可证统计
+  console.log(`\n${COLORS.cyan}许可证分布:${COLORS.reset}`)
+  Object.entries(analysis.licenses)
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([license, count]) => {
+      const color = license === 'Unknown' ? COLORS.yellow : COLORS.green
+      console.log(`  ${color}${license}${COLORS.reset}: ${count} 个包`)
+    })
+
+  // 显示总大小
+  console.log(`\n${COLORS.cyan}依赖总大小:${COLORS.reset} ${formatSize(analysis.totalSize)}`)
+
+  return analysis
+}
+
+/**
+ * 获取目录大小
+ */
+function getDirectorySize(dirPath) {
+  let totalSize = 0
+
+  function calculateSize(path) {
+    try {
+      const stats = fs.statSync(path)
+      if (stats.isDirectory()) {
+        const files = fs.readdirSync(path)
+        files.forEach(file => {
+          calculateSize(dirPath + '/' + file)
+        })
+      } else {
+        totalSize += stats.size
+      }
+    } catch (error) {
+      // 忽略无法访问的文件
+    }
+  }
+
+  calculateSize(dirPath)
+  return totalSize
+}
+
+/**
+ * 格式化文件大小
+ */
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
+}
+
+/**
  * 生成详细报告
  */
-function generateReport(packageJson, depResults, updates, audit) {
+function generateReport(packageJson, depResults, updates, audit, analysis) {
   const report = {
     timestamp: new Date().toISOString(),
     summary: {
@@ -332,12 +452,14 @@ function generateReport(packageJson, depResults, updates, audit) {
       installed: depResults.installed.length,
       missing: depResults.missing.length,
       outdated: updates.length,
-      vulnerabilities: audit.total || 0
+      vulnerabilities: audit.total || 0,
+      totalSize: analysis?.totalSize || 0
     },
     dependencies: depResults.installed,
     missing: depResults.missing,
     updates: updates,
-    security: audit
+    security: audit,
+    analysis: analysis || {}
   }
 
   // 确保日志目录存在
@@ -369,30 +491,30 @@ async function main() {
   const depResults = checkInstalledDependencies(packageJson, options)
   displayDependencyResults(depResults)
 
+  let analysis = null
+  let updates = []
+  let audit = {}
+
+  // 依赖分析
+  if (options.analyze) {
+    analysis = analyzeDependencies(packageJson)
+  }
+
   // 检查更新
   if (options.updates) {
-    const updates = checkUpdates()
+    updates = checkUpdates()
     displayUpdateResults(updates)
-
-    if (options.report) {
-      const audit = options.audit ? runAudit() : {}
-      generateReport(packageJson, depResults, updates, audit)
-    }
   }
 
   // 安全审计
   if (options.audit) {
-    const audit = runAudit()
+    audit = runAudit()
     displayAuditResults(audit)
-
-    if (options.report && !options.updates) {
-      generateReport(packageJson, depResults, [], audit)
-    }
   }
 
   // 生成报告
-  if (options.report && !options.updates && !options.audit) {
-    generateReport(packageJson, depResults, [], {})
+  if (options.report) {
+    generateReport(packageJson, depResults, updates, audit, analysis)
   }
 
   // 返回退出码

@@ -81,3 +81,6 @@ scheduler/tasks.json
 
 # 插件系统运行时文件
 memory/
+
+# 配置备份文件
+backups/

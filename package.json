@@ -1,6 +1,6 @@
 {
   "name": "oprcli",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "统一 AI CLI 连接器服务器 - 支持 Claude Code 和 IFlow",
   "main": "server.js",
   "scripts": {

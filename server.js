@@ -56,6 +56,10 @@ const GracefulShutdown = require('./utils/graceful-shutdown')
 const MemoryMonitor = require('./utils/memory-monitor')
 const { createAxiosRetryInterceptor } = require('./utils/retry-helper')
 
+// 🆕 安全增强（2026-03-05 第三轮优化）
+const InputValidator = require('./utils/input-validator')
+const SecurityEnhancer = require('./utils/security-enhancer')
+
 class UnifiedServer {
   // 命令配置表
   static COMMANDS = {
@@ -116,6 +120,10 @@ class UnifiedServer {
 
     // 🆕 优雅关闭处理器（2026-03-05 第二轮优化）
     this.gracefulShutdown = null  // 将在 start() 中初始化
+
+    // 🆕 安全增强工具（2026-03-05 第三轮优化）
+    this.inputValidator = new InputValidator(this.logger)
+    this.securityEnhancer = new SecurityEnhancer(this.logger)
 
     this._setupMiddleware()
     this._setupRoutes()
@@ -358,8 +366,11 @@ class UnifiedServer {
   async handleSetConfig(req, res) {
     const { key, value } = req.body
 
-    if (!key) {
-      return res.status(400).json({ success: false, error: '缺少 key 参数' })
+    // 🆕 输入验证（2026-03-05 第三轮优化）
+    const keyValidation = this.inputValidator.validateConfigKey(key)
+    if (!keyValidation.valid) {
+      this.logger.warn('API', `配置键验证失败: ${keyValidation.error}`, { requestId: req.id })
+      return res.status(400).json({ success: false, error: keyValidation.error })
     }
 
     try {
@@ -441,9 +452,24 @@ class UnifiedServer {
     }
 
     const { message, sessionId } = req.body
-    if (!message?.trim()) {
-      return res.status(400).json({ success: false, error: '消息不能为空' })
+
+    // 🆕 输入验证（2026-03-05 第三轮优化）
+    // 验证消息内容
+    const messageValidation = this.inputValidator.validateMessage(message)
+    if (!messageValidation.valid) {
+      this.logger.warn('API', `消息验证失败: ${messageValidation.error}`, { requestId: req.id })
+      return res.status(400).json({ success: false, error: messageValidation.error })
     }
+
+    // 验证会话 ID
+    const sessionValidation = this.inputValidator.validateSessionId(sessionId)
+    if (!sessionValidation.valid) {
+      this.logger.warn('API', `会话 ID 验证失败: ${sessionValidation.error}`, { requestId: req.id })
+      return res.status(400).json({ success: false, error: sessionValidation.error })
+    }
+
+    // 使用清理后的消息
+    const sanitizedMessage = messageValidation.sanitized
 
     try {
       const events = []
@@ -472,9 +498,9 @@ class UnifiedServer {
         }
 
         if (isResume) {
-          connector.continueSession(sessionId, message, options)
+          connector.continueSession(sessionId, sanitizedMessage, options)
         } else {
-          const result = connector.startSession(message, options)
+          const result = connector.startSession(sanitizedMessage, options)
           this.currentSessionId = result.sessionId
         }
       })
