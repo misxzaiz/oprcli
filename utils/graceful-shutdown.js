@@ -39,7 +39,10 @@ class GracefulShutdown {
 
     // 监听未捕获的异常
     process.on('uncaughtException', (error) => {
-      this.logger.error('SHUTDOWN', '未捕获的异常', { error: error.message })
+      this.logger.error('SHUTDOWN', '未捕获的异常', {
+        error: error.message,
+        stack: error.stack
+      })
       this.shutdown('UNCAUGHT_EXCEPTION')
     })
 

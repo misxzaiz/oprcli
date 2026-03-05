@@ -12,8 +12,8 @@
  * - 会话管理
  */
 
-// 首先加载环境变量
-require('dotenv').config()
+// 首先加载环境变量（覆盖已存在的环境变量）
+require('dotenv').config({ override: true })
 
 const express = require('express')
 const helmet = require('helmet')

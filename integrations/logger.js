@@ -64,7 +64,8 @@ class Logger {
 
     let logMsg = `${color}[${timestamp}] ${icon} [${levelName}] [${category}] ${message}${reset}`
 
-    if (data && level <= this.levels.DEBUG) {
+    // 🔧 修复：ERROR 和 WARNING 级别也显示详细数据
+    if (data && (level <= this.levels.DEBUG || level >= this.levels.WARNING)) {
       logMsg += '\n' + JSON.stringify(data, null, 2)
     }
 
