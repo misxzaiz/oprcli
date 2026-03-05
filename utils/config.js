@@ -199,26 +199,169 @@ class Config {
 
   validate() {
     const errors = []
+    const warnings = []
 
+    // Provider 验证
     if (!['claude', 'iflow'].includes(this.provider)) {
-      errors.push(`Invalid PROVIDER: ${this.provider}`)
+      errors.push({
+        field: 'PROVIDER',
+        message: `无效的 PROVIDER 值: "${this.provider}"，有效值为: claude, iflow`,
+        value: this.provider
+      })
     }
 
+    // Port 验证
+    if (this.port !== null) {
+      if (typeof this.port !== 'number' || isNaN(this.port)) {
+        errors.push({
+          field: 'PORT',
+          message: `PORT 必须是数字，当前值: ${this.port}`,
+          value: this.port
+        })
+      } else if (this.port < 1 || this.port > 65535) {
+        errors.push({
+          field: 'PORT',
+          message: `PORT 超出有效范围 (1-65535)，当前值: ${this.port}`,
+          value: this.port
+        })
+      } else if (this.port < 1024) {
+        warnings.push({
+          field: 'PORT',
+          message: `使用特权端口 (${this.port}) 可能需要管理员权限`
+        })
+      }
+    }
+
+    // Claude 配置验证
     if (this.provider === 'claude') {
-      if (!this.claude.cmdPath) errors.push('CLAUDE_CMD_PATH is required')
-      if (!this.claude.workDir) errors.push('CLAUDE_WORK_DIR is required')
-    } else if (this.provider === 'iflow') {
-      if (!this.iflow.workDir) errors.push('IFLOW_WORK_DIR is required')
+      if (!this.claude.cmdPath) {
+        errors.push({
+          field: 'CLAUDE_CMD_PATH',
+          message: 'Claude 命令路径未配置',
+          hint: '请设置 CLAUDE_CMD_PATH 环境变量'
+        })
+      } else if (!this._checkFileExists(this.claude.cmdPath)) {
+        warnings.push({
+          field: 'CLAUDE_CMD_PATH',
+          message: `Claude 命令路径不存在或无法访问: ${this.claude.cmdPath}`,
+          hint: '请检查路径是否正确'
+        })
+      }
+
+      if (!this.claude.workDir) {
+        errors.push({
+          field: 'CLAUDE_WORK_DIR',
+          message: 'Claude 工作目录未配置',
+          hint: '请设置 CLAUDE_WORK_DIR 环境变量'
+        })
+      } else if (!this._checkDirectoryExists(this.claude.workDir)) {
+        warnings.push({
+          field: 'CLAUDE_WORK_DIR',
+          message: `工作目录不存在或无法访问: ${this.claude.workDir}`,
+          hint: '请检查目录是否存在'
+        })
+      }
+
+      if (this.claude.gitBinPath && !this._checkFileExists(this.claude.gitBinPath)) {
+        warnings.push({
+          field: 'CLAUDE_GIT_BIN_PATH',
+          message: `Git 可执行文件不存在: ${this.claude.gitBinPath}`,
+          hint: '将使用系统默认 Git'
+        })
+      }
     }
 
+    // IFlow 配置验证
+    if (this.provider === 'iflow') {
+      if (!this.iflow.workDir) {
+        errors.push({
+          field: 'IFLOW_WORK_DIR',
+          message: 'IFlow 工作目录未配置',
+          hint: '请设置 IFLOW_WORK_DIR 环境变量'
+        })
+      } else if (!this._checkDirectoryExists(this.iflow.workDir)) {
+        warnings.push({
+          field: 'IFLOW_WORK_DIR',
+          message: `工作目录不存在或无法访问: ${this.iflow.workDir}`
+        })
+      }
+    }
+
+    // 钉钉配置验证
     if (this.dingtalk.enabled) {
-      if (!this.dingtalk.clientId) errors.push('DINGTALK_CLIENT_ID is required')
-      if (!this.dingtalk.clientSecret) errors.push('DINGTALK_CLIENT_SECRET is required')
+      if (!this.dingtalk.clientId) {
+        errors.push({
+          field: 'DINGTALK_CLIENT_ID',
+          message: '钉钉客户端 ID 未配置',
+          hint: '请设置 DINGTALK_CLIENT_ID 环境变量'
+        })
+      }
+      if (!this.dingtalk.clientSecret) {
+        errors.push({
+          field: 'DINGTALK_CLIENT_SECRET',
+          message: '钉钉客户端密钥未配置',
+          hint: '请设置 DINGTALK_CLIENT_SECRET 环境变量'
+        })
+      }
+    }
+
+    // 流式配置验证
+    if (this.streaming.interval < 100) {
+      warnings.push({
+        field: 'STREAM_INTERVAL',
+        message: `流式输出间隔过短 (${this.streaming.interval}ms)，可能导致性能问题`,
+        hint: '建议设置为 500ms 或更长'
+      })
+    }
+
+    if (this.streaming.maxLength > 10000) {
+      warnings.push({
+        field: 'STREAM_MAX_LENGTH',
+        message: `流式输出最大长度过长 (${this.streaming.maxLength})`,
+        hint: '可能导致消息截断或显示问题'
+      })
+    }
+
+    // 通知配置验证
+    if (this.notification.enabled) {
+      if (this.notification.type === 'dingtalk') {
+        if (!this.notification.dingtalk.webhook) {
+          warnings.push({
+            field: 'NOTIFICATION_DINGTALK_WEBHOOK',
+            message: '钉钉通知 Webhook 未配置，通知功能可能无法正常工作'
+          })
+        }
+      }
     }
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
+      warnings
+    }
+  }
+
+  /**
+   * 检查文件是否存在
+   * @private
+   */
+  _checkFileExists(filePath) {
+    try {
+      return fs.existsSync(filePath) && fs.statSync(filePath).isFile()
+    } catch (err) {
+      return false
+    }
+  }
+
+  /**
+   * 检查目录是否存在
+   * @private
+   */
+  _checkDirectoryExists(dirPath) {
+    try {
+      return fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()
+    } catch (err) {
+      return false
     }
   }
 

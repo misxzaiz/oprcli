@@ -45,6 +45,11 @@ const {
 } = require('./utils/middleware')
 const StartupCheck = require('./utils/startup-check')
 
+// 🆕 新增功能（2026-03-05）
+const { createLooseRateLimit, createMediumRateLimit } = require('./utils/rate-limit')
+const createHealthRoutes = require('./routes/health')
+const { AppError } = require('./utils/app-errors')
+
 class UnifiedServer {
   // 命令配置表
   static COMMANDS = {
@@ -156,6 +161,17 @@ class UnifiedServer {
     })
     this.logger.info('SERVER', '✓ 性能监控已启用')
 
+    // 🛡️ 速率限制中间件（2026-03-05 新增）
+    const rateLimitEnabled = process.env.RATE_LIMIT_ENABLED !== 'false' // 默认启用
+    if (rateLimitEnabled) {
+      const apiRateLimit = createMediumRateLimit()
+      // 对 API 路由应用速率限制（将在路由中应用）
+      this.apiRateLimit = apiRateLimit
+      this.logger.info('SERVER', '✓ 速率限制已启用')
+    } else {
+      this.logger.info('SERVER', '⚠️  速率限制已禁用')
+    }
+
     // 🆕 请求日志中间件（增强版，包含请求ID）
     if (process.env.NODE_ENV === 'production') {
       this.app.use((req, res, next) => {
@@ -182,6 +198,16 @@ class UnifiedServer {
   }
 
   _setupRoutes() {
+    // 🆕 健康检查路由（2026-03-05 新增）
+    const healthRoutes = createHealthRoutes(this)
+    this.app.use('/', healthRoutes)
+    this.logger.info('SERVER', '✓ 健康检查端点已注册')
+
+    // 🛡️ 对 API 路由应用速率限制
+    if (this.apiRateLimit) {
+      this.app.use('/api', this.apiRateLimit)
+    }
+
     this.app.post('/api/connect', this.handleConnect.bind(this))
     this.app.get('/api/status', this.handleStatus.bind(this))
     this.app.post('/api/message', this.handleMessage.bind(this))
