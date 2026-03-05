@@ -696,6 +696,299 @@ class ConfigManager {
     this.logger.info('CONFIG', '手动触发配置重载');
     await this.debouncedReload();
   }
+
+  // ==================== 🆕 配置备份和历史（2026-03-05 优化） ====================
+
+  /**
+   * 备份当前配置
+   */
+  async backup(backupName = null) {
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const name = backupName || `backup-${timestamp}`;
+      const backupPath = path.join(path.dirname(this.configPath), `backups/${name}.json`);
+
+      // 确保备份目录存在
+      await fs.mkdir(path.dirname(backupPath), { recursive: true });
+
+      // 创建备份
+      await fs.writeFile(backupPath, JSON.stringify(this.config, null, 2), 'utf-8');
+
+      this.logger.success('CONFIG', `✓ 配置已备份: ${name}`);
+      return { success: true, backupPath, name };
+    } catch (error) {
+      this.logger.error('CONFIG', '配置备份失败', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 列出所有备份
+   */
+  async listBackups() {
+    try {
+      const backupDir = path.join(path.dirname(this.configPath), 'backups');
+
+      // 检查备份目录是否存在
+      try {
+        await fs.access(backupDir);
+      } catch {
+        return []; // 目录不存在，返回空列表
+      }
+
+      const files = await fs.readdir(backupDir);
+      const backups = [];
+
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          const filePath = path.join(backupDir, file);
+          const stats = await fs.stat(filePath);
+
+          backups.push({
+            name: file.replace('.json', ''),
+            path: filePath,
+            size: stats.size,
+            created: stats.birthtime,
+            modified: stats.mtime
+          });
+        }
+      }
+
+      // 按创建时间排序（最新的在前）
+      backups.sort((a, b) => b.created - a.created);
+
+      return backups;
+    } catch (error) {
+      this.logger.error('CONFIG', '列出备份失败', error);
+      return [];
+    }
+  }
+
+  /**
+   * 恢复备份
+   */
+  async restoreBackup(backupName) {
+    try {
+      const backupPath = path.join(
+        path.dirname(this.configPath),
+        `backups/${backupName}.json`
+      );
+
+      // 读取备份文件
+      const content = await fs.readFile(backupPath, 'utf-8');
+      const backupConfig = JSON.parse(content);
+
+      // 验证备份配置
+      this.config = backupConfig;
+      await this.validateConfig();
+
+      // 保存为当前配置
+      await this.save();
+
+      this.logger.success('CONFIG', `✓ 配置已从备份恢复: ${backupName}`);
+      return { success: true };
+    } catch (error) {
+      this.logger.error('CONFIG', '恢复备份失败', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 删除备份
+   */
+  async deleteBackup(backupName) {
+    try {
+      const backupPath = path.join(
+        path.dirname(this.configPath),
+        `backups/${backupName}.json`
+      );
+
+      await fs.unlink(backupPath);
+
+      this.logger.info('CONFIG', `✓ 备份已删除: ${backupName}`);
+      return { success: true };
+    } catch (error) {
+      this.logger.error('CONFIG', '删除备份失败', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 清理旧备份（保留最新的N个）
+   */
+  async cleanOldBackups(keepCount = 10) {
+    try {
+      const backups = await this.listBackups();
+
+      if (backups.length <= keepCount) {
+        this.logger.info('CONFIG', `备份数量未超限（${backups.length}/${keepCount}），无需清理`);
+        return { success: true, deleted: 0 };
+      }
+
+      // 删除多余的备份
+      const toDelete = backups.slice(keepCount);
+      let deletedCount = 0;
+
+      for (const backup of toDelete) {
+        const result = await this.deleteBackup(backup.name);
+        if (result.success) {
+          deletedCount++;
+        }
+      }
+
+      this.logger.success('CONFIG', `✓ 已清理 ${deletedCount} 个旧备份（保留 ${keepCount} 个）`);
+      return { success: true, deleted: deletedCount };
+    } catch (error) {
+      this.logger.error('CONFIG', '清理旧备份失败', error);
+      return { success: false, error: error.message, deleted: 0 };
+    }
+  }
+
+  // ==================== 🆕 配置验证增强（2026-03-05 优化） ====================
+
+  /**
+   * 深度验证配置（增强版）
+   */
+  async validateConfigDeep() {
+    const errors = [];
+    const warnings = [];
+
+    try {
+      // 基本验证
+      if (!this.config.server) {
+        errors.push('缺少 server 配置');
+      } else {
+        if (!this.config.server.port) {
+          errors.push('缺少 server.port 配置');
+        } else if (this.config.server.port < 1024 || this.config.server.port > 65535) {
+          errors.push('端口号必须在 1024-65535 之间');
+        }
+
+        if (this.config.server.host) {
+          // 验证主机地址格式
+          const hostPattern = /^(\*|[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|[a-zA-Z0-9.-]+)$/;
+          if (!hostPattern.test(this.config.server.host)) {
+            warnings.push('server.host 格式可能不正确');
+          }
+        }
+      }
+
+      // 连接器配置验证
+      if (this.config.connectors) {
+        if (!this.config.connectors.default) {
+          warnings.push('未设置默认连接器');
+        } else if (!['claude', 'iflow'].includes(this.config.connectors.default)) {
+          errors.push('不支持的连接器类型: ' + this.config.connectors.default);
+        }
+
+        if (this.config.connectors.timeout) {
+          if (this.config.connectors.timeout < 1000 || this.config.connectors.timeout > 600000) {
+            warnings.push('连接器超时时间建议在 1-600 秒之间');
+          }
+        }
+      }
+
+      // 插件配置验证
+      if (this.config.plugins) {
+        if (this.config.plugins.enabled && !Array.isArray(this.config.plugins.enabled)) {
+          errors.push('plugins.enabled 必须是数组');
+        }
+
+        if (this.config.plugins.config && typeof this.config.plugins.config !== 'object') {
+          errors.push('plugins.config 必须是对象');
+        }
+      }
+
+      // 任务配置验证
+      if (this.config.tasks) {
+        if (this.config.tasks.concurrent) {
+          if (this.config.tasks.concurrent < 1 || this.config.tasks.concurrent > 10) {
+            warnings.push('并发任务数建议在 1-10 之间');
+          }
+        }
+
+        if (this.config.tasks.retryTimes) {
+          if (this.config.tasks.retryTimes < 0 || this.config.tasks.retryTimes > 10) {
+            warnings.push('重试次数建议在 0-10 之间');
+          }
+        }
+      }
+
+      // 内存配置验证
+      if (this.config.memory) {
+        if (this.config.memory.maxSize) {
+          if (this.config.memory.maxSize < 100 || this.config.memory.maxSize > 10000) {
+            warnings.push('内存最大条目数建议在 100-10000 之间');
+          }
+        }
+
+        if (this.config.memory.defaultTTL) {
+          // 默认7天
+          const oneWeek = 7 * 24 * 60 * 60 * 1000;
+          if (this.config.memory.defaultTTL > oneWeek) {
+            warnings.push('默认 TTL 过长，建议不超过 7 天');
+          }
+        }
+      }
+
+      // 生成验证报告
+      const report = {
+        valid: errors.length === 0,
+        errors,
+        warnings,
+        timestamp: new Date().toISOString()
+      };
+
+      if (errors.length > 0) {
+        this.logger.error('CONFIG', `配置验证失败：${errors.length} 个错误`, { errors });
+      } else if (warnings.length > 0) {
+        this.logger.warning('CONFIG', `配置验证通过，但有 ${warnings.length} 个警告`, { warnings });
+      } else {
+        this.logger.success('CONFIG', '✓ 配置深度验证通过');
+      }
+
+      return report;
+    } catch (error) {
+      this.logger.error('CONFIG', '配置验证失败', error);
+      return {
+        valid: false,
+        errors: [error.message],
+        warnings: [],
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * 获取配置摘要
+   */
+  getSummary() {
+    return {
+      server: {
+        port: this.get('server.port'),
+        host: this.get('server.host')
+      },
+      connectors: {
+        default: this.get('connectors.default'),
+        timeout: this.get('connectors.timeout')
+      },
+      plugins: {
+        enabled: this.get('plugins.enabled', []).length,
+        configured: Object.keys(this.get('plugins.config', {})).length
+      },
+      tasks: {
+        concurrent: this.get('tasks.concurrent'),
+        retryTimes: this.get('tasks.retryTimes')
+      },
+      memory: {
+        maxSize: this.get('memory.maxSize'),
+        defaultTTL: this.get('memory.defaultTTL')
+      },
+      tools: this.get('tools', []).length,
+      stats: this.getStats(),
+      reloadStats: this.getReloadStats()
+    };
+  }
 }
 
 module.exports = ConfigManager;

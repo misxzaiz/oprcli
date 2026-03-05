@@ -2,7 +2,7 @@
 
 **统一 AI CLI 连接器服务器** - 支持 Claude Code 和 IFlow，提供 Web 界面和钉钉机器人集成。
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com)
+[![Version](https://img.shields.io/badge/version-2.0.4-blue.svg)](https://github.com)
 [![Node](https://img.shields.io/badge/node-%3E=14.0.0-green.svg)](https://nodejs.org)
 [![License](https://img.shields.io/badge/license-MIT-purple.svg)](LICENSE)
 
@@ -295,5 +295,5 @@ MIT License
 
 ---
 
-**版本**: v2.0.0
-**最后更新**: 2026-03-02
+**版本**: v2.0.4
+**最后更新**: 2026-03-05
