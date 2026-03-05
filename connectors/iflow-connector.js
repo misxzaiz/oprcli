@@ -429,21 +429,27 @@ class IFlowConnector extends BaseConnector {
   }
 
   async _findLatestJsonl(sessionDir) {
-    if (!fs.existsSync(sessionDir)) {
+    // 🔥 性能优化：使用异步文件操作，避免阻塞事件循环
+    let fileNames;
+    try {
+      // 检查目录是否存在并读取文件列表（异步）
+      fileNames = await fs.promises.readdir(sessionDir);
+    } catch (e) {
+      // 目录不存在或无法访问
       return null;
     }
 
-    // 🔥 性能优化：使用 Promise.all 并行获取文件状态，减少 I/O 等待时间
-    const fileNames = fs.readdirSync(sessionDir)
-      .filter(f => f.startsWith('session-') && f.endsWith('.jsonl'));
+    // 过滤 JSONL 文件
+    const jsonlFiles = fileNames.filter(f => f.startsWith('session-') && f.endsWith('.jsonl'));
 
-    if (fileNames.length === 0) {
+    if (jsonlFiles.length === 0) {
       return null;
     }
 
     try {
+      // 🔥 性能优化：使用 Promise.all 并行获取文件状态，减少 I/O 等待时间
       const files = await Promise.all(
-        fileNames.map(async f => {
+        jsonlFiles.map(async f => {
           const filePath = path.join(sessionDir, f);
           const stat = await fs.promises.stat(filePath);
           return { name: f, path: filePath, time: stat.mtime.getTime() };
@@ -481,14 +487,18 @@ class IFlowConnector extends BaseConnector {
   }
 
   async _findSessionJsonl(sessionDir, sessionId) {
-    if (!fs.existsSync(sessionDir)) {
-      throw new Error(`会话目录不存在: ${sessionDir}`);
+    // 🔥 性能优化：使用异步文件操作，避免阻塞事件循环
+    let files;
+    try {
+      files = await fs.promises.readdir(sessionDir);
+    } catch (e) {
+      throw new Error(`会话目录不存在或无法访问: ${sessionDir}`);
     }
 
-    const files = fs.readdirSync(sessionDir)
-      .filter(f => f.startsWith('session-') && f.endsWith('.jsonl'));
+    // 过滤 JSONL 文件
+    const jsonlFiles = files.filter(f => f.startsWith('session-') && f.endsWith('.jsonl'));
 
-    for (const file of files) {
+    for (const file of jsonlFiles) {
       const filePath = path.join(sessionDir, file);
       try {
         // 🔥 性能优化：使用异步文件读取
