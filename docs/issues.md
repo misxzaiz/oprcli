@@ -1,6 +1,6 @@
 # OPRCLI 系统问题清单
 
-最后更新：2026-03-06 21:20
+最后更新：2026-03-06 22:00
 
 ## 当前问题
 
@@ -23,6 +23,35 @@
 - **优化价值**: 高（防止内存泄漏）
 
 ### 中优先级
+
+#### ISS-018: notification-queue.js 同步文件操作 ✅ 已修复
+- **文件**: `utils/notification-queue.js` (行70-282)
+- **问题**: 使用 existsSync/readFileSync/writeFileSync 阻塞事件循环
+- **严重程度**: 中
+- **影响**: 并发性能、缓存操作阻塞
+- **修复内容**:
+  - _ensureCacheDir(): fs.mkdirSync → fs.promises.mkdir
+  - _loadFailedCache(): fs.readFileSync → fs.promises.readFile
+  - _saveFailedCache(): fs.writeFileSync → fs.promises.writeFile
+  - 新增 _initializeCache() 异步初始化方法
+  - _handleFailedItem() 改为 async
+- **优化价值**: 高（避免阻塞事件循环）
+- **修复时间**: 2026-03-06
+- **测试结果**: ✅ 全部通过
+
+#### ISS-019: config.js 提示词读取阻塞 ✅ 已修复
+- **文件**: `utils/config.js` (行148)
+- **问题**: 使用 readFileSync 读取提示词，首次访问阻塞
+- **严重程度**: 中
+- **影响**: 提示词加载性能
+- **修复内容**:
+  - 新增 _warmupPromptCache() 异步预热方法
+  - 在构造函数中异步预加载常用提示词文件（default, provider, provider-slim）
+  - 保持同步接口兼容性
+  - 后台预热不阻塞构造函数
+- **优化价值**: 高（首次访问更快）
+- **修复时间**: 2026-03-06
+- **测试结果**: ✅ 全部通过（缓存预热3个文件）
 
 #### ISS-015: LRU 缓存效率低 ✅ 已修复
 - **文件**: `utils/cache-manager.js` (行71-78, 107-133)
