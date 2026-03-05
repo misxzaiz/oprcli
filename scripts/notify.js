@@ -1,190 +1,234 @@
 #!/usr/bin/env node
-
 /**
- * 统一通知脚本
- * Agent 调用：node scripts/notify.js "通知内容"
+ * 钉钉通知脚本
+ * 用于发送通知到钉钉群
  *
- * 功能：
- * - 自动读取环境变量中的通知配置
- * - 支持钉钉机器人（自动签名）
- * - 统一错误处理
- * - 可选的日志记录
+ * @version 1.0.0
+ * @created 2026-03-05
+ *
+ * 使用方法:
+ *   node scripts/notify.js "消息内容"
+ *   node scripts/notify.js --type=markdown "消息内容"
+ *   node scripts/notify.js --title="标题" "消息内容"
  */
 
-const https = require('https')
 const crypto = require('crypto')
-const url = require('url')
-const fs = require('fs')
+const axios = require('axios')
 const path = require('path')
 
-// ========== 环境变量读取 ==========
-const NOTIFICATION_TYPE = process.env.NOTIFICATION_TYPE || 'dingtalk'
-const WEBHOOK_URL = process.env.NOTIFICATION_DINGTALK_WEBHOOK
-const SECRET = process.env.NOTIFICATION_DINGTALK_SECRET
-const LOG_ENABLED = process.env.NOTIFICATION_LOG_ENABLED === 'true'
-const LOG_FILE = process.env.NOTIFICATION_LOG_FILE || 'logs/notifications.log'
+// 加载环境变量
+require('dotenv').config()
 
-// ========== 参数解析 ==========
-const MESSAGE = process.argv[2] || ''
-
-// ========== 帮助信息 ==========
-function showHelp() {
-  console.log(`
-用法: node scripts/notify.js "通知内容"
-
-示例:
-  node scripts/notify.js "任务完成"
-  node scripts/notify.js "今日天气：晴天 20°C"
-
-环境变量:
-  NOTIFICATION_TYPE          通知类型（默认: dingtalk）
-  NOTIFICATION_DINGTALK_WEBHOOK 钉钉机器人 Webhook URL
-  NOTIFICATION_DINGTALK_SECRET  钉钉机器人加签密钥（可选）
-  NOTIFICATION_LOG_ENABLED    是否记录日志（默认: false）
-  NOTIFICATION_LOG_FILE       日志文件路径（默认: logs/notifications.log）
-`)
+/**
+ * 生成钉钉签名
+ * @param {string} secret - 钉钉机器人密钥
+ * @param {number} timestamp - 时间戳
+ * @returns {string} 签名字符串
+ */
+function generateSignature(secret, timestamp) {
+  const stringToSign = `${timestamp}\n${secret}`
+  const hmac = crypto.createHmac('sha256', secret)
+  hmac.update(stringToSign)
+  return encodeURIComponent(hmac.digest('base64'))
 }
 
-if (MESSAGE === '--help' || MESSAGE === '-h') {
-  showHelp()
-  process.exit(0)
-}
+/**
+ * 发送钉钉通知
+ * @param {string} content - 消息内容
+ * @param {Object} options - 配置选项
+ * @returns {Promise<Object>} 发送结果
+ */
+async function sendDingTalkNotification(content, options = {}) {
+  const {
+    type = 'text',
+    title = 'OPRCLI 通知',
+    webhook = process.env.NOTIFICATION_DINGTALK_WEBHOOK,
+    secret = process.env.NOTIFICATION_DINGTALK_SECRET
+  } = options
 
-// ========== 参数验证 ==========
-if (!MESSAGE) {
-  console.error('❌ 错误: 缺少通知内容')
-  console.error('用法: node scripts/notify.js "通知内容"')
-  console.error('提示: 使用 --help 查看帮助信息')
-  process.exit(1)
-}
+  // 验证配置
+  if (!webhook) {
+    throw new Error('钉钉 Webhook 未配置，请设置 NOTIFICATION_DINGTALK_WEBHOOK 环境变量')
+  }
 
-if (!WEBHOOK_URL) {
-  console.error('❌ 错误: 未配置 NOTIFICATION_DINGTALK_WEBHOOK 环境变量')
-  console.error('请在 .env 文件中配置:')
-  console.error('  NOTIFICATION_DINGTALK_WEBHOOK=https://oapi.dingtalk.com/robot/send?access_token=YOUR_TOKEN')
-  process.exit(1)
-}
+  // 构建消息数据
+  let data = {}
 
-// ========== 签名计算 ==========
-function getSignedUrl(webhook, secret) {
-  if (!secret) return webhook
+  const timestamp = Date.now()
+
+  if (type === 'text') {
+    // 文本消息
+    data = {
+      msgtype: 'text',
+      text: {
+        content: content
+      }
+    }
+  } else if (type === 'markdown') {
+    // Markdown 消息
+    data = {
+      msgtype: 'markdown',
+      markdown: {
+        title: title,
+        text: content
+      }
+    }
+  } else if (type === 'link') {
+    // 链接消息
+    data = {
+      msgtype: 'link',
+      link: {
+        title: title,
+        text: content,
+        messageUrl: options.url || '',
+        picUrl: options.picUrl || ''
+      }
+    }
+  } else {
+    throw new Error(`不支持的消息类型: ${type}`)
+  }
+
+  // 添加签名（如果配置了密钥）
+  let url = webhook
+  if (secret) {
+    const sign = generateSignature(secret, timestamp)
+    url = `${webhook}&timestamp=${timestamp}&sign=${sign}`
+  }
 
   try {
-    const timestamp = Date.now()
-    const signString = timestamp + '\n' + secret
-    const sign = crypto.createHmac('sha256', secret)
-      .update(signString)
-      .digest('base64')
-
-    const separator = webhook.includes('?') ? '&' : '?'
-    return `${webhook}${separator}timestamp=${timestamp}&sign=${encodeURIComponent(sign)}`
-  } catch (error) {
-    console.error('❌ 签名计算失败:', error.message)
-    return webhook
-  }
-}
-
-// ========== 日志记录 ==========
-function logNotification(message, success, error = null) {
-  if (!LOG_ENABLED) return
-
-  try {
-    const logDir = path.dirname(LOG_FILE)
-    if (!fs.existsSync(logDir)) {
-      fs.mkdirSync(logDir, { recursive: true })
-    }
-
-    const timestamp = new Date().toISOString()
-    const logEntry = {
-      timestamp,
-      type: NOTIFICATION_TYPE,
-      message,
-      success,
-      error: error ? error.message : null
-    }
-
-    const logLine = JSON.stringify(logEntry) + '\n'
-    fs.appendFileSync(LOG_FILE, logLine)
-  } catch (error) {
-    // 日志记录失败不影响主流程
-    console.warn('⚠️ 日志记录失败:', error.message)
-  }
-}
-
-// ========== 发送通知 ==========
-async function sendNotification(message) {
-  const signedUrl = getSignedUrl(WEBHOOK_URL, SECRET)
-
-  const postData = JSON.stringify({
-    msgtype: 'text',
-    text: { content: message }
-  })
-
-  const urlParsed = url.parse(signedUrl)
-
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: urlParsed.hostname,
-      path: urlParsed.path,
-      method: 'POST',
+    // 发送请求
+    const response = await axios.post(url, data, {
       headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData)
+        'Content-Type': 'application/json'
       },
-      timeout: 10000 // 10秒超时
+      timeout: 5000
+    })
+
+    // 检查响应
+    if (response.data.errcode !== 0) {
+      throw new Error(`钉钉通知发送失败: ${response.data.errmsg}`)
     }
 
-    const req = https.request(options, (res) => {
-      let data = ''
-
-      res.on('data', chunk => {
-        data += chunk
-      })
-
-      res.on('end', () => {
-        if (res.statusCode === 200) {
-          try {
-            const result = JSON.parse(data)
-            if (result.errcode === 0) {
-              resolve(true)
-            } else {
-              reject(new Error(`钉钉错误: ${result.errmsg} (errcode: ${result.errcode})`))
-            }
-          } catch (error) {
-            // 解析失败，但状态码是200，认为成功
-            resolve(true)
-          }
-        } else {
-          reject(new Error(`HTTP ${res.statusCode}: ${data}`))
-        }
-      })
-    })
-
-    req.on('error', (error) => {
-      reject(error)
-    })
-
-    req.on('timeout', () => {
-      req.destroy()
-      reject(new Error('请求超时（10秒）'))
-    })
-
-    req.write(postData)
-    req.end()
-  })
+    return {
+      success: true,
+      data: response.data
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    }
+  }
 }
 
-// ========== 执行 ==========
-console.log(`📤 发送通知: "${MESSAGE.substring(0, 50)}${MESSAGE.length > 50 ? '...' : ''}"`)
+/**
+ * 格式化消息为 Markdown
+ * @param {string} title - 标题
+ * @param {string} message - 消息内容
+ * @param {Object} metadata - 额外元数据
+ * @returns {string} Markdown 格式的消息
+ */
+function formatMarkdownMessage(title, message, metadata = {}) {
+  let content = `# ${title}\n\n`
+  content += `${message}\n\n`
 
-sendNotification(MESSAGE)
-  .then(() => {
-    console.log('✅ 通知发送成功')
-    logNotification(MESSAGE, true)
+  if (metadata.time) {
+    content += `**时间**: ${metadata.time}\n`
+  }
+
+  if (metadata.level) {
+    const levelIcon = {
+      info: 'ℹ️',
+      success: '✅',
+      warning: '⚠️',
+      error: '❌'
+    }
+    content += `${levelIcon[metadata.level] || ''} **级别**: ${metadata.level}\n`
+  }
+
+  if (metadata.source) {
+    content += `**来源**: ${metadata.source}\n`
+  }
+
+  return content
+}
+
+/**
+ * 主函数
+ */
+async function main() {
+  // 解析命令行参数
+  const args = process.argv.slice(2)
+
+  let content = ''
+  let type = 'text'
+  let title = 'OPRCLI 通知'
+  let level = 'info'
+
+  // 解析选项
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]
+
+    if (arg.startsWith('--type=')) {
+      type = arg.split('=')[1]
+    } else if (arg.startsWith('--title=')) {
+      title = arg.split('=')[1]
+    } else if (arg.startsWith('--level=')) {
+      level = arg.split('=')[1]
+    } else if (!arg.startsWith('--')) {
+      content = arg
+    }
+  }
+
+  // 如果没有提供内容，从标准输入读取
+  if (!content) {
+    if (process.stdin.isTTY) {
+      console.error('错误: 请提供消息内容')
+      console.error('使用方法: node scripts/notify.js "消息内容"')
+      process.exit(1)
+    }
+
+    // 从管道读取
+    content = await new Promise((resolve, reject) => {
+      let data = ''
+      process.stdin.on('data', chunk => data += chunk)
+      process.stdin.on('end', () => resolve(data))
+      process.stdin.on('error', reject)
+    })
+  }
+
+  // 如果是 Markdown 类型，格式化消息
+  if (type === 'markdown') {
+    const metadata = {
+      time: new Date().toLocaleString('zh-CN'),
+      level,
+      source: 'OPRCLI 系统通知'
+    }
+    content = formatMarkdownMessage(title, content, metadata)
+  }
+
+  // 发送通知
+  const result = await sendDingTalkNotification(content, { type, title })
+
+  if (result.success) {
+    console.log('✅ 钉钉通知发送成功')
     process.exit(0)
-  })
-  .catch((error) => {
-    console.error('❌ 通知发送失败:', error.message)
-    logNotification(MESSAGE, false, error)
+  } else {
+    console.error('❌ 钉钉通知发送失败:', result.error)
+    process.exit(1)
+  }
+}
+
+// 如果直接运行脚本
+if (require.main === module) {
+  main().catch(error => {
+    console.error('❌ 发生错误:', error.message)
     process.exit(1)
   })
+}
+
+// 导出函数供其他模块使用
+module.exports = {
+  sendDingTalkNotification,
+  formatMarkdownMessage
+}

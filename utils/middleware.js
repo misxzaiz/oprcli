@@ -2,11 +2,13 @@
  * 自定义中间件集合
  * 提供请求跟踪、错误处理、安全增强等功能
  *
- * @version 2.1.0
+ * @version 2.2.0
  * @lastUpdated 2026-03-05
+ * @changelog 集成请求统计工具，增强性能监控
  */
 
 const { randomUUID } = require('crypto')
+const { globalRequestStats } = require('./request-stats')
 
 /**
  * 请求 ID 中间件
@@ -134,8 +136,8 @@ function cacheControlMiddleware(options = {}) {
 }
 
 /**
- * 性能监控中间件
- * 记录请求处理时间和统计信息
+ * 性能监控中间件（增强版）
+ * 记录请求处理时间和统计信息，集成全局请求统计
  */
 function performanceMonitorMiddleware(logger) {
   const stats = {
@@ -152,6 +154,18 @@ function performanceMonitorMiddleware(logger) {
     // 记录响应
     res.on('finish', () => {
       const duration = Date.now() - startTime
+
+      // 🆕 记录到全局请求统计器
+      try {
+        globalRequestStats.recordRequest(
+          req.method,
+          req.path,
+          res.statusCode,
+          duration
+        )
+      } catch (err) {
+        // 静默失败，不影响主流程
+      }
 
       // 更新平均响应时间
       stats.avgResponseTime =
@@ -175,12 +189,17 @@ function performanceMonitorMiddleware(logger) {
 
       // 记录慢请求
       if (duration > 1000) {
-        logger.warn('PERF', `慢请求检测 [${req.id}]`, {
+        logger?.warn('PERF', `慢请求检测 [${req.id}]`, {
           path: req.path,
           method: req.method,
           duration: `${duration}ms`,
           statusCode: res.statusCode
         })
+      }
+
+      // 🆕 添加响应时间头
+      if (!res.headersSent) {
+        res.setHeader('X-Response-Time', `${duration}ms`)
       }
     })
 
@@ -191,22 +210,48 @@ function performanceMonitorMiddleware(logger) {
 }
 
 /**
- * 获取性能统计信息
+ * 获取性能统计信息（增强版）
+ * 整合本地统计和全局统计
  */
-function getPerformanceStats(stats) {
-  return {
-    totalRequests: stats.totalRequests,
-    totalErrors: stats.totalErrors,
-    errorRate: stats.totalRequests > 0
-      ? `${(stats.totalErrors / stats.totalRequests * 100).toFixed(2)}%`
+function getPerformanceStats(localStats) {
+  const localStatsData = {
+    totalRequests: localStats.totalRequests,
+    totalErrors: localStats.totalErrors,
+    errorRate: localStats.totalRequests > 0
+      ? `${(localStats.totalErrors / localStats.totalRequests * 100).toFixed(2)}%`
       : '0%',
-    avgResponseTime: `${stats.avgResponseTime.toFixed(0)}ms`,
-    routes: Object.entries(stats.routes).map(([route, data]) => ({
+    avgResponseTime: `${localStats.avgResponseTime.toFixed(0)}ms`,
+    routes: Object.entries(localStats.routes).map(([route, data]) => ({
       route,
       requests: data.count,
       avgTime: `${(data.totalTime / data.count).toFixed(0)}ms`,
       errors: data.errors
     })).sort((a, b) => b.requests - a.requests).slice(0, 10) // Top 10 routes
+  }
+
+  // 🆕 合并全局统计
+  const globalStats = globalRequestStats.getStats()
+  const endpointStats = globalRequestStats.getEndpointStats(10)
+  const windowStats = globalRequestStats.getWindowStats(60000)
+
+  return {
+    ...localStatsData,
+    global: {
+      totalRequests: globalStats.requestCount,
+      successRate: globalStats.successRate,
+      avgResponseTime: `${globalStats.responseTime.avg}ms`,
+      minResponseTime: globalStats.responseTime.min,
+      maxResponseTime: globalStats.responseTime.max,
+      statusCodes: globalStats.statusCodes
+    },
+    window: {
+      lastMinute: {
+        requests: windowStats.count,
+        rps: windowStats.requestsPerSecond,
+        avgResponseTime: `${windowStats.avgResponseTime}ms`
+      }
+    },
+    topEndpoints: endpointStats
   }
 }
 
@@ -297,5 +342,8 @@ module.exports = {
   requestTimeoutMiddleware,
   cacheControlMiddleware,
   performanceMonitorMiddleware,
-  getPerformanceStats
+  getPerformanceStats,
+
+  // 🆕 导出请求统计工具（2026-03-05）
+  globalRequestStats
 }
