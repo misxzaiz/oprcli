@@ -1441,22 +1441,22 @@ class UnifiedServer {
     let server = null
     if (config.port) {
       server = this.app.listen(config.port, () => {
-        console.log('\n========================================')
-        console.log('  Unified AI CLI Connector Server')
-        console.log('========================================')
-        console.log(`\n🌐 服务器运行在: http://localhost:${config.port}`)
-        console.log(`🤖 提供商: ${config.provider.toUpperCase()}`)
-        console.log(`📱 钉钉: ${dingtalkEnabled ? '✅ 已启用' : '❌ 未启用'}`)
-        console.log('\n按 Ctrl+C 停止服务器\n')
+        this.logger.log('\n========================================')
+        this.logger.log('  Unified AI CLI Connector Server')
+        this.logger.log('========================================')
+        this.logger.log(`\n🌐 服务器运行在: http://localhost:${config.port}`)
+        this.logger.log(`🤖 提供商: ${config.provider.toUpperCase()}`)
+        this.logger.log(`📱 钉钉: ${dingtalkEnabled ? '✅ 已启用' : '❌ 未启用'}`)
+        this.logger.log('\n按 Ctrl+C 停止服务器\n')
       })
     } else {
-      console.log('\n========================================')
-      console.log('  Unified AI CLI Connector Server')
-      console.log('========================================')
-      console.log(`\n🤖 提供商: ${config.provider.toUpperCase()}`)
-      console.log(`📱 钉钉: ${dingtalkEnabled ? '✅ 已启用' : '❌ 未启用'}`)
-      console.log(`🌐 API: 未启用（未配置端口）`)
-      console.log('\n按 Ctrl+C 停止服务器\n')
+      this.logger.log('\n========================================')
+      this.logger.log('  Unified AI CLI Connector Server')
+      this.logger.log('========================================')
+      this.logger.log(`\n🤖 提供商: ${config.provider.toUpperCase()}`)
+      this.logger.log(`📱 钉钉: ${dingtalkEnabled ? '✅ 已启用' : '❌ 未启用'}`)
+      this.logger.log(`🌐 API: 未启用（未配置端口）`)
+      this.logger.log('\n按 Ctrl+C 停止服务器\n')
     }
 
     // 🆕 设置优雅关闭（2026-03-05 第二轮优化）
