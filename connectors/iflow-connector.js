@@ -80,11 +80,8 @@ class IFlowConnector extends BaseConnector {
       this._terminateProcess(session.process);
     }
 
-    const oldMonitor = this.jsonlMonitors.get(sessionId);
-    if (oldMonitor) {
-      clearInterval(oldMonitor);
-      this.jsonlMonitors.delete(sessionId);
-    }
+    // 统一的定时器清理
+    this._clearJsonlMonitor(sessionId);
 
     const fullMessage = this._buildFullMessage(message, true);
     const args = this._buildCommandArgs(message, true, sessionId);
@@ -102,13 +99,57 @@ class IFlowConnector extends BaseConnector {
 
     this._terminateProcess(session.process);
 
+    // 统一的定时器清理
+    this._clearJsonlMonitor(sessionId);
+
+    return true;
+  }
+
+  // ==================== 定时器管理（防止泄漏）====================
+
+  /**
+   * 清理指定会话的 JSONL 监控定时器
+   * @param {string} sessionId - 会话 ID
+   * @returns {boolean} 是否成功清理
+   */
+  _clearJsonlMonitor(sessionId) {
     const monitor = this.jsonlMonitors.get(sessionId);
     if (monitor) {
       clearInterval(monitor);
       this.jsonlMonitors.delete(sessionId);
+      console.log(`[IFlowConnector] 已清理会话 ${sessionId} 的定时器`);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * 清理所有定时器（用于析构和重置）
+   */
+  _clearAllJsonlMonitors() {
+    for (const [sessionId, monitor] of this.jsonlMonitors) {
+      clearInterval(monitor);
+    }
+    const count = this.jsonlMonitors.size;
+    this.jsonlMonitors.clear();
+    if (count > 0) {
+      console.log(`[IFlowConnector] 已清理 ${count} 个定时器`);
+    }
+  }
+
+  /**
+   * 清理资源（用于析构）
+   */
+  cleanup() {
+    console.log('[IFlowConnector] 清理资源...');
+    this._clearAllJsonlMonitors();
+
+    // 终止所有活动会话
+    for (const sessionId of this.getActiveSessions()) {
+      this.interruptSession(sessionId);
     }
 
-    return true;
+    this.currentSessionId = null;
   }
 
   // ==================== 辅助方法 ====================
@@ -207,10 +248,12 @@ class IFlowConnector extends BaseConnector {
               console.log(`[IFlowConnector] 会话 ID 更新: ${sessionId} -> ${realSessionId}`);
             }
 
+            // 转移定时器到新的 sessionId
             const monitor = this.jsonlMonitors.get(sessionId);
             if (monitor) {
               this.jsonlMonitors.set(realSessionId, monitor);
               this.jsonlMonitors.delete(sessionId);
+              console.log(`[IFlowConnector] 定时器已转移: ${sessionId} -> ${realSessionId}`);
             }
           }
 
@@ -243,11 +286,8 @@ class IFlowConnector extends BaseConnector {
 
       this._unregisterSession(finalSessionId);
 
-      const monitor = this.jsonlMonitors.get(finalSessionId);
-      if (monitor) {
-        clearInterval(monitor);
-        this.jsonlMonitors.delete(finalSessionId);
-      }
+      // 统一的定时器清理
+      this._clearJsonlMonitor(finalSessionId);
 
       if (onComplete) {
         onComplete(code);
@@ -341,11 +381,8 @@ class IFlowConnector extends BaseConnector {
 
                   if (streamEvent.type === 'session_end') {
                     console.log('[IFlowConnector] 会话结束');
-                    const monitor = this.jsonlMonitors.get(sessionId);
-                    if (monitor) {
-                      clearInterval(monitor);
-                      this.jsonlMonitors.delete(sessionId);
-                    }
+                    // 统一的定时器清理
+                    this._clearJsonlMonitor(sessionId);
                     return;
                   }
                 }
@@ -371,11 +408,8 @@ class IFlowConnector extends BaseConnector {
 
       if (attempts > maxAttempts && !jsonlPath) {
         console.log('[IFlowConnector] JSONL 监控超时，将使用 stdout 输出');
-        const monitor = this.jsonlMonitors.get(sessionId);
-        if (monitor) {
-          clearInterval(monitor);
-          this.jsonlMonitors.delete(sessionId);
-        }
+        // 统一的定时器清理
+        this._clearJsonlMonitor(sessionId);
         return;
       }
 
