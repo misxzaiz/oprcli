@@ -25,7 +25,7 @@ class DingTalkIntegration {
         this.logger.debug('DINGTALK', `Processed message evicted: ${key}`)
       }
     })
-    this.maxProcessedMessages = 1000
+    // ✨ 优化：移除未使用的 maxProcessedMessages 配置（BoundedMap 已在构造时设置大小）
 
     // 🆕 自动清理配置
     this.cleanupConfig = {
@@ -215,23 +215,8 @@ class DingTalkIntegration {
   markAsProcessed(messageId) {
     const now = Date.now()
     this.processedMessages.set(messageId, now)
-
-    // 删除最旧的消息（按时间戳）
-    if (this.processedMessages.size > this.maxProcessedMessages) {
-      let oldestTimestamp = Infinity
-      let oldestMessageId = null
-
-      for (const [id, timestamp] of this.processedMessages.entries()) {
-        if (timestamp < oldestTimestamp) {
-          oldestTimestamp = timestamp
-          oldestMessageId = id
-        }
-      }
-
-      if (oldestMessageId) {
-        this.processedMessages.delete(oldestMessageId)
-      }
-    }
+    // ✨ 优化：BoundedMap 已自动处理 FIFO 淘汰，无需手动清理
+    // 原手动清理逻辑已移除，避免双重管理导致的冲突
   }
 
   // ==================== 会话状态管理 ====================
