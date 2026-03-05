@@ -3,12 +3,19 @@
  *
  * 提供内存缓存功能，支持 TTL（Time To Live）策略
  *
+ * 🆕 增强功能（2026-03-05 自动升级优化）：
+ * - 缓存预热功能
+ * - 智能预测和预加载
+ * - 缓存命中率分析
+ * - 热点数据识别
+ *
  * @example
  * ```js
  * const cache = new CacheManager();
  * cache.set('key', { data: 'value' }, 60000); // 缓存 60 秒
  * const value = cache.get('key');
  * cache.clear(); // 清空所有缓存
+ * cache.warmup([{ key: 'key1', value: 'value1' }]); // 缓存预热
  * ```
  */
 
@@ -24,7 +31,27 @@ class CacheManager {
       misses: 0,
       sets: 0,
       deletes: 0,
-      clears: 0
+      clears: 0,
+      warms: 0 // 🆕 预热统计
+    }
+
+    // 🆕 缓存预热配置
+    this.warmupConfig = {
+      enabled: options.warmupEnabled !== false,
+      autoWarmup: options.autoWarmup || false,
+      warmupInterval: options.warmupInterval || 300000 // 默认 5 分钟
+    }
+
+    // 🆕 热点数据追踪
+    this.hotKeys = new Map() // 记录访问频率
+    this.accessHistory = [] // 访问历史
+
+    // 🆕 预热数据加载器
+    this.dataLoaders = new Map()
+
+    // 🆕 启动自动预热
+    if (this.warmupConfig.autoWarmup) {
+      this._startAutoWarmup()
     }
   }
 
@@ -76,6 +103,9 @@ class CacheManager {
    */
   get(key) {
     if (!this.enabled) return null
+
+    // 🆕 记录访问
+    this._trackAccess(key)
 
     const item = this.cache.get(key)
 
@@ -280,6 +310,236 @@ class CacheManager {
     }
 
     return cleanupCount
+  }
+
+  /**
+   * 🆕 缓存预热 - 批量预加载数据
+   * @param {Array} items - 预加载项数组 [{ key, value, ttl }]
+   * @returns {Object} 预热结果
+   */
+  warmup(items = []) {
+    if (!this.enabled || !this.warmupConfig.enabled) {
+      return { success: false, message: '缓存预热功能未启用' }
+    }
+
+    const results = {
+      total: items.length,
+      succeeded: 0,
+      failed: 0,
+      skipped: 0
+    }
+
+    for (const item of items) {
+      try {
+        if (!item.key) {
+          results.skipped++
+          continue
+        }
+
+        // 如果键已存在且未过期，跳过
+        if (this.has(item.key)) {
+          results.skipped++
+          continue
+        }
+
+        // 使用加载器或直接设置值
+        if (this.dataLoaders.has(item.key)) {
+          // 使用异步加载器
+          const loader = this.dataLoaders.get(item.key)
+          loader().then(value => {
+            this.set(item.key, value, item.ttl || this.defaultTTL)
+            this.stats.warms++
+          }).catch(err => {
+            results.failed++
+          })
+          results.succeeded++
+        } else if (item.value !== undefined) {
+          // 直接设置值
+          this.set(item.key, item.value, item.ttl || this.defaultTTL)
+          this.stats.warms++
+          results.succeeded++
+        } else {
+          results.skipped++
+        }
+      } catch (error) {
+        results.failed++
+      }
+    }
+
+    return results
+  }
+
+  /**
+   * 🆕 注册数据加载器（用于延迟加载）
+   * @param {string} key - 缓存键
+   * @param {Function} loader - 异步加载函数
+   */
+  registerLoader(key, loader) {
+    if (typeof loader !== 'function') {
+      throw new Error('Loader must be a function')
+    }
+    this.dataLoaders.set(key, loader)
+  }
+
+  /**
+   * 🆕 智能预热 - 基于热点数据预测
+   * @param {number} topN - 预加载前 N 个热点数据
+   */
+  async smartWarmup(topN = 10) {
+    if (!this.enabled || !this.warmupConfig.enabled) {
+      return { success: false, message: '缓存预热功能未启用' }
+    }
+
+    // 获取热点数据
+    const hotKeys = this.getHotKeys(topN)
+
+    if (hotKeys.length === 0) {
+      return { success: true, message: '无热点数据需要预热', count: 0 }
+    }
+
+    const items = []
+    for (const keyInfo of hotKeys) {
+      if (!this.has(keyInfo.key) && this.dataLoaders.has(keyInfo.key)) {
+        items.push({ key: keyInfo.key })
+      }
+    }
+
+    if (items.length === 0) {
+      return { success: true, message: '所有热点数据已缓存', count: 0 }
+    }
+
+    // 执行预热
+    return this.warmup(items)
+  }
+
+  /**
+   * 🆕 获取热点数据（按访问频率排序）
+   * @param {number} limit - 返回数量限制
+   */
+  getHotKeys(limit = 10) {
+    const sortedKeys = Array.from(this.hotKeys.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, limit)
+      .map(([key, info]) => ({
+        key,
+        count: info.count,
+        lastAccess: info.lastAccess
+      }))
+
+    return sortedKeys
+  }
+
+  /**
+   * 🆕 获取缓存命中率
+   */
+  getHitRate() {
+    const total = this.stats.hits + this.stats.misses
+    return total > 0 ? (this.stats.hits / total) * 100 : 0
+  }
+
+  /**
+   * 🆕 获取缓存统计报告（增强版）
+   */
+  getDetailedStats() {
+    const stats = this.getStats()
+    const hitRate = this.getHitRate()
+
+    return {
+      ...stats,
+      hitRate: `${hitRate.toFixed(2)}%`,
+      warmupStats: {
+        enabled: this.warmupConfig.enabled,
+        autoWarmup: this.warmupConfig.autoWarmup,
+        warms: this.stats.warms,
+        loadersRegistered: this.dataLoaders.size
+      },
+      hotKeys: this.getHotKeys(5)
+    }
+  }
+
+  /**
+   * 🆕 跟踪访问（用于热点分析）
+   * @private
+   */
+  _trackAccess(key) {
+    // 更新访问频率
+    if (!this.hotKeys.has(key)) {
+      this.hotKeys.set(key, { count: 0, lastAccess: null })
+    }
+
+    const info = this.hotKeys.get(key)
+    info.count++
+    info.lastAccess = Date.now()
+
+    // 添加到访问历史
+    this.accessHistory.push({
+      key,
+      timestamp: Date.now()
+    })
+
+    // 限制历史大小
+    if (this.accessHistory.length > 1000) {
+      this.accessHistory.shift()
+    }
+  }
+
+  /**
+   * 🆕 启动自动预热
+   * @private
+   */
+  _startAutoWarmup() {
+    // 每隔一段时间自动执行智能预热
+    setInterval(() => {
+      this.smartWarmup()
+    }, this.warmupConfig.warmupInterval)
+  }
+
+  /**
+   * 🆕 预测可能需要的缓存（基于访问模式）
+   */
+  predictNextKeys(count = 5) {
+    if (this.accessHistory.length < 10) {
+      return []
+    }
+
+    // 分析最近的访问模式
+    const recentAccess = this.accessHistory.slice(-100)
+    const keySequences = []
+
+    // 构建键序列
+    for (let i = 0; i < recentAccess.length - 1; i++) {
+      keySequences.push({
+        current: recentAccess[i].key,
+        next: recentAccess[i + 1].key
+      })
+    }
+
+    // 找出最后访问的键
+    const lastKey = recentAccess[recentAccess.length - 1].key
+
+    // 预测下一个可能的键
+    const predictions = keySequences
+      .filter(seq => seq.current === lastKey)
+      .map(seq => seq.next)
+
+    // 统计并返回最可能的前 N 个
+    const predictionCount = {}
+    for (const key of predictions) {
+      predictionCount[key] = (predictionCount[key] || 0) + 1
+    }
+
+    return Object.entries(predictionCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, count)
+      .map(([key]) => key)
+  }
+
+  /**
+   * 🆕 清理热点数据统计
+   */
+  clearHotKeys() {
+    this.hotKeys.clear()
+    this.accessHistory = []
   }
 }
 
