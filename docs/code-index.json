@@ -1,5 +1,5 @@
 {
-  "lastScan": "2026-03-06T12:00:00Z",
+  "lastScan": "2026-03-06T14:30:00Z",
   "version": "2.0.7",
   "files": {
     "server.js": {
@@ -16,6 +16,13 @@
       "complexity": "high",
       "risk": "low"
     },
+    "utils/health-enhanced.js": {
+      "path": "utils/health-enhanced.js",
+      "size": 677,
+      "lastModified": "2026-03-06",
+      "complexity": "medium",
+      "risk": "low"
+    },
     "utils/cache-manager.js": {
       "path": "utils/cache-manager.js",
       "size": 620,
@@ -30,16 +37,9 @@
       "complexity": "high",
       "risk": "low"
     },
-    "utils/health-check.js": {
-      "path": "utils/health-check.js",
-      "size": 494,
-      "lastModified": "2026-03-06",
-      "complexity": "medium",
-      "risk": "low"
-    },
-    "utils/health-enhanced.js": {
-      "path": "utils/health-enhanced.js",
-      "size": 298,
+    "utils/memory-monitor-enhanced.js": {
+      "path": "utils/memory-monitor-enhanced.js",
+      "size": 398,
       "lastModified": "2026-03-06",
       "complexity": "medium",
       "risk": "low"
@@ -57,31 +57,18 @@
       "lastModified": "2026-03-06",
       "complexity": "medium",
       "risk": "low"
-    },
-    "utils/memory-monitor-enhanced.js": {
-      "path": "utils/memory-monitor-enhanced.js",
-      "size": 398,
-      "lastModified": "2026-03-06",
-      "complexity": "medium",
-      "risk": "low"
     }
   },
   "summary": {
-    "totalFiles": 58,
+    "totalFiles": 57,
     "highComplexity": 5,
-    "mediumComplexity": 10,
+    "mediumComplexity": 9,
     "lowComplexity": 43,
     "highRisk": 0,
     "mediumRisk": 4,
-    "lowRisk": 54
+    "lowRisk": 53
   },
   "issues": [
-    {
-      "id": "ISS-002",
-      "title": "健康检查模块重复",
-      "severity": "high",
-      "status": "open"
-    },
     {
       "id": "ISS-007",
       "title": "server.js 文件过大",

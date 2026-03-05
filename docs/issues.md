@@ -1,42 +1,12 @@
 # OPRCLI 系统问题清单
 
-最后更新：2026-03-06 12:00
+最后更新：2026-03-06 14:30
 
 ## 当前问题
 
 ### 高优先级
 
-#### ISS-002: 健康检查模块重复 ⚠️
-- **文件**: `utils/memory-monitor.js` (293行), `utils/memory-monitor-enhanced.js` (398行)
-- **问题**: 存在两个功能重叠的内存监控模块
-  - 基础版本：基本监控功能
-  - 增强版本：额外包含 GC 跟踪、趋势分析、泄漏检测
-- **严重程度**: 中
-- **影响**: 可维护性、内存占用
-- **建议**: 保留 `memory-monitor-enhanced.js`，删除基础版本
-- **优化价值**: 高（减少代码重复，降低维护成本）
-
-#### ISS-002: 健康检查模块重复 ⚠️
-- **文件**: `utils/health-check.js` (494行), `utils/health-enhanced.js` (298行)
-- **问题**: 两个健康检查模块功能重叠
-  - 基础版本：SystemHealthChecker、DiagnosticsCollector、PerformanceMetricsCollector
-  - 增强版本：EnhancedHealthChecker（带缓存、历史记录）
-- **严重程度**: 中
-- **影响**: 可维护性、API 一致性
-- **建议**: 合并功能，统一接口
-- **优化价值**: 高（提升 API 一致性）
-
-#### ISS-003: ~~速率限制模块命名混淆~~ ✅ 已修复
-- **文件**: ~~`utils/rate-limiter.js`~~ → `utils/message-rate-limiter.js`, `utils/rate-limit.js`
-- **问题**: 两个模块用途不同但命名相似，容易混淆
-  - ~~`rate-limiter.js`~~ → `message-rate-limiter.js` - 钉钉消息发送限流（内部使用）
-  - `rate-limit.js` - HTTP API 请求限流（Express 中间件）
-- **严重程度**: 低
-- **影响**: 代码可读性
-- **建议**: ~~重命名使其用途更明确~~ ✅ 已完成
-  - ✅ `rate-limiter.js` → `message-rate-limiter.js`
-  - `rate-limit.js` 保持不变（已符合 Express 中间件命名约定）
-- **优化价值**: 中（提升代码可读性）
+无问题
 
 ### 中优先级
 
@@ -52,7 +22,7 @@
 - **严重程度**: 低
 - **影响**: 可维护性
 
-#### ISS-007: server.js 文件过大 ⚠️ NEW
+#### ISS-007: server.js 文件过大 ⚠️
 - **文件**: `server.js` (1921 行)
 - **问题**: 主服务器文件过大，包含过多逻辑
 - **严重程度**: 中
@@ -60,7 +30,7 @@
 - **建议**: 拆分成多个模块（路由、中间件、初始化等）
 - **优化价值**: 高（提升可维护性）
 
-#### ISS-008: config-manager.js 复杂度高 ⚠️ NEW
+#### ISS-008: config-manager.js 复杂度高 ⚠️
 - **文件**: `plugins/core/config-manager.js` (995 行)
 - **问题**: 配置管理器复杂度较高
 - **严重程度**: 中
@@ -77,6 +47,19 @@
 - **影响**: 测试
 
 ## 已修复问题
+
+### ✅ ISS-002: 健康检查模块重复 (2026-03-06)
+- **修复内容**:
+  - 删除 `utils/health-check.js` (494 行)
+  - 统一使用 `utils/health-enhanced.js`
+  - 更新路由文件引用使用解构导入
+  - 合并所有功能到单一模块
+- **影响**:
+  - 减少代码重复 494 行
+  - 提升 API 一致性
+  - 降低维护成本
+  - 统一健康检查接口
+- **测试结果**: ✅ 通过
 
 ### ✅ ISS-003: 速率限制模块命名混淆 (2026-03-06)
 - **修复内容**:
