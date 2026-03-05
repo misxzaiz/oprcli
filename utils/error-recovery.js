@@ -165,6 +165,7 @@ class CircuitBreaker {
     this.threshold = options.threshold || 5 // 失败阈值
     this.timeout = options.timeout || 60000 // 熔断超时（毫秒）
     this.halfOpenMaxCalls = options.halfOpenMaxCalls || 3 // 半开状态最大调用数
+    this.logger = options.logger || null // 可选的 logger 实例
 
     this.reset()
   }
@@ -253,8 +254,13 @@ class CircuitBreaker {
       this.halfOpenCalls = 0
     }
 
-    // 状态转换日志
-    console.log(`熔断器状态转换: ${oldState} -> ${newState}`)
+    // 状态转换日志（支持可选的 logger）
+    const message = `熔断器状态转换: ${oldState} -> ${newState}`
+    if (this.logger) {
+      this.logger.info('CIRCUIT_BREAKER', message)
+    } else {
+      console.log(message)
+    }
   }
 
   /**
@@ -276,10 +282,11 @@ class CircuitBreaker {
  * 错误恢复管理器
  */
 class ErrorRecoveryManager {
-  constructor() {
+  constructor(options = {}) {
     this.retryers = new Map()
     this.circuitBreakers = new Map()
     this.fallbacks = new Map()
+    this.logger = options.logger || null // 可选的 logger 实例
   }
 
   /**
@@ -295,7 +302,11 @@ class ErrorRecoveryManager {
    * 创建熔断器
    */
   createCircuitBreaker(name, options) {
-    const circuitBreaker = new CircuitBreaker(options)
+    // 将 logger 传递给熔断器
+    const circuitBreaker = new CircuitBreaker({
+      ...options,
+      logger: options.logger || this.logger
+    })
     this.circuitBreakers.set(name, circuitBreaker)
     return circuitBreaker
   }
