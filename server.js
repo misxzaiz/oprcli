@@ -483,18 +483,7 @@ class UnifiedServer {
 
   async handleConnect(req, res) {
     // Connectors 已经在 start() 时初始化，这里返回状态
-    const providers = []
-    const versions = {}
-
-    for (const [provider, connector] of this.connectors.entries()) {
-      if (connector?.connected) {
-        providers.push(provider)
-        // 尝试获取版本信息（如果 connector 有）
-        if (connector.version) {
-          versions[provider] = connector.version
-        }
-      }
-    }
+    const { providers, versions } = this._getConnectedProvidersInfo()
 
     if (providers.length === 0) {
       return res.status(503).json({
@@ -601,17 +590,7 @@ class UnifiedServer {
 
   handleInterrupt(req, res) {
     // 中断所有 connectors 的所有活动会话
-    let totalInterrupted = 0
-
-    for (const [provider, connector] of this.connectors.entries()) {
-      if (connector?.connected) {
-        const sessions = connector.getActiveSessions()
-        sessions.forEach(sessionId => {
-          connector.interruptSession(sessionId)
-          totalInterrupted++
-        })
-      }
-    }
+    const totalInterrupted = this._interruptAllSessions()
 
     // 清空所有会话映射
     this.dingtalk.clearSessions()
@@ -848,17 +827,9 @@ class UnifiedServer {
       }
 
       // 收集每个 connector 的详细信息
-      for (const [provider, connector] of this.connectors.entries()) {
-        if (connector) {
-          const sessions = connector.getActiveSessions() || []
-          metrics.connectors[provider] = {
-            connected: connector.connected || false,
-            activeSessions: sessions.length,
-            sessionIds: sessions
-          }
-          metrics.activeSessions += sessions.length
-        }
-      }
+      const { connectors: connectorMetrics, activeSessions } = this._getAllConnectorMetrics()
+      metrics.connectors = connectorMetrics
+      metrics.activeSessions = activeSessions
 
       res.json(metrics)
     } catch (error) {
@@ -868,6 +839,81 @@ class UnifiedServer {
         error: error.message
       })
     }
+  }
+
+  /**
+   * 获取所有已连接的 providers
+   * @returns {Array<string>} 已连接的 provider 列表
+   * @private
+   */
+  _getConnectedProviders() {
+    const providers = []
+    for (const [provider, connector] of this.connectors.entries()) {
+      if (connector?.connected) {
+        providers.push(provider)
+      }
+    }
+    return providers
+  }
+
+  /**
+   * 获取所有已连接的 connectors 及其版本信息
+   * @returns {Object} 包含 providers 和 versions 的对象
+   * @private
+   */
+  _getConnectedProvidersInfo() {
+    const providers = []
+    const versions = {}
+    for (const [provider, connector] of this.connectors.entries()) {
+      if (connector?.connected) {
+        providers.push(provider)
+        if (connector.version) {
+          versions[provider] = connector.version
+        }
+      }
+    }
+    return { providers, versions }
+  }
+
+  /**
+   * 中断所有已连接 connector 的会话
+   * @returns {number} 中断的会话总数
+   * @private
+   */
+  _interruptAllSessions() {
+    let totalInterrupted = 0
+    for (const [provider, connector] of this.connectors.entries()) {
+      if (connector?.connected) {
+        const sessions = connector.getActiveSessions()
+        sessions.forEach(sessionId => {
+          connector.interruptSession(sessionId)
+          totalInterrupted++
+        })
+      }
+    }
+    return totalInterrupted
+  }
+
+  /**
+   * 获取所有 connector 的指标信息
+   * @returns {Object} 包含 connectors 信息和活跃会话数的对象
+   * @private
+   */
+  _getAllConnectorMetrics() {
+    const connectors = {}
+    let activeSessions = 0
+    for (const [provider, connector] of this.connectors.entries()) {
+      if (connector) {
+        const sessions = connector.getActiveSessions() || []
+        connectors[provider] = {
+          connected: connector.connected || false,
+          activeSessions: sessions.length,
+          sessionIds: sessions
+        }
+        activeSessions += sessions.length
+      }
+    }
+    return { connectors, activeSessions }
   }
 
   _createConnector(options) {

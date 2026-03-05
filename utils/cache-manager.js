@@ -358,15 +358,15 @@ class CacheManager {
         if (this.dataLoaders.has(item.key)) {
           // 使用异步加载器
           const loader = this.dataLoaders.get(item.key)
-          // 🔥 修复：确保异步操作正确计数
+          // 🔥 修复：正确处理异步操作的计数
           loader().then(value => {
             this.set(item.key, value, item.ttl || this.defaultTTL)
             this.stats.warms++
+            results.succeeded++
           }).catch(err => {
             this.logger?.error?.('CACHE', `预热加载失败: ${item.key}`, { error: err.message })
             results.failed++
           })
-          results.succeeded++
         } else if (item.value !== undefined) {
           // 直接设置值
           this.set(item.key, item.value, item.ttl || this.defaultTTL)
