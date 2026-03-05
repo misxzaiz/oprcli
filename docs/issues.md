@@ -1,6 +1,6 @@
 # OPRCLI 系统问题清单
 
-最后更新：2026-03-06 18:00
+最后更新：2026-03-06 21:20
 
 ## 当前问题
 
@@ -66,13 +66,18 @@
 - **修复建议**: 使用 lru-cache 库或实现双向链表+HashMap
 - **优化价值**: 中（O(n)→O(1)复杂度）
 
-#### ISS-016: 同步文件操作阻塞
-- **文件**: `connectors/iflow-connector.js` (行398-474)
+#### ISS-016: 同步文件操作阻塞 ✅ 已修复
+- **文件**: `connectors/iflow-connector.js` (行431-459, 483-508)
 - **问题**: 使用 fs.existsSync 和 fs.readdirSync 阻塞事件循环
 - **严重程度**: 中
 - **影响**: 并发性能
-- **修复建议**: 改用 fs.promises
-- **优化价值**: 中（提升并发性能）
+- **修复内容**:
+  - _findLatestJsonl(): fs.existsSync/fs.readdirSync → fs.promises.readdir
+  - _findSessionJsonl(): fs.existsSync/fs.readdirSync → fs.promises.readdir
+  - 使用 try-catch 处理目录不存在的错误
+- **优化价值**: 高（提升并发性能）
+- **修复时间**: 2026-03-06
+- **测试结果**: ✅ 全部通过
 
 #### ISS-017: 代码风格不一致
 - **文件**: 多个文件
@@ -106,6 +111,21 @@
 - **影响**: 测试
 
 ## 已修复问题
+
+### ✅ ISS-016: 同步文件操作阻塞 (2026-03-06)
+- **修复内容**:
+  - _findLatestJsonl(): fs.existsSync/fs.readdirSync → fs.promises.readdir
+  - _findSessionJsonl(): fs.existsSync/fs.readdirSync → fs.promises.readdir
+  - 使用 try-catch 处理目录不存在的错误
+- **影响**:
+  - 避免阻塞事件循环
+  - 提升并发处理能力
+  - 减少 I/O 操作的响应延迟
+- **测试结果**: ✅ 全部通过
+  - 模块加载测试通过
+  - 异步操作逻辑测试通过
+  - 功能完整性测试通过
+  - 源代码验证通过（无同步操作残留）
 
 ### ✅ ISS-015: LRU 缓存效率低 (2026-03-06)
 - **修复内容**:
