@@ -13,7 +13,9 @@
     "audit": "npm audit",
     "audit:fix": "npm audit fix",
     "outdated": "npm outdated",
-    "analyze": "node scripts/performance-analyzer.js"
+    "analyze": "node scripts/performance-analyzer.js",
+    "health": "node scripts/dependency-health-check.js",
+    "health:fix": "node scripts/dependency-health-check.js --fix"
   },
   "keywords": [
     "claude",

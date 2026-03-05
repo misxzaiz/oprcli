@@ -39,17 +39,19 @@ class CacheManager {
 
     // 检查缓存大小限制
     if (this.cache.size >= this.maxEntries && !this.cache.has(key)) {
-      // 删除最旧的条目（简单的 LRU 策略）
-      const firstKey = this.cache.keys().next().value
-      if (firstKey) {
-        this.delete(firstKey)
+      // 🆕 改进的 LRU 策略：删除最旧的多个条目以避免频繁清理
+      const cleanupCount = Math.floor(this.maxEntries * 0.1) // 清理 10%
+      const keysToDelete = Array.from(this.cache.keys()).slice(0, cleanupCount)
+      for (const k of keysToDelete) {
+        this.delete(k)
       }
     }
 
     this.cache.set(key, {
       value,
       expires: Date.now() + ttl,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      size: this._estimateSize(value) // 🆕 记录值的大小
     })
 
     // 设置定时器自动删除
@@ -167,18 +169,22 @@ class CacheManager {
   }
 
   /**
-   * 获取缓存统计信息
+   * 获取缓存统计信息（增强版）
    */
   getStats() {
     const hitRate = this.stats.hits + this.stats.misses > 0
       ? ((this.stats.hits / (this.stats.hits + this.stats.misses)) * 100).toFixed(2) + '%'
       : '0%'
 
+    // 🆕 计算内存使用估算
+    const memoryUsage = this._calculateMemoryUsage()
+
     return {
       size: this.cache.size,
       maxSize: this.maxEntries,
       ...this.stats,
-      hitRate
+      hitRate,
+      memoryUsage // 🆕 添加内存使用信息
     }
   }
 
@@ -222,6 +228,58 @@ class CacheManager {
     this.clear()
     this.cache = null
     this.timers = null
+  }
+
+  /**
+   * 🆕 估算值的内存大小（字节）
+   * @private
+   */
+  _estimateSize(value) {
+    if (value === null || value === undefined) return 0
+    if (typeof value === 'string') return value.length * 2 // UTF-16
+    if (typeof value === 'number') return 8
+    if (typeof value === 'boolean') return 4
+    if (typeof value === 'object') return JSON.stringify(value).length * 2
+    return 0
+  }
+
+  /**
+   * 🆕 计算缓存总内存使用
+   * @private
+   */
+  _calculateMemoryUsage() {
+    let totalSize = 0
+    for (const [key, item] of this.cache.entries()) {
+      totalSize += key.length * 2 // 键的大小
+      totalSize += item.size || 0 // 值的大小
+      totalSize += 64 // 元数据开销估算
+    }
+    return {
+      estimatedBytes: totalSize,
+      estimatedKB: (totalSize / 1024).toFixed(2),
+      estimatedMB: (totalSize / 1024 / 1024).toFixed(2)
+    }
+  }
+
+  /**
+   * 🆕 智能清理：清理最旧和最不常用的缓存
+   */
+  smartCleanup(cleanupRatio = 0.2) {
+    if (!this.enabled) return 0
+
+    const cleanupCount = Math.floor(this.cache.size * cleanupRatio)
+    if (cleanupCount === 0) return 0
+
+    // 按创建时间排序，删除最旧的
+    const entries = Array.from(this.cache.entries())
+      .sort((a, b) => a[1].createdAt - b[1].createdAt)
+      .slice(0, cleanupCount)
+
+    for (const [key] of entries) {
+      this.delete(key)
+    }
+
+    return cleanupCount
   }
 }
 

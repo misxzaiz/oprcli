@@ -33,7 +33,7 @@ function generateSignature(secret, timestamp) {
 }
 
 /**
- * 发送钉钉通知
+ * 发送钉钉通知（增强版 - 支持重试机制）
  * @param {string} content - 消息内容
  * @param {Object} options - 配置选项
  * @returns {Promise<Object>} 发送结果
@@ -43,7 +43,9 @@ async function sendDingTalkNotification(content, options = {}) {
     type = 'text',
     title = 'OPRCLI 通知',
     webhook = process.env.NOTIFICATION_DINGTALK_WEBHOOK,
-    secret = process.env.NOTIFICATION_DINGTALK_SECRET
+    secret = process.env.NOTIFICATION_DINGTALK_SECRET,
+    maxRetries = 3, // 最大重试次数
+    retryDelay = 1000 // 重试延迟（毫秒）
   } = options
 
   // 验证配置
@@ -95,29 +97,61 @@ async function sendDingTalkNotification(content, options = {}) {
     url = `${webhook}&timestamp=${timestamp}&sign=${sign}`
   }
 
-  try {
-    // 发送请求
-    const response = await axios.post(url, data, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      timeout: 5000
-    })
+  // 重试机制
+  let lastError = null
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // 发送请求
+      const response = await axios.post(url, data, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 5000
+      })
 
-    // 检查响应
-    if (response.data.errcode !== 0) {
-      throw new Error(`钉钉通知发送失败: ${response.data.errmsg}`)
-    }
+      // 检查响应
+      if (response.data.errcode !== 0) {
+        throw new Error(`钉钉通知发送失败: ${response.data.errmsg} (错误码: ${response.data.errcode})`)
+      }
 
-    return {
-      success: true,
-      data: response.data
+      return {
+        success: true,
+        data: response.data,
+        attempt // 记录尝试次数
+      }
+    } catch (error) {
+      lastError = error
+
+      // 如果是最后一次尝试，不再重试
+      if (attempt === maxRetries) {
+        break
+      }
+
+      // 判断是否应该重试
+      const shouldRetry =
+        error.code === 'ECONNRESET' ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ENOTFOUND' ||
+        error.response?.status >= 500 ||
+        error.message?.includes('timeout')
+
+      if (!shouldRetry) {
+        // 不可重试的错误，直接返回
+        break
+      }
+
+      // 等待后重试
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay * attempt))
+      }
     }
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message
-    }
+  }
+
+  // 所有重试都失败
+  return {
+    success: false,
+    error: lastError?.message || '发送失败',
+    attempt: maxRetries
   }
 }
 
