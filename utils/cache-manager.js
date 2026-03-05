@@ -49,6 +49,9 @@ class CacheManager {
     // 🆕 预热数据加载器
     this.dataLoaders = new Map()
 
+    // 🆕 自动预热定时器引用
+    this.autoWarmupTimer = null
+
     // 🆕 启动自动预热
     if (this.warmupConfig.autoWarmup) {
       this._startAutoWarmup()
@@ -255,9 +258,18 @@ class CacheManager {
    * 销毁缓存管理器
    */
   destroy() {
+    // 🔥 修复：停止自动预热定时器
+    if (this.autoWarmupTimer) {
+      clearInterval(this.autoWarmupTimer)
+      this.autoWarmupTimer = null
+    }
+
     this.clear()
     this.cache = null
     this.timers = null
+    this.hotKeys = null
+    this.accessHistory = null
+    this.dataLoaders = null
   }
 
   /**
@@ -346,10 +358,12 @@ class CacheManager {
         if (this.dataLoaders.has(item.key)) {
           // 使用异步加载器
           const loader = this.dataLoaders.get(item.key)
+          // 🔥 修复：确保异步操作正确计数
           loader().then(value => {
             this.set(item.key, value, item.ttl || this.defaultTTL)
             this.stats.warms++
           }).catch(err => {
+            this.logger?.error?.('CACHE', `预热加载失败: ${item.key}`, { error: err.message })
             results.failed++
           })
           results.succeeded++
@@ -488,8 +502,8 @@ class CacheManager {
    * @private
    */
   _startAutoWarmup() {
-    // 每隔一段时间自动执行智能预热
-    setInterval(() => {
+    // 🔥 修复：存储定时器引用，以便后续停止
+    this.autoWarmupTimer = setInterval(() => {
       this.smartWarmup()
     }, this.warmupConfig.warmupInterval)
   }
@@ -540,6 +554,26 @@ class CacheManager {
   clearHotKeys() {
     this.hotKeys.clear()
     this.accessHistory = []
+  }
+
+  /**
+   * 🆕 停止自动预热
+   */
+  stopAutoWarmup() {
+    if (this.autoWarmupTimer) {
+      clearInterval(this.autoWarmupTimer)
+      this.autoWarmupTimer = null
+    }
+  }
+
+  /**
+   * 🆕 启动自动预热（如果尚未启动）
+   */
+  startAutoWarmup() {
+    if (this.autoWarmupTimer) {
+      return // 已经在运行
+    }
+    this._startAutoWarmup()
   }
 }
 

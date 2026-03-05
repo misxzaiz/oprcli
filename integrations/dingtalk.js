@@ -442,7 +442,7 @@ class DingTalkIntegration {
       ...this.cleanupStats,
       currentProcessedMessages: this.processedMessages.size,
       currentConversations: this.conversations.size,
-      maxProcessedMessages: this.maxProcessedMessages,
+      maxProcessedMessages: this.processedMessages.maxSize || 1000, // 从 BoundedMap 获取最大容量
       cleanupInterval: this.cleanupConfig.interval,
       messageAgeLimit: this.cleanupConfig.messageAgeLimit,
       sessionAgeLimit: this.cleanupConfig.sessionAgeLimit,
