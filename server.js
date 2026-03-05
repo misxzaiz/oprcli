@@ -570,7 +570,7 @@ class UnifiedServer {
           },
           onError: (error) => {
             this.logger.error('SESSION', '错误', { error: error.message })
-            resolve({ success: false, error: error.message, events })
+            reject(new Error(error.message))
           }
         }
 

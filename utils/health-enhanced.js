@@ -88,16 +88,23 @@ class SystemHealthChecker {
 
     for (const [name, check] of this.checks.entries()) {
       const start = performance.now()
+      let timeoutId = null
 
       try {
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('检查超时')), check.timeout)
+          timeoutId = setTimeout(() => reject(new Error('检查超时')), check.timeout)
         })
 
         const result = await Promise.race([
           check.fn(),
           timeoutPromise
         ])
+
+        // 清理超时定时器
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+          timeoutId = null
+        }
 
         const duration = performance.now() - start
 
@@ -109,6 +116,12 @@ class SystemHealthChecker {
           data: result
         }
       } catch (error) {
+        // 清理超时定时器（错误情况下也需要清理）
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+          timeoutId = null
+        }
+
         const duration = performance.now() - start
 
         checks[name] = {

@@ -708,14 +708,27 @@ class ConfigManager {
       const name = backupName || `backup-${timestamp}`;
       const backupPath = path.join(path.dirname(this.configPath), `backups/${name}.json`);
 
+      // 预估配置文件大小（JSON 格式化后约 2 倍）
+      const configContent = JSON.stringify(this.config, null, 2);
+      const estimatedSize = Buffer.byteLength(configContent, 'utf-8');
+
       // 确保备份目录存在
       await fs.mkdir(path.dirname(backupPath), { recursive: true });
 
-      // 创建备份
-      await fs.writeFile(backupPath, JSON.stringify(this.config, null, 2), 'utf-8');
+      // 验证目录可写性（尝试写入临时文件）
+      const testPath = backupPath + '.tmp';
+      try {
+        await fs.writeFile(testPath, 'test', 'utf-8');
+        await fs.unlink(testPath);
+      } catch (writeError) {
+        throw new Error(`备份目录不可写: ${writeError.message}`);
+      }
 
-      this.logger.success('CONFIG', `✓ 配置已备份: ${name}`);
-      return { success: true, backupPath, name };
+      // 创建备份
+      await fs.writeFile(backupPath, configContent, 'utf-8');
+
+      this.logger.success('CONFIG', `✓ 配置已备份: ${name} (${estimatedSize} 字节)`);
+      return { success: true, backupPath, name, size: estimatedSize };
     } catch (error) {
       this.logger.error('CONFIG', '配置备份失败', error);
       return { success: false, error: error.message };
