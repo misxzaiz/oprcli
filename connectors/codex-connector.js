@@ -33,6 +33,10 @@ class CodexConnector extends BaseConnector {
     this.currentSessionId = null;
     this.modelConfig = options.modelConfig || {};
 
+    // 🆕 会话历史存储（实现上下文记忆）
+    this.conversationHistory = new Map(); // sessionId -> [{role, content, timestamp}]
+    this.maxHistoryLength = parseInt(process.env.CODEX_MAX_HISTORY_LENGTH || '20', 10); // 最大历史轮数
+
     // 初始化 Logger（如果没有提供）
     if (!this.logger) {
       this.logger = new Logger('CodexConnector');
@@ -63,7 +67,13 @@ class CodexConnector extends BaseConnector {
     this.logger.log(`[CodexConnector] 启动会话: ${tempSessionId}`);
     this.logger.log(`[CodexConnector] 消息长度: ${message.length} 字符`);
 
-    const fullMessage = this._buildFullMessage(message, false);
+    // 🆕 初始化会话历史
+    this.conversationHistory.set(tempSessionId, [
+      { role: 'user', content: message, timestamp: Date.now() }
+    ]);
+    this.logger.log(`[CodexConnector] 初始化历史记录: ${tempSessionId}`);
+
+    const fullMessage = this._buildFullMessage(message, false, tempSessionId);
     const args = this._buildCommandArgs(message, false);
     const child = this._spawnProcess(args, fullMessage);
 
@@ -79,13 +89,30 @@ class CodexConnector extends BaseConnector {
     this.logger.log(`[CodexConnector] 继续会话: ${sessionId}`);
     this.logger.log(`[CodexConnector] 消息长度: ${message.length} 字符`);
 
+    // 🆕 添加新消息到历史记录
+    const history = this.conversationHistory.get(sessionId) || [];
+    history.push({ role: 'user', content: message, timestamp: Date.now() });
+
+    // 🆕 限制历史长度（防止 token 溢出）
+    if (history.length > this.maxHistoryLength * 2) {
+      // 保留最近的 N 轮对话（每轮包含 user + assistant）
+      const keepLength = this.maxHistoryLength * 2;
+      const removed = history.length - keepLength;
+      history.splice(0, removed);
+      this.logger.log(`[CodexConnector] 历史记录过长，移除最早的 ${removed} 条消息`);
+    }
+
+    this.conversationHistory.set(sessionId, history);
+    this.logger.log(`[CodexConnector] 历史记录长度: ${history.length}`);
+
     const session = this._getSession(sessionId);
     if (session?.process && !session.process.killed) {
       this.logger.log(`[CodexConnector] 终止旧进程: ${session.process.pid}`);
       this._terminateProcess(session.process);
     }
 
-    const fullMessage = this._buildFullMessage(message, true);
+    // 🆕 构建包含历史上下文的消息
+    const fullMessage = this._buildFullMessage(message, true, sessionId);
     const args = this._buildCommandArgs(message, true, sessionId);
     const child = this._spawnProcess(args, fullMessage);
 
@@ -128,9 +155,9 @@ class CodexConnector extends BaseConnector {
   }
 
   /**
-   * 构建完整的消息内容（包含系统提示词）
+   * 构建完整的消息内容（包含系统提示词和历史上下文）
    */
-  _buildFullMessage(message, isResume) {
+  _buildFullMessage(message, isResume, sessionId = null) {
     let finalMessage = message;
 
     // 首次会话时加载系统提示词
@@ -147,9 +174,38 @@ class CodexConnector extends BaseConnector {
         finalMessage = `${this.systemPrompt}\n\n${message}`;
         this.logger.log('[CodexConnector] 已添加系统提示词到 prompt（首次会话）');
       }
+    } else if (isResume && sessionId) {
+      // 🆕 继续会话时，添加历史上下文
+      const history = this.conversationHistory.get(sessionId);
+      if (history && history.length > 0) {
+        const context = this._buildConversationContext(history, message);
+        finalMessage = context;
+        this.logger.log(`[CodexConnector] 已添加历史上下文 (${history.length} 条消息)`);
+      }
     }
 
     return finalMessage;
+  }
+
+  /**
+   * 构建对话上下文（用于继续会话）
+   */
+  _buildConversationContext(history, newMessage) {
+    const parts = [];
+
+    // 添加历史对话
+    for (const item of history) {
+      if (item.role === 'user') {
+        parts.push(`**用户**: ${item.content}`);
+      } else if (item.role === 'assistant') {
+        parts.push(`**助手**: ${item.content}`);
+      }
+    }
+
+    // 添加新的用户消息（不带角色标签，因为是当前输入）
+    parts.push(`\n\n请继续上述对话。用户最新的问题是：\n${newMessage}`);
+
+    return parts.join('\n\n---\n\n');
   }
 
   /**
@@ -203,6 +259,35 @@ class CodexConnector extends BaseConnector {
   _setupEventHandlers(child, sessionId, options) {
     const { onEvent, onError, onComplete } = options;
 
+    // 🆕 包装 onEvent 回调，用于保存助手回复到历史记录
+    const wrappedOnEvent = (event) => {
+      // 保存助手回复到历史记录
+      if (event.type === 'assistant' && event.message?.content) {
+        const text = event.message.content
+          .filter(c => c.type === 'text')
+          .map(c => c.text)
+          .join('');
+
+        if (text.trim()) {
+          const history = this.conversationHistory.get(sessionId);
+          if (history) {
+            history.push({
+              role: 'assistant',
+              content: text,
+              timestamp: Date.now()
+            });
+            this.conversationHistory.set(sessionId, history);
+            this.logger.log(`[CodexConnector] 保存助手回复到历史 (${text.length} 字符)`);
+          }
+        }
+      }
+
+      // 调用原始回调
+      if (onEvent) {
+        onEvent(event);
+      }
+    };
+
     let stdoutBuffer = '';
     let stderrBuffer = '';
     let realSessionId = null;
@@ -214,8 +299,8 @@ class CodexConnector extends BaseConnector {
       this.logger.log('[CodexConnector] stdout:', text.substring(0, 200));
       stdoutBuffer += text;
 
-      // 尝试实时解析输出
-      const parsedEvents = this._processOutput(text, sessionId, options);
+      // 尝试实时解析输出（使用包装后的回调）
+      const parsedEvents = this._processOutput(text, sessionId, { ...options, onEvent: wrappedOnEvent });
       if (parsedEvents > 0) {
         hasParsedEvents = true; // ✅ 标记已解析到事件
       }
@@ -243,11 +328,11 @@ class CodexConnector extends BaseConnector {
       this.logger.log(`[CodexConnector] 进程结束: ${finalSessionId}, code: ${code}`);
       this.logger.log(`[CodexConnector] hasParsedEvents: ${hasParsedEvents}`);
 
-      // 🔍 只有没有解析到事件时，才使用原始输出作为降级方案
+      // 🔍 只没有解析到事件时，才使用原始输出作为降级方案
       // 这样可以避免重复推送（已通过 JSONL 解析推送的内容）
-      if (!hasParsedEvents && stdoutBuffer.trim() && onEvent) {
+      if (!hasParsedEvents && stdoutBuffer.trim() && wrappedOnEvent) {
         this.logger.warning('[CodexConnector] 未解析到 JSONL 事件，使用原始输出作为降级方案');
-        onEvent({
+        wrappedOnEvent({
           type: 'assistant',
           message: {
             content: [{ type: 'text', text: stdoutBuffer.trim() }]
@@ -258,8 +343,8 @@ class CodexConnector extends BaseConnector {
       }
 
       // 发送会话结束事件
-      if (onEvent) {
-        onEvent({ type: 'session_end' });
+      if (wrappedOnEvent) {
+        wrappedOnEvent({ type: 'session_end' });
       }
 
       this._unregisterSession(finalSessionId);
@@ -466,6 +551,10 @@ class CodexConnector extends BaseConnector {
     for (const sessionId of this.getActiveSessions()) {
       this.interruptSession(sessionId);
     }
+
+    // 🆕 清理会话历史
+    this.conversationHistory.clear();
+    this.logger.log('[CodexConnector] 已清理会话历史');
 
     this.currentSessionId = null;
   }

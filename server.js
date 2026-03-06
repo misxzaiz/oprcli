@@ -1726,9 +1726,17 @@ class UnifiedServer {
       }
 
       // 🤖 获取当前会话使用的 provider
-      const session = this.dingtalk.getSession(conversationId)
-      const provider = session?.provider || this.defaultProvider
-      const sessionId = session?.sessionId || null
+      let session = this.dingtalk.getSession(conversationId)
+      let provider = session?.provider
+      let sessionId = session?.sessionId || null
+
+      // 🔧 如果是首次对话（没有 provider），设置并保存
+      if (!provider) {
+        provider = this.defaultProvider
+        this.dingtalk.setSession(conversationId, null, provider)
+        this.logger.info('DINGTALK', `✅ 首次对话，设置 provider: ${provider}`)
+      }
+
       const connector = this.connectors.get(provider)
 
       this.logger.debug('DINGTALK', '使用模型', { provider })
