@@ -1,6 +1,6 @@
 {
-  "lastScan": "2026-03-06T24:20:00Z",
-  "version": "2.0.12",
+  "lastScan": "2026-03-06T24:30:00Z",
+  "version": "2.0.13",
   "files": {
     "server.js": {
       "path": "server.js",
@@ -18,12 +18,15 @@
     },
     "plugins/core/config-manager.js": {
       "path": "plugins/core/config-manager.js",
-      "size": 995,
+      "size": 1083,
       "lastModified": "2026-03-06",
       "complexity": "high",
-      "risk": "medium",
+      "risk": "low",
       "issues": [
-        {"id": "ISS-012", "type": "权限检查缺失", "line": "705-723"}
+        {"id": "ISS-012", "type": "权限检查缺失", "line": "705-723", "status": "fixed"}
+      ],
+      "optimizations": [
+        {"id": "ISS-026", "type": "配置热重载验证", "line": "563-643, 1008-1077", "status": "fixed"}
       ]
     },
     "utils/health-enhanced.js": {
