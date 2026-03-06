@@ -1,7 +1,18 @@
 {
-  "lastScan": "2026-03-06T24:30:00Z",
-  "version": "2.0.13",
+  "lastScan": "2026-03-06T25:00:00Z",
+  "version": "2.0.14",
   "files": {
+    "utils/config-validator.js": {
+      "path": "utils/config-validator.js",
+      "size": 277,
+      "lastModified": "2026-03-06",
+      "complexity": "low",
+      "risk": "low",
+      "issues": [],
+      "optimizations": [
+        {"id": "ISS-038", "type": "配置验证规则统一", "status": "fixed"}
+      ]
+    },
     "server.js": {
       "path": "server.js",
       "size": 1921,
