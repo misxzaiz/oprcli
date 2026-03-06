@@ -573,6 +573,21 @@ class ConfigManager {
     try {
       this.logger.info('CONFIG', '🔄 正在自动重载配置...');
 
+      // 🆕 ISS-026: 先验证文件格式，验证失败时保留旧配置
+      const validationResult = await this._validateConfigFile();
+      if (!validationResult.valid) {
+        this.logger.error('CONFIG', '配置文件验证失败，重载已中止', {
+          errors: validationResult.errors
+        });
+        // 通知监听器验证失败
+        this.notifyConfigChange({
+          hasChanged: false,
+          error: '配置文件验证失败: ' + validationResult.errors.join(', '),
+          timestamp: new Date()
+        });
+        return;
+      }
+
       // 读取文件修改时间和大小
       const stats = await fs.stat(this.configPath);
       const fileInfo = {
@@ -969,6 +984,67 @@ class ConfigManager {
         warnings: [],
         timestamp: new Date().toISOString()
       };
+    }
+  }
+
+  /**
+   * 🆕 ISS-026: 验证配置文件格式（热重载前验证）
+   * @returns {Promise<{valid: boolean, errors: string[], parsed?: object}>}
+   */
+  async _validateConfigFile() {
+    const errors = [];
+
+    try {
+      // 1. 检查文件是否存在
+      try {
+        await fs.access(this.configPath);
+      } catch {
+        // 文件不存在，允许使用默认配置
+        return { valid: true, errors: [] };
+      }
+
+      // 2. 读取文件内容
+      let content;
+      try {
+        content = await fs.readFile(this.configPath, 'utf-8');
+      } catch (readError) {
+        errors.push(`无法读取配置文件: ${readError.message}`);
+        return { valid: false, errors };
+      }
+
+      // 3. 验证 JSON 格式
+      let parsedConfig;
+      try {
+        parsedConfig = JSON.parse(content);
+      } catch (jsonError) {
+        errors.push(`JSON 格式错误: ${jsonError.message}`);
+        return { valid: false, errors };
+      }
+
+      // 4. 基本结构验证（必须包含 server 配置）
+      if (parsedConfig && typeof parsedConfig === 'object') {
+        if (!parsedConfig.server) {
+          errors.push('缺少必需的 server 配置');
+        } else if (!parsedConfig.server.port) {
+          errors.push('缺少必需的 server.port 配置');
+        } else if (typeof parsedConfig.server.port !== 'number') {
+          errors.push('server.port 必须是数字');
+        } else if (parsedConfig.server.port < 1024 || parsedConfig.server.port > 65535) {
+          errors.push('端口号必须在 1024-65535 之间');
+        }
+      } else {
+        errors.push('配置文件根节点必须是对象');
+      }
+
+      // 5. 返回验证结果
+      return {
+        valid: errors.length === 0,
+        errors,
+        parsed: parsedConfig
+      };
+    } catch (error) {
+      errors.push(`验证过程出错: ${error.message}`);
+      return { valid: false, errors };
     }
   }
 
