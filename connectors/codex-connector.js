@@ -74,8 +74,8 @@ class CodexConnector extends BaseConnector {
     this.logger.log(`[CodexConnector] 初始化历史记录: ${tempSessionId}`);
 
     const fullMessage = this._buildFullMessage(message, false, tempSessionId);
-    const args = this._buildCommandArgs(message, false);
-    const child = this._spawnProcess(args, fullMessage);
+    const args = this._buildCommandArgs(fullMessage, false);
+    const child = this._spawnProcess(args);
 
     this._registerSession(tempSessionId, { process: child });
     this._setupEventHandlers(child, tempSessionId, options);
@@ -113,8 +113,8 @@ class CodexConnector extends BaseConnector {
 
     // 🆕 构建包含历史上下文的消息
     const fullMessage = this._buildFullMessage(message, true, sessionId);
-    const args = this._buildCommandArgs(message, true, sessionId);
-    const child = this._spawnProcess(args, fullMessage);
+    const args = this._buildCommandArgs(fullMessage, true, sessionId);
+    const child = this._spawnProcess(args);
 
     this._registerSession(sessionId, { process: child });
     this.currentSessionId = sessionId;
@@ -202,8 +202,12 @@ class CodexConnector extends BaseConnector {
       }
     }
 
-    // 添加新的用户消息（不带角色标签，因为是当前输入）
-    parts.push(`\n\n请继续上述对话。用户最新的问题是：\n${newMessage}`);
+    const last = history[history.length - 1];
+    const alreadyIncluded = !!last && last.role === 'user' && last.content === newMessage;
+    if (!alreadyIncluded) {
+      parts.push(`**用户**: ${newMessage}`);
+    }
+    parts.push('请继续上述对话。');
 
     return parts.join('\n\n---\n\n');
   }
@@ -212,7 +216,7 @@ class CodexConnector extends BaseConnector {
    * 启动子进程
    * 直接调用 node.js 运行 Codex
    */
-  _spawnProcess(args, stdinMessage = null) {
+  _spawnProcess(args) {
     // 如果 codexPath 是 .cmd 文件，需要解析到实际的 .js 文件
     let executable = this.codexPath;
     let useShell = this._isWindows();

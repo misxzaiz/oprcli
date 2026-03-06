@@ -80,6 +80,13 @@ class ContextMemory {
   }
 
   /**
+   * 兼容 server.js 关闭流程中的 saveAll 调用
+   */
+  async saveAll() {
+    return await this.save();
+  }
+
+  /**
    * 保存上下文
    * @param {string} key - 键
    * @param {any} value - 值
