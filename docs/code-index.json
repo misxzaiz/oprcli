@@ -1,6 +1,6 @@
 {
-  "lastScan": "2026-03-06T23:20:00Z",
-  "version": "2.0.11",
+  "lastScan": "2026-03-06T24:00:00Z",
+  "version": "2.0.12",
   "files": {
     "server.js": {
       "path": "server.js",
@@ -100,7 +100,8 @@
       "complexity": "medium",
       "risk": "low",
       "optimizations": [
-        {"id": "ISS-019", "type": "异步预热", "line": "171-210", "status": "fixed"}
+        {"id": "ISS-019", "type": "异步预热", "line": "171-210", "status": "fixed"},
+        {"id": "ISS-022", "type": "异步文件操作", "line": "142-247", "status": "fixed"}
       ]
     }
   },
@@ -115,6 +116,12 @@
   },
   "issues": [
     {"id": "ISS-009", "title": "Promise错误处理缺陷", "severity": "high", "status": "fixed"},
+    {"id": "ISS-010", "title": "缓存预热异步计数错误", "severity": "high", "status": "fixed"},
+    {"id": "ISS-011", "title": "定时器泄漏风险", "severity": "high", "status": "fixed"},
+    {"id": "ISS-012", "title": "配置备份权限检查缺失", "severity": "high", "status": "fixed"},
+    {"id": "ISS-013", "title": "健康检查定时器泄漏", "severity": "high", "status": "fixed"},
+    {"id": "ISS-015", "title": "LRU缓存效率低", "severity": "medium", "status": "fixed"},
+    {"id": "ISS-022", "title": "config.js同步文件操作", "severity": "medium", "status": "fixed"},
     {"id": "ISS-010", "title": "缓存预热异步计数错误", "severity": "high", "status": "fixed"},
     {"id": "ISS-011", "title": "定时器泄漏风险", "severity": "high", "status": "fixed"},
     {"id": "ISS-012", "title": "配置备份权限检查缺失", "severity": "high", "status": "fixed"},

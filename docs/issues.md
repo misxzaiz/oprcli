@@ -50,7 +50,21 @@
 
 ### 中优先级
 
-#### ISS-022: 同步文件操作阻塞事件循环
+#### ISS-022: 同步文件操作阻塞事件循环 ✅ 已修复
+- **文件**: `utils/config.js` (行 153, 409, 421)
+- **问题**: _loadSystemPromptFromFile 使用 fs.readFileSync，阻塞读取文件
+- **严重程度**: 中
+- **影响**: 配置加载性能、系统响应性
+- **修复内容**:
+  - _loadSystemPromptFromFile: 改为异步方法，使用 fs.promises.readFile
+  - getSystemPrompt: 改为异步方法
+  - getConnectorOptions: 改为异步方法
+  - server.js: 调用处添加 await
+- **优化价值**: 高（提升并发性能）
+- **修复时间**: 2026-03-06
+- **测试结果**: ✅ 全部通过（异步功能验证、缓存机制正常）
+
+#### ISS-026: 配置热重载缺少输入验证
 - **文件**: `utils/config.js` (行 153, 409, 421)
 - **问题**: _loadSystemPromptFromFile 使用 fs.readFileSync，阻塞读取文件
 - **严重程度**: 中
@@ -289,6 +303,22 @@
 - **影响**: 测试
 
 ## 已修复问题
+
+### ✅ ISS-022: 同步文件操作阻塞事件循环 (2026-03-06)
+- **修复内容**:
+  * _loadSystemPromptFromFile: fs.readFileSync → fs.promises.readFile
+  * getSystemPrompt: 改为异步方法
+  * getConnectorOptions: 改为异步方法
+  * server.js: 调用处添加 await
+- **影响**:
+  - 避免阻塞事件循环
+  - 提升并发处理能力
+  - 保持缓存机制（首次 2ms，缓存 0ms）
+- **测试结果**: ✅ 全部通过
+  - 特性测试通过
+  - 模块测试通过
+  - 异步功能验证通过
+  - 缓存加速验证通过
 
 ### ✅ ISS-033: 敏感信息脱敏不完整 (2026-03-06)
 - **修复内容**:
