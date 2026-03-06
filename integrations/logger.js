@@ -57,7 +57,8 @@ class Logger {
   log(level, category, message, data = null) {
     if (level < this.currentLevel) return
 
-    const levelName = Object.keys(this.levels).find(key => this.levels[key] === level)
+    // 🔥 修复：确保 levelName 有效
+    const levelName = Object.keys(this.levels).find(key => this.levels[key] === level) || 'INFO'
     const timestamp = new Date().toISOString().split('T')[1].substring(0, 12)
     const color = this.colors[Object.keys(this.colors)[level]] || ''
     const icon = this.icons[levelName] || ''
@@ -72,8 +73,9 @@ class Logger {
 
     console.log(logMsg)
 
-    // 🆕 更新统计
-    this.stats[levelName.toLowerCase()]++
+    // 🆕 更新统计（使用安全的默认值）
+    const levelNameLower = levelName ? levelName.toLowerCase() : 'info'
+    this.stats[levelNameLower] = (this.stats[levelNameLower] || 0) + 1
     this.stats.total++
 
     // 🆕 性能监控：记录类别最后日志时间

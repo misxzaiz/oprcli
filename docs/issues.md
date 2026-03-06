@@ -4,6 +4,21 @@
 
 ## 当前问题
 
+### 🔥 新修复
+
+#### ISS-037: Logger levelName 未定义错误 ✅ 已修复
+- **文件**: `integrations/logger.js` (行 76)
+- **问题**: 当日志级别未匹配时，levelName 为 undefined，调用 toLowerCase() 导致错误
+- **严重程度**: 高
+- **影响**: 系统启动失败、日志系统崩溃
+- **修复内容**:
+  - 添加默认值: `|| 'INFO'`
+  - 统计更新增加空值检查: `levelName ? levelName.toLowerCase() : 'info'`
+  - 防止 undefined.toLowerCase() 错误
+- **优化价值**: 高（修复严重bug）
+- **修复时间**: 2026-03-06
+- **测试结果**: ✅ 通过（边界情况测试通过）
+
 ### 高优先级 ⚠️
 
 #### ISS-033: 敏感信息脱敏不完整 ✅ 已修复
