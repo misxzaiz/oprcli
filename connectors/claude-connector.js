@@ -22,6 +22,7 @@ const BaseConnector = require('./base-connector');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const Logger = require('../integrations/logger');
 
 class ClaudeConnector extends BaseConnector {
   constructor(options = {}) {
@@ -31,6 +32,11 @@ class ClaudeConnector extends BaseConnector {
     this.systemPrompt = options.systemPrompt || null;
     this.nodeExe = null;
     this.cliJs = null;
+
+    // 初始化 Logger（如果没有提供）
+    if (!this.logger) {
+      this.logger = new Logger('ClaudeConnector');
+    }
   }
 
   // ==================== 内部实现 ====================
@@ -53,8 +59,8 @@ class ClaudeConnector extends BaseConnector {
       }
       this.nodeExe = resolved.nodeExe;
       this.cliJs = resolved.cliJs;
-      console.log(`[ClaudeConnector] node.exe: ${this.nodeExe}`);
-      console.log(`[ClaudeConnector] cli.js: ${this.cliJs}`);
+      this.logger.log(`[ClaudeConnector] node.exe: ${this.nodeExe}`);
+      this.logger.log(`[ClaudeConnector] cli.js: ${this.cliJs}`);
     }
 
     // 3. 测试命令
@@ -93,8 +99,8 @@ class ClaudeConnector extends BaseConnector {
 
   async _startSessionInternal(message, options) {
     const tempId = this._generateTempId();
-    console.log(`[ClaudeConnector] 启动会话: ${tempId}`);
-    console.log(`[ClaudeConnector] 消息长度: ${message.length} 字符`);
+    this.logger.log(`[ClaudeConnector] 启动会话: ${tempId}`);
+    this.logger.log(`[ClaudeConnector] 消息长度: ${message.length} 字符`);
 
     const args = this._buildCommandArgs(message, this.systemPrompt, false);
     const child = this._spawnProcess(args);
@@ -111,7 +117,7 @@ class ClaudeConnector extends BaseConnector {
           this._unregisterSession(tempId);
           this._registerSession(realSessionId, session);
           sessionId = realSessionId;
-          console.log(`[ClaudeConnector] 会话 ID 更新: ${tempId} -> ${realSessionId}`);
+          this.logger.log(`[ClaudeConnector] 会话 ID 更新: ${tempId} -> ${realSessionId}`);
         }
       }
     });
@@ -120,13 +126,13 @@ class ClaudeConnector extends BaseConnector {
   }
 
   async _continueSessionInternal(sessionId, message, options) {
-    console.log(`[ClaudeConnector] 继续会话: ${sessionId}`);
-    console.log(`[ClaudeConnector] 消息长度: ${message.length} 字符`);
+    this.logger.log(`[ClaudeConnector] 继续会话: ${sessionId}`);
+    this.logger.log(`[ClaudeConnector] 消息长度: ${message.length} 字符`);
 
     // 终止旧进程
     const session = this._getSession(sessionId);
     if (session?.process && !session.process.killed) {
-      console.log(`[ClaudeConnector] 终止旧进程: ${session.process.pid}`);
+      this.logger.log(`[ClaudeConnector] 终止旧进程: ${session.process.pid}`);
       this._terminateProcess(session.process);
     }
 
@@ -160,10 +166,10 @@ class ClaudeConnector extends BaseConnector {
       const result = spawnSync('where', ['node'], { encoding: 'utf8' });
       if (result.status === 0 && result.stdout) {
         nodeExe = result.stdout.trim().split('\n')[0];
-        console.log(`[ClaudeConnector] 找到 node.exe: ${nodeExe}`);
+        this.logger.log(`[ClaudeConnector] 找到 node.exe: ${nodeExe}`);
       }
     } catch (e) {
-      console.log('[ClaudeConnector] where node 失败:', e.message);
+      this.logger.log('[ClaudeConnector] where node 失败:', e.message);
     }
 
     // 方法 2: npm 目录下的 node.exe
@@ -172,7 +178,7 @@ class ClaudeConnector extends BaseConnector {
       try {
         fs.accessSync(npmNodeExe);
         nodeExe = npmNodeExe;
-        console.log(`[ClaudeConnector] 找到 node.exe: ${nodeExe}`);
+        this.logger.log(`[ClaudeConnector] 找到 node.exe: ${nodeExe}`);
       } catch (e) {}
     }
 
@@ -189,7 +195,7 @@ class ClaudeConnector extends BaseConnector {
         try {
           fs.accessSync(p);
           nodeExe = p;
-          console.log(`[ClaudeConnector] 找到 node.exe: ${p}`);
+          this.logger.log(`[ClaudeConnector] 找到 node.exe: ${p}`);
           break;
         } catch (e2) {}
       }
@@ -197,7 +203,7 @@ class ClaudeConnector extends BaseConnector {
 
     // 如果还是找不到，报错
     if (!nodeExe) {
-      console.error('[ClaudeConnector] 无法找到 node.exe，请确保 Node.js 已安装');
+      this.logger.error('[ClaudeConnector] 无法找到 node.exe，请确保 Node.js 已安装');
       return null;
     }
 
@@ -214,7 +220,7 @@ class ClaudeConnector extends BaseConnector {
       fs.accessSync(cliJs);
       return { nodeExe, cliJs };
     } catch (e) {
-      console.error(`[ClaudeConnector] cli.js 不存在: ${cliJs}`);
+      this.logger.error(`[ClaudeConnector] cli.js 不存在: ${cliJs}`);
       return null;
     }
   }
@@ -275,7 +281,7 @@ class ClaudeConnector extends BaseConnector {
       };
     }
 
-    console.log(`[ClaudeConnector] 执行命令: ${cmd} ${args.slice(0, 3).join(' ')}...`);
+    this.logger.log(`[ClaudeConnector] 执行命令: ${cmd} ${args.slice(0, 3).join(' ')}...`);
     return spawn(cmd, args, spawnOptions);
   }
 
@@ -293,7 +299,7 @@ class ClaudeConnector extends BaseConnector {
 
           // 🔍 详细日志：所有 system 事件
           if (event.type === 'system') {
-            console.log(`[ClaudeConnector] 收到 system 事件:`, {
+            this.logger.log(`[ClaudeConnector] 收到 system 事件:`, {
               hasSessionIdField: !!event.session_id,
               sessionId: event.session_id || 'none',
               subtype: event.subtype
@@ -302,12 +308,12 @@ class ClaudeConnector extends BaseConnector {
 
           // ⭐ 关键修复：检查 event.session_id（不是 event.extra.session_id）
           if (event.type === 'system' && event.session_id) {
-            console.log(`[ClaudeConnector] ✅ 收到真实 session_id: ${event.session_id}`);
+            this.logger.log(`[ClaudeConnector] ✅ 收到真实 session_id: ${event.session_id}`);
             if (this.sessionIdUpdateCallback) {
-              console.log(`[ClaudeConnector] 触发 sessionId 更新回调`);
+              this.logger.log(`[ClaudeConnector] 触发 sessionId 更新回调`);
               this.sessionIdUpdateCallback(event.session_id);
             } else {
-              console.log(`[ClaudeConnector] ⚠️ 没有设置 sessionIdUpdateCallback`);
+              this.logger.log(`[ClaudeConnector] ⚠️ 没有设置 sessionIdUpdateCallback`);
             }
           }
 
@@ -315,17 +321,17 @@ class ClaudeConnector extends BaseConnector {
             onEvent(event);
           }
         } catch (e) {
-          console.log(`[ClaudeConnector stdout] ${trimmed.substring(0, 100)}...`);
+          this.logger.log(`[ClaudeConnector stdout] ${trimmed.substring(0, 100)}...`);
         }
       }
     });
 
     child.stderr.on('data', (data) => {
-      console.error(`[ClaudeConnector stderr] ${data.toString()}`);
+      this.logger.error(`[ClaudeConnector stderr] ${data.toString()}`);
     });
 
     child.on('close', (code) => {
-      console.log(`[ClaudeConnector] 进程结束: ${sessionId}, code: ${code}`);
+      this.logger.log(`[ClaudeConnector] 进程结束: ${sessionId}, code: ${code}`);
 
       if (onEvent) {
         onEvent({ type: 'session_end' });
@@ -339,7 +345,7 @@ class ClaudeConnector extends BaseConnector {
     });
 
     child.on('error', (err) => {
-      console.error(`[ClaudeConnector] 进程错误: ${err.message}`);
+      this.logger.error(`[ClaudeConnector] 进程错误: ${err.message}`);
       if (onError) {
         onError(err);
       }

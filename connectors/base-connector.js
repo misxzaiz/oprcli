@@ -13,6 +13,9 @@ class BaseConnector {
     this.connected = false
     this.version = null
     this.activeSessions = new Map() // sessionId -> { process, ... }
+
+    // 可选的 Logger 实例（向后兼容）
+    this.logger = options.logger || null
   }
 
   // ==================== 公共接口 ====================

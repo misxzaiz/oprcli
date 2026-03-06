@@ -22,6 +22,7 @@ const BaseConnector = require('./base-connector');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const Logger = require('../integrations/logger');
 
 class IFlowConnector extends BaseConnector {
   constructor(options = {}) {
@@ -31,6 +32,11 @@ class IFlowConnector extends BaseConnector {
     this.systemPrompt = options.systemPrompt || null;
     this.jsonlMonitors = new Map(); // sessionId -> interval
     this.currentSessionId = null;
+
+    // 初始化 Logger（如果没有提供）
+    if (!this.logger) {
+      this.logger = new Logger('IFlowConnector');
+    }
   }
 
   // ==================== 内部实现 ====================
@@ -54,8 +60,8 @@ class IFlowConnector extends BaseConnector {
 
   async _startSessionInternal(message, options) {
     const tempSessionId = this._generateTempId();
-    console.log(`[IFlowConnector] 启动会话: ${tempSessionId}`);
-    console.log(`[IFlowConnector] 消息长度: ${message.length} 字符`);
+    this.logger.log(`[IFlowConnector] 启动会话: ${tempSessionId}`);
+    this.logger.log(`[IFlowConnector] 消息长度: ${message.length} 字符`);
 
     const fullMessage = this._buildFullMessage(message, false);
     const args = this._buildCommandArgs(message, false);
@@ -71,12 +77,12 @@ class IFlowConnector extends BaseConnector {
   }
 
   async _continueSessionInternal(sessionId, message, options) {
-    console.log(`[IFlowConnector] 继续会话: ${sessionId}`);
-    console.log(`[IFlowConnector] 消息长度: ${message.length} 字符`);
+    this.logger.log(`[IFlowConnector] 继续会话: ${sessionId}`);
+    this.logger.log(`[IFlowConnector] 消息长度: ${message.length} 字符`);
 
     const session = this._getSession(sessionId);
     if (session?.process && !session.process.killed) {
-      console.log(`[IFlowConnector] 终止旧进程: ${session.process.pid}`);
+      this.logger.log(`[IFlowConnector] 终止旧进程: ${session.process.pid}`);
       this._terminateProcess(session.process);
     }
 
@@ -117,7 +123,7 @@ class IFlowConnector extends BaseConnector {
     if (monitor) {
       clearInterval(monitor);
       this.jsonlMonitors.delete(sessionId);
-      console.log(`[IFlowConnector] 已清理会话 ${sessionId} 的定时器`);
+      this.logger.log(`[IFlowConnector] 已清理会话 ${sessionId} 的定时器`);
       return true;
     }
     return false;
@@ -133,7 +139,7 @@ class IFlowConnector extends BaseConnector {
     const count = this.jsonlMonitors.size;
     this.jsonlMonitors.clear();
     if (count > 0) {
-      console.log(`[IFlowConnector] 已清理 ${count} 个定时器`);
+      this.logger.log(`[IFlowConnector] 已清理 ${count} 个定时器`);
     }
   }
 
@@ -141,7 +147,7 @@ class IFlowConnector extends BaseConnector {
    * 清理资源（用于析构）
    */
   cleanup() {
-    console.log('[IFlowConnector] 清理资源...');
+    this.logger.log('[IFlowConnector] 清理资源...');
     this._clearAllJsonlMonitors();
 
     // 终止所有活动会话
@@ -182,7 +188,7 @@ class IFlowConnector extends BaseConnector {
     let finalMessage = message;
     if (!isResume && this.systemPrompt && this.systemPrompt.trim()) {
       finalMessage = `${this.systemPrompt}\n\n${message}`;
-      console.log('[IFlowConnector] 已添加系统提示词到 prompt（首次会话）');
+      this.logger.log('[IFlowConnector] 已添加系统提示词到 prompt（首次会话）');
     }
     return finalMessage;
   }
@@ -198,9 +204,9 @@ class IFlowConnector extends BaseConnector {
 
     // 构建完整的命令
     const fullCommand = `"${this.iflowPath}" ${cmdStr}`;
-    console.log(`[IFlowConnector] 执行命令: ${fullCommand}`);
+    this.logger.log(`[IFlowConnector] 执行命令: ${fullCommand}`);
     if (stdinMessage) {
-      console.log(`[IFlowConnector] 通过 stdin 传递消息: ${stdinMessage.length} 字符`);
+      this.logger.log(`[IFlowConnector] 通过 stdin 传递消息: ${stdinMessage.length} 字符`);
     }
 
     // 使用命令字符串而不是数组，让 shell 正确解析带引号的参数
@@ -210,7 +216,7 @@ class IFlowConnector extends BaseConnector {
     if (stdinMessage && child.stdin) {
       child.stdin.write(stdinMessage);
       child.stdin.end();
-      console.log('[IFlowConnector] 消息已写入 stdin');
+      this.logger.log('[IFlowConnector] 消息已写入 stdin');
     }
 
     return child;
@@ -225,19 +231,19 @@ class IFlowConnector extends BaseConnector {
 
     child.stdout.on('data', (data) => {
       const text = data.toString();
-      console.log('[IFlowConnector] stdout:', text);
+      this.logger.log('[IFlowConnector] stdout:', text);
       stdoutBuffer += text;
     });
 
     child.stderr.on('data', (data) => {
       const text = data.toString();
-      console.log('[IFlowConnector] stderr:', text);
+      this.logger.log('[IFlowConnector] stderr:', text);
 
       if (!realSessionId) {
         const jsonMatch = text.match(/"session-id":\s*"([^"]+)"/i);
         if (jsonMatch) {
           realSessionId = jsonMatch[1];
-          console.log('[IFlowConnector] 检测到 session_id:', realSessionId);
+          this.logger.log('[IFlowConnector] 检测到 session_id:', realSessionId);
 
           if (realSessionId !== sessionId) {
             const proc = this._getSession(sessionId);
@@ -245,7 +251,7 @@ class IFlowConnector extends BaseConnector {
               this._unregisterSession(sessionId);
               this._registerSession(realSessionId, proc);
               this.currentSessionId = realSessionId;
-              console.log(`[IFlowConnector] 会话 ID 更新: ${sessionId} -> ${realSessionId}`);
+              this.logger.log(`[IFlowConnector] 会话 ID 更新: ${sessionId} -> ${realSessionId}`);
             }
 
             // 转移定时器到新的 sessionId
@@ -253,13 +259,13 @@ class IFlowConnector extends BaseConnector {
             if (monitor) {
               this.jsonlMonitors.set(realSessionId, monitor);
               this.jsonlMonitors.delete(sessionId);
-              console.log(`[IFlowConnector] 定时器已转移: ${sessionId} -> ${realSessionId}`);
+              this.logger.log(`[IFlowConnector] 定时器已转移: ${sessionId} -> ${realSessionId}`);
             }
           }
 
           // ⭐ 通知 server.js 保存 sessionId
           if (this.sessionIdUpdateCallback) {
-            console.log('[IFlowConnector] 触发 sessionId 更新回调');
+            this.logger.log('[IFlowConnector] 触发 sessionId 更新回调');
             this.sessionIdUpdateCallback(realSessionId);
           }
         }
@@ -268,10 +274,10 @@ class IFlowConnector extends BaseConnector {
 
     child.on('close', (code) => {
       const finalSessionId = realSessionId || sessionId;
-      console.log(`[IFlowConnector] 进程结束: ${finalSessionId}, code: ${code}`);
+      this.logger.log(`[IFlowConnector] 进程结束: ${finalSessionId}, code: ${code}`);
 
       if (!hasJsonlEvents && stdoutBuffer.trim() && onEvent) {
-        console.log('[IFlowConnector] 使用 stdout 文本作为输出');
+        this.logger.log('[IFlowConnector] 使用 stdout 文本作为输出');
         onEvent({
           type: 'assistant',
           message: {
@@ -295,7 +301,7 @@ class IFlowConnector extends BaseConnector {
     });
 
     child.on('error', (err) => {
-      console.error(`[IFlowConnector] 进程错误: ${err.message}`);
+      this.logger.error(`[IFlowConnector] 进程错误: ${err.message}`);
       if (onError) {
         onError(err);
       }
@@ -330,12 +336,12 @@ class IFlowConnector extends BaseConnector {
           }
 
           if (jsonlPath) {
-            console.log('[IFlowConnector] 找到 JSONL 文件:', jsonlPath);
+            this.logger.log('[IFlowConnector] 找到 JSONL 文件:', jsonlPath);
             try {
               const stats = await fs.promises.stat(jsonlPath);
               lastSize = stats.size;
               lastPosition = 0;
-              console.log('[IFlowConnector] JSONL 文件大小:', lastSize);
+              this.logger.log('[IFlowConnector] JSONL 文件大小:', lastSize);
             } catch (e) {}
           }
         } catch (e) {}
@@ -349,7 +355,7 @@ class IFlowConnector extends BaseConnector {
 
           // 文件有新内容
           if (currentSize > lastSize) {
-            console.log(`[IFlowConnector] 检测到新内容: ${currentSize - lastSize} 字节`);
+            this.logger.log(`[IFlowConnector] 检测到新内容: ${currentSize - lastSize} 字节`);
 
             // 🔥 性能优化：使用异步文件操作，不阻塞事件循环
             const fd = await fs.promises.open(jsonlPath, 'r');
@@ -360,13 +366,13 @@ class IFlowConnector extends BaseConnector {
             const newContent = buffer.toString('utf-8');
             const lines = newContent.split('\n').filter(l => l.trim());
 
-            console.log(`[IFlowConnector] 新增行数: ${lines.length}`);
+            this.logger.log(`[IFlowConnector] 新增行数: ${lines.length}`);
 
             for (const line of lines) {
               const event = this._parseJsonlLine(line);
 
               if (event) {
-                console.log('[IFlowConnector] 解析到 JSONL 事件:', event.type);
+                this.logger.log('[IFlowConnector] 解析到 JSONL 事件:', event.type);
 
                 if (onEventReceived) {
                   onEventReceived();
@@ -380,7 +386,7 @@ class IFlowConnector extends BaseConnector {
                   }
 
                   if (streamEvent.type === 'session_end') {
-                    console.log('[IFlowConnector] 会话结束');
+                    this.logger.log('[IFlowConnector] 会话结束');
                     // 统一的定时器清理
                     this._clearJsonlMonitor(sessionId);
                     return;
@@ -396,18 +402,18 @@ class IFlowConnector extends BaseConnector {
         } catch (e) {
           // 文件可能被删除或正在写入，忽略错误
           if (e.code !== 'ENOENT') {
-            console.error('[IFlowConnector] 读取 JSONL 失败:', e.message);
+            this.logger.error('[IFlowConnector] 读取 JSONL 失败:', e.message);
           }
         }
       }
 
       attempts++;
       if (attempts % 50 === 0 && !jsonlPath) {
-        console.log('[IFlowConnector] 等待 JSONL 文件...', `尝试 ${attempts}/${maxAttempts}`);
+        this.logger.log('[IFlowConnector] 等待 JSONL 文件...', `尝试 ${attempts}/${maxAttempts}`);
       }
 
       if (attempts > maxAttempts && !jsonlPath) {
-        console.log('[IFlowConnector] JSONL 监控超时，将使用 stdout 输出');
+        this.logger.log('[IFlowConnector] JSONL 监控超时，将使用 stdout 输出');
         // 统一的定时器清理
         this._clearJsonlMonitor(sessionId);
         return;
@@ -459,7 +465,7 @@ class IFlowConnector extends BaseConnector {
       files.sort((a, b) => b.time - a.time);
       return files[0].path;
     } catch (e) {
-      console.error('[IFlowConnector] 查找 JSONL 文件失败:', e.message);
+      this.logger.error('[IFlowConnector] 查找 JSONL 文件失败:', e.message);
       return null;
     }
   }
