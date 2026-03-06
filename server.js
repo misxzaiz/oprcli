@@ -32,6 +32,10 @@ const PluginManager = require('./plugins/core/plugin-manager')
 const ConfigManager = require('./plugins/core/config-manager')
 const ContextMemory = require('./plugins/core/context-memory')
 
+// 🆕 自进化系统
+const EvolutionManager = require('./evolution/evolution-manager')
+const IntelligentUpgrader = require('./evolution/intelligent-upgrader')
+
 // 🆕 自定义中间件和启动检查
 const {
   requestIdMiddleware,
@@ -108,6 +112,10 @@ class UnifiedServer {
     this.configManager = new ConfigManager(this.logger)
     this.pluginManager = new PluginManager(this, this.logger)
     this.contextMemory = new ContextMemory(this.logger)
+
+    // 🆕 自进化系统（初始化为 null，在 start() 中初始化）
+    this.evolution = null
+    this.intelligentUpgrader = null
 
     // 🆕 性能统计（2026-03-05 新增）
     this.performanceStats = null  // 将在中间件中初始化
@@ -362,6 +370,12 @@ class UnifiedServer {
     this.app.post('/api/config', this.handleSetConfig.bind(this))
     this.app.get('/api/memory/stats', this.handleMemoryStats.bind(this))
 
+    // 🆕 自进化系统 API
+    this.app.get('/api/evolution/stats', this.handleEvolutionStats.bind(this))
+    this.app.get('/api/evolution/upgrades', this.handleEvolutionUpgrades.bind(this))
+    this.app.post('/api/evolution/upgrade', this.handleEvolutionUpgrade.bind(this))
+    this.app.get('/api/evolution/suggestions', this.handleEvolutionSuggestions.bind(this))
+
     // 🆕 健康检查和监控 API
     this.app.get('/health', this.handleHealthCheck.bind(this))
     this.app.get('/api/health', this.handleHealthCheck.bind(this))
@@ -476,6 +490,124 @@ class UnifiedServer {
     try {
       const stats = this.contextMemory.getStats()
       res.json({ success: true, stats })
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message })
+    }
+  }
+
+  // ==================== 🆕 自进化系统 API ====================
+
+  /**
+   * API: 获取自进化统计信息
+   */
+  async handleEvolutionStats(req, res) {
+    try {
+      if (!this.evolution) {
+        return res.status(503).json({
+          success: false,
+          error: '自进化系统未初始化'
+        })
+      }
+
+      const stats = this.evolution.getStats()
+      const suggestionStats = this.intelligentUpgrader?.getStats() || {}
+
+      res.json({
+        success: true,
+        evolution: stats,
+        suggestions: suggestionStats
+      })
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message })
+    }
+  }
+
+  /**
+   * API: 获取升级记录
+   */
+  async handleEvolutionUpgrades(req, res) {
+    try {
+      if (!this.evolution) {
+        return res.status(503).json({
+          success: false,
+          error: '自进化系统未初始化'
+        })
+      }
+
+      const { limit = 20, type } = req.query
+      const upgrades = type
+        ? this.evolution.getUpgradesByType(type)
+        : this.evolution.getRecentUpgrades(parseInt(limit))
+
+      res.json({
+        success: true,
+        upgrades,
+        total: upgrades.length
+      })
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message })
+    }
+  }
+
+  /**
+   * API: 手动记录升级
+   */
+  async handleEvolutionUpgrade(req, res) {
+    try {
+      if (!this.evolution) {
+        return res.status(503).json({
+          success: false,
+          error: '自进化系统未初始化'
+        })
+      }
+
+      const { type, action, name, description, details } = req.body
+
+      if (!type || !name) {
+        return res.status(400).json({
+          success: false,
+          error: '缺少必需参数: type, name'
+        })
+      }
+
+      const entry = await this.evolution.recordUpgrade({
+        type,
+        action: action || 'add',
+        name,
+        description: description || `${action} ${type}: ${name}`,
+        details: details || {}
+      })
+
+      res.json({
+        success: true,
+        entry,
+        message: '升级已记录'
+      })
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message })
+    }
+  }
+
+  /**
+   * API: 获取升级建议
+   */
+  async handleEvolutionSuggestions(req, res) {
+    try {
+      if (!this.intelligentUpgrader) {
+        return res.status(503).json({
+          success: false,
+          error: '智能升级系统未初始化'
+        })
+      }
+
+      const { limit = 10 } = req.query
+      const suggestions = this.intelligentUpgrader.getRecentSuggestions(parseInt(limit))
+
+      res.json({
+        success: true,
+        suggestions,
+        total: suggestions.length
+      })
     } catch (error) {
       res.status(500).json({ success: false, error: error.message })
     }
@@ -1411,6 +1543,23 @@ class UnifiedServer {
       process.exit(1)
     }
 
+    // 🆕 初始化自进化系统
+    try {
+      this.logger.info('SERVER', '正在初始化自进化系统...')
+
+      // 初始化进化管理器
+      this.evolution = new EvolutionManager(this, this.logger)
+      await this.evolution.initialize()
+
+      // 初始化智能升级器
+      this.intelligentUpgrader = new IntelligentUpgrader(this.evolution, this)
+
+      this.logger.success('SERVER', '✓ 自进化系统初始化完成')
+    } catch (error) {
+      this.logger.warning('SERVER', `自进化系统初始化失败: ${error.message}，将继续运行`)
+      // 不阻止启动，继续运行
+    }
+
     // 初始化所有可用的 connectors
     try {
       const availableProviders = await this._initializeAllConnectors()
@@ -1481,6 +1630,13 @@ class UnifiedServer {
         if (this.scheduler) {
           this.scheduler.stop()
         }
+      })
+
+      // 🆕 中断所有连接器会话（ISS-034: 连接器进程信号处理）
+      this.gracefulShutdown.registerCleanupTask(async () => {
+        this.logger.info('SHUTDOWN', '中断所有连接器会话...')
+        const interruptedCount = this._interruptAllSessions()
+        this.logger.info('SHUTDOWN', `已中断 ${interruptedCount} 个会话`)
       })
 
       // 设置信号监听
