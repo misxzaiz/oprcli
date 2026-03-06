@@ -1,0 +1,132 @@
+{
+  "lastScan": "2026-03-06T23:20:00Z",
+  "version": "2.0.11",
+  "files": {
+    "server.js": {
+      "path": "server.js",
+      "size": 1921,
+      "lastModified": "2026-03-06",
+      "complexity": "high",
+      "risk": "medium",
+      "issues": [
+        {"id": "ISS-009", "type": "Promise错误处理", "line": "566-594", "status": "fixed"},
+        {"id": "ISS-014", "type": "重复逻辑", "occurrences": 5, "status": "fixed"}
+      ],
+      "optimizations": [
+        {"id": "ISS-020", "type": "统一日志记录", "line": "1444-1459", "status": "fixed"}
+      ]
+    },
+    "plugins/core/config-manager.js": {
+      "path": "plugins/core/config-manager.js",
+      "size": 995,
+      "lastModified": "2026-03-06",
+      "complexity": "high",
+      "risk": "medium",
+      "issues": [
+        {"id": "ISS-012", "type": "权限检查缺失", "line": "705-723"}
+      ]
+    },
+    "utils/health-enhanced.js": {
+      "path": "utils/health-enhanced.js",
+      "size": 677,
+      "lastModified": "2026-03-06",
+      "complexity": "medium",
+      "risk": "medium",
+      "issues": [
+        {"id": "ISS-013", "type": "定时器泄漏", "line": "93-95"}
+      ]
+    },
+    "utils/cache-manager.js": {
+      "path": "utils/cache-manager.js",
+      "size": 625,
+      "lastModified": "2026-03-06",
+      "complexity": "medium",
+      "risk": "low",
+      "issues": [
+        {"id": "ISS-010", "type": "异步计数错误", "line": "359-369", "status": "fixed"}
+      ],
+      "optimizations": [
+        {"id": "ISS-015", "type": "LRU优化", "line": "71-82, 107-133", "status": "fixed"}
+      ]
+    },
+    "connectors/iflow-connector.js": {
+      "path": "connectors/iflow-connector.js",
+      "size": 642,
+      "lastModified": "2026-03-06",
+      "complexity": "high",
+      "risk": "low",
+      "issues": [
+        {"id": "ISS-011", "type": "定时器泄漏", "line": "264-395", "status": "fixed"}
+      ],
+      "optimizations": [
+        {"id": "ISS-016", "type": "异步文件操作", "line": "431-459, 483-508", "status": "fixed"}
+      ]
+    },
+    "utils/memory-monitor-enhanced.js": {
+      "path": "utils/memory-monitor-enhanced.js",
+      "size": 398,
+      "lastModified": "2026-03-06",
+      "complexity": "medium",
+      "risk": "low"
+    },
+    "utils/message-rate-limiter.js": {
+      "path": "utils/message-rate-limiter.js",
+      "size": 120,
+      "lastModified": "2026-03-06",
+      "complexity": "medium",
+      "risk": "low"
+    },
+    "utils/rate-limit.js": {
+      "path": "utils/rate-limit.js",
+      "size": 85,
+      "lastModified": "2026-03-06",
+      "complexity": "medium",
+      "risk": "low"
+    },
+    "utils/notification-queue.js": {
+      "path": "utils/notification-queue.js",
+      "size": 413,
+      "lastModified": "2026-03-06",
+      "complexity": "medium",
+      "risk": "low",
+      "optimizations": [
+        {"id": "ISS-018", "type": "异步文件操作", "line": "69-282", "status": "fixed"}
+      ]
+    },
+    "utils/config.js": {
+      "path": "utils/config.js",
+      "size": 450,
+      "lastModified": "2026-03-06",
+      "complexity": "medium",
+      "risk": "low",
+      "optimizations": [
+        {"id": "ISS-019", "type": "异步预热", "line": "171-210", "status": "fixed"}
+      ]
+    }
+  },
+  "summary": {
+    "totalFiles": 57,
+    "highComplexity": 5,
+    "mediumComplexity": 9,
+    "lowComplexity": 43,
+    "highRisk": 5,
+    "mediumRisk": 8,
+    "lowRisk": 44
+  },
+  "issues": [
+    {"id": "ISS-009", "title": "Promise错误处理缺陷", "severity": "high", "status": "fixed"},
+    {"id": "ISS-010", "title": "缓存预热异步计数错误", "severity": "high", "status": "fixed"},
+    {"id": "ISS-011", "title": "定时器泄漏风险", "severity": "high", "status": "fixed"},
+    {"id": "ISS-012", "title": "配置备份权限检查缺失", "severity": "high", "status": "fixed"},
+    {"id": "ISS-013", "title": "健康检查定时器泄漏", "severity": "high", "status": "fixed"},
+    {"id": "ISS-015", "title": "LRU缓存效率低", "severity": "medium", "status": "fixed"},
+    {"id": "ISS-007", "title": "server.js文件过大", "severity": "medium", "status": "open"},
+    {"id": "ISS-008", "title": "config-manager.js复杂度高", "severity": "medium", "status": "open"},
+    {"id": "ISS-014", "title": "重复的连接器遍历逻辑", "severity": "medium", "status": "fixed"},
+    {"id": "ISS-016", "title": "同步文件操作阻塞", "severity": "medium", "status": "fixed"},
+    {"id": "ISS-017", "title": "代码风格不一致", "severity": "medium", "status": "open"},
+    {"id": "ISS-018", "title": "notification-queue.js同步文件操作", "severity": "medium", "status": "fixed"},
+    {"id": "ISS-020", "title": "server.js启动日志不统一", "severity": "low", "status": "fixed"},
+    {"id": "ISS-019", "title": "config.js提示词读取阻塞", "severity": "medium", "status": "fixed"}
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "enabled": true,
+  "tasks": [
+    {
+      "id": "0",
+      "name": "OPRCLI 系统优化任务",
+      "enabled": false,
+      "schedule": "*/20 * * * *",
+      "provider": "claude",
+      "message": "【OPRCLI 系统持续优化任务】\n\n系统每 20 分钟执行一次优化任务。\n\n目标是持续提升系统：\n\n性能\n稳定性\n代码质量\n可维护性\n安全性\n\n禁止新增业务功能。\n\n\n--------------------------------------------------\n\n项目位置\n\nD:/space/oprcli/\n\n\n--------------------------------------------------\n\n执行流程\n\n\n第一步：读取系统状态\n\n读取：\n\ndocs/system-score.md\ndocs/issues.md\ndocs/update.md\ndocs/code-index.json\n\n理解当前系统：\n\n历史优化记录\n未解决问题\n代码扫描状态\n\n\n--------------------------------------------------\n\n第二步：Git 初始化检查\n\n如果仓库未初始化：\n\ngit init\ngit add .\ngit commit -m \"init: oprcli system\"\n\n\n--------------------------------------------------\n\n第三步：增量代码扫描\n\n\n扫描策略：\n\n只扫描以下文件：\n\n1 新增文件\n2 最近修改文件\n3 历史高风险文件\n4 最近优化相关文件\n\n\n扫描维度：\n\n代码重复\n复杂度\n嵌套深度\n同步阻塞\n性能热点\n内存风险\n异常处理\n日志规范\n安全风险\n\n\n更新：\n\ndocs/code-index.json\n\n\n--------------------------------------------------\n\n第四步：问题识别\n\n\n生成问题清单：\n\n问题ID\n文件\n位置\n问题描述\n严重等级\n影响范围\n\n\n写入：\n\ndocs/issues.md\n\n\n--------------------------------------------------\n\n第五步：系统健康评估\n\n\n更新系统评分：\n\n性能\n代码质量\n可维护性\n安全\n测试\n\n\n写入：\n\ndocs/system-score.md\n\n\n--------------------------------------------------\n\n第六步：优化方案选择\n\n\n从 issues 中选择：\n\n高价值\n低风险\n影响明确\n\n的优化点。\n\n\n限制：\n\n最多修改 3 个文件。\n\n\n生成优化计划：\n\n问题\n修改位置\n预期收益\n风险评估\n回滚方案\n\n\n--------------------------------------------------\n\n第七步：创建优化分支\n\n\ngit checkout -b optimize-[timestamp]\n\n\n--------------------------------------------------\n\n第八步：实施优化\n\n\n优化内容包括：\n\n代码结构\n性能\n内存\n可读性\n日志\n异常处理\n\n\n要求：\n\n保持代码风格一致\n不破坏现有功能\n\n\n--------------------------------------------------\n\n第九步：测试验证\n\n\n运行：\n\nnode test-features.js\nnode test-modules.js\n\n\n如果失败：\n\n立即修复\n重新测试\n\n直到全部通过。\n\n\n--------------------------------------------------\n\n第十步：性能验证\n\n\n如果涉及性能代码：\n\n执行性能测试。\n\n确认：\n\n优化前后差异。\n\n\n--------------------------------------------------\n\n第十一步：提交代码\n\n\ngit add .\ngit commit -m \"optimize: [优化描述]\"\n\n\n合并：\n\ngit checkout main\ngit merge optimize-[timestamp]\n\n\n--------------------------------------------------\n\n第十二步：更新文档\n\n\n更新：\n\ndocs/update.md\n\n\n记录：\n\n本次优化内容\n影响模块\n性能变化\n\n\n更新：\n\ndocs/issues.md\n\n标记已修复问题。\n\n\n--------------------------------------------------\n\n第十三步：通知\n\n\n发送钉钉通知：\n\n内容包括：\n\n扫描问题数量\n本次优化内容\n涉及文件\n测试结果\n系统评分变化\n未解决问题\n\n\n--------------------------------------------------\n\n成功标准\n\n\n完成增量扫描\n发现问题\n实施至少一个优化\n所有测试通过\n代码提交成功\n系统评分更新\n发送通知"
+    },
+    {
+      "id": "1",
+      "name": "早间热点新闻收集",
+      "enabled": false,
+      "schedule": "10 6 * * *",
+      "provider": "iflow",
+      "command": "node D:/space/mcp/mcp-browser/fetch-hot-news-report.mjs",
+      "message": "执行智能资讯收集任务，收集并分析全球科技资讯：\n\n**执行脚本**：\nnode D:/space/oprcli/tasks/news-collector-with-analysis.js\n\n**核心功能**：\n1. 收集 Hacker News 热门资讯（5条）\n2. 使用 IFlow AI 引擎分析每条资讯\n3. 生成中文摘要和关键要点\n4. 提供推荐指数（⭐1-5星）\n5. 整理成详细报告推送到钉钉\n\n**AI 分析内容**：\n- 核心摘要（1-2句话，不超过50字）\n- 关键要点（3-5个要点）\n- 推荐指数（基于评分和热度）\n\n**输出格式**：\n- 标题 + 链接\n- 数据（评分、评论数）\n- AI 智能分析\n- 今日推荐\n\n**推送要求**：\n- 使用 scripts/notify.js 发送\n- 消息类型：markdown\n- 消息标题：📰 今日科技热点分析\n- 必须包含关键词：科技资讯\n\n**缓存**：\n- 使用 .cache/news-analyzed.json\n- 自动去重\n- 保留最近100条分析记录"
+    },
+    {
+      "id": "2",
+      "name": "晚间热点新闻收集",
+      "enabled": false,
+      "schedule": "10 21 * * *",
+      "provider": "iflow",
+      "command": "node D:/space/mcp/mcp-browser/fetch-hot-news-report.mjs",
+      "message": "【热点新闻收集任务 - 晚间】\n\n执行时间: 每天 21:10\n脚本位置: D:/space/mcp/mcp-browser/fetch-hot-news-report.mjs\n\n收集范围:\n- 🔥 热点时事 (百度热搜)\n- 💰 投资财经 (新浪财经)\n- 🤖 AI事件 (36氪)\n- 👨‍💻 程序员资讯 (掘金/InfoQ)\n\n功能:\n- 自动抓取热点新闻\n- 生成Markdown格式报告\n- 发送钉钉通知"
+    },
+    {
+      "id": "3",
+      "name": "自进化系统升级任务",
+      "enabled": false,
+      "schedule": "*/20 * * * *",
+      "provider": "iflow",
+      "message": "【OPRCLI 自进化系统升级任务】\n\n每20分钟执行一次系统自进化升级，主动发现并集成新的MCP服务器。\n\n## 核心要求\n\n### ⚠️ 必须执行：新增MCP\n\n**无需确认，直接执行以下完整流程**：\n\n#### 第一步：收集阶段\n1. 检查已安装MCP状态和版本（目录：D:/space/mcp/）\n2. 搜索MCP官方参考服务器最新版本（使用web_search）\n3. 搜索社区热门MCP服务器（mcpmarket.com、GitHub Trending）\n4. 对比当前系统缺失的MCP能力\n\n#### 第二步：设计阶段\n1. 分析候选MCP的功能、依赖、兼容性\n2. 评估安全风险（检查CVE漏洞、安全报告）\n3. 设计集成方案（安装位置、配置参数）\n4. 规划依赖项（Node.js版本、npm包）\n\n#### 第三步：审查阶段\n1. 检查MCP源代码安全性\n2. 验证官方认证或社区信誉\n3. 评估对现有系统的影响\n4. 确认安装可行性\n\n#### 第四步：实现阶段\n1. 创建MCP目录结构\n2. 安装必要的依赖包\n3. 编写配置文件和代码\n4. 配置与OPRCLI的集成\n\n#### 第五步：测试阶段（循环执行直到成功）\n1. 运行单元测试\n2. 执行集成测试\n3. 验证功能正确性\n4. 检查性能影响\n\n#### 第六步：修复阶段（如测试失败）\n1. 分析错误日志\n2. 定位问题根源\n3. 应用修复方案\n4. **重新执行测试阶段**（循环直到成功）\n\n#### 第七步：总结阶段\n1. 记录集成过程到进化日志\n2. 更新系统文档\n3. 生成功能清单\n4. 标注安全注意事项\n\n#### 第八步：通知阶段\n1. 发送钉钉通知（使用scripts/notify.js）\n2. 包含新增MCP的名称、功能、版本\n3. 说明升级效果和使用方法\n\n### 📋 优先集成MCP清单\n\n**官方参考服务器**（最高优先级）：\n1. `@modelcontextprotocol/server-fetch` - Web内容获取\n2. `@modelcontextprotocol/server-filesystem` - 文件系统操作\n3. `@modelcontextprotocol/server-git` - Git版本控制\n4. `@modelcontextprotocol/server-memory` - 知识图谱记忆\n5. `@modelcontextprotocol/server-sequentialthinking` - 思维链推理\n\n**社区热门服务器**：\n1. `Charlotte` - 网页结构化渲染\n2. `Hive Memory` - 跨项目记忆\n3. `Token Compressor` - 提示词压缩\n4. `GitHub MCP` - 代码仓库交互\n\n### 🔍 分析维度\n\n#### MCP生态动态\n- MCP SDK最新版本（当前最新：1.26.0）\n- 官方服务器更新公告\n- 社区新服务器发布\n- 安全漏洞和修复\n\n#### 系统能力缺口\n- 对比官方参考实现\n- 分析社区最佳实践\n- 识别功能盲点\n- 评估性能瓶颈\n\n#### 安全风险评估\n- CVE漏洞数据库查询\n- 代码安全审计\n- 依赖项漏洞扫描\n- 权限边界检查\n\n### 📤 输出要求\n\n1. **进化日志**：D:/space/tasks/evolution-log.md\n   - 记录完整的集成过程\n   - 包含每个阶段的详细执行情况\n   - 标注成功/失败状态和原因\n\n2. **钉钉通知**：使用 `node scripts/notify.js`\n   - 新增MCP的名称和版本\n   - 功能说明和使用示例\n   - 升级效果和性能提升\n\n### ⚠️ 重要约束\n\n- **无需确认**：发现合适的MCP后直接集成，不需要用户确认\n- **完整流程**：必须执行全部8个阶段，不可跳过\n- **循环测试**：测试失败时自动修复并重试，直到成功\n- **安全第一**：每个MCP集成前必须进行安全审查\n- **禁止修改**：D:/space/base/oprcli/ 目录（基础版本）\n\n### 🎯 成功标准\n\n- ✅ 新MCP成功安装并可运行\n- ✅ 所有测试用例通过\n- ✅ 无安全漏洞警告\n- ✅ 进化日志已更新\n- ✅ 钉钉通知已发送\n\n### 📊 执行优先级\n\n🔴🔴🔴 最高：安全漏洞修复、SDK升级\n🔴🔴 高：官方参考服务器集成\n🔴 高：社区热门服务器集成\n🟡 中：功能增强型MCP\n🟢 低：实验性MCP"
+    },
+    {
+      "id": "4",
+      "name": "全球科技资讯收集",
+      "enabled": false,
+      "schedule": "30 4 * * *",
+      "provider": "iflow",
+      "message": "执行资讯收集任务，收集全球多平台科技资讯并推送到钉钉：\n\n**步骤1：收集资讯**\n使用包装器执行收集脚本：\nnode tasks/iflow-tool-wrapper.js collect-news\n\n等待脚本完成，检查返回值：\n- success: true → 收集成功\n- success: false → 收集失败，发送错误通知\n\n**步骤2：分析结果（如果成功）**\n如果收集成功，脚本会自动：\n- 收集 Hacker News (10条)\n- 收集 Reddit (10条)\n- 自动翻译标题为中文\n- 智能分类（科技/开源/AI/产品）\n- 生成 Markdown 格式报告\n\n**步骤3：发送通知**\n脚本已内置钉钉推送功能，会自动发送：\n- 标题：📰 全球科技资讯速递\n- 格式：Markdown\n- 包含：标题翻译、智能摘要、推荐阅读\n\n**重要提示**：\n1. 必须使用包装器：tasks/iflow-tool-wrapper.js\n2. 不要直接调用 scripts/notify.js\n3. 等待脚本完全执行完成\n4. 检查返回的 success 字段\n\n**如果失败**：\n- 使用包装器发送错误通知\n- node tasks/iflow-tool-wrapper.js notify-markdown \"❌ 资讯收集失败\" \"错误详情：...\""
+    },
+    {
+      "id": "8",
+      "name": "aTool 轻量工具集开发",
+      "enabled": false,
+      "schedule": "*/5 * * * *",
+      "provider": "iflow",
+      "message": "【aTool Workspace 自进化任务】\n\n系统每20分钟执行一次任务。\n\n目标不是简单工具集合，而是持续演化一个可扩展的 Web 工作空间。\n\naTool 将逐步形成一个模块化能力平台，支持：\n\n个人工具\n信息处理\n自动化能力\nAI 协作能力\n数据记录\n工作空间管理\n\n系统允许 AI 自主扩展系统能力。\n\n\n--------------------------------------------------\n\n项目位置\n\nD:/space/app/aTool/\n\n\n--------------------------------------------------\n\n目录结构\n\ncore/\n  ui/\n  layout/\n  state/\n  ai/\n\nmodules/\n  workspace/\n  tools/\n  notes/\n  automation/\n  panels/\n\nservices/\n  ai/\n  storage/\n  automation/\n\nmcp/\ndocs/\nscripts/\n\n\n--------------------------------------------------\n\n系统核心原则\n\n1 轻量\n2 模块化\n3 可演化\n4 AI 可参与\n5 UI 统一\n6 文档完整\n\n\n--------------------------------------------------\n\n执行流程\n\n\n第一步：读取系统状态\n\n读取：\n\ndocs/base.md\ndocs/todo.md\ndocs/update.md\n\n\n理解当前系统：\n\n已有模块\n系统能力\n未完成任务\nMCP工具\nAI能力\n\n\n--------------------------------------------------\n\n第二步：初始化 Git（仅第一次）\n\n如果项目未初始化 Git：\n\n执行：\n\ngit init\ngit add .\ngit commit -m \"init: aTool workspace\"\n\n\n--------------------------------------------------\n\n第三步：确定本次任务\n\n如果 todo.md 存在未完成任务：\n\n继续完成。\n\n\n否则 AI 自主选择一个系统演化方向：\n\n可能包括：\n\n新增能力模块\n增强已有模块\nUI 体验优化\nAI 协作能力增强\n自动化能力\nMCP 工具集成\n文档系统优化\n系统架构优化\n\n\n系统允许 AI：\n\n重构代码结构\n合并模块\n删除低价值模块\n\n\n--------------------------------------------------\n\n第四步：实现模块或能力\n\n所有功能必须以模块方式实现：\n\nmodules/\n\n模块类型不限，例如：\n\n工具\n数据记录\n内容管理\n自动化\n信息处理\nAI辅助功能\n工作区组件\n\n\n模块必须：\n\n轻量\n可复用\n可组合\n\n\n--------------------------------------------------\n\n第五步：AI 协作能力\n\n系统逐步支持 AI 协作。\n\n要求：\n\n支持 OpenAI API 协议\n\n模块可以调用 AI\nAI 可以参与模块操作\nAI 可以分析内容\n\n\n--------------------------------------------------\n\n第六步：MCP 工具系统\n\n系统需要逐步支持 MCP（Model Context Protocol）工具。\n\n如果系统没有 MCP：\n\nAI 需要实现一个简单 MCP 框架。\n\n\nMCP 目录：\n\nmcp/\n\n\n每个 MCP 工具为独立模块，例如：\n\nbrowser\nscreenshot\nfile\nsearch\nautomation\n\n\n当前建议 MCP：\n\n浏览器操作 MCP\n截图 MCP\n文件操作 MCP\n网页解析 MCP\n\n\n如果系统不存在：\n\nAI 可以实现。\n\n\n--------------------------------------------------\n\n第七步：自动截图能力\n\n系统存在 screenshot MCP 时：\n\n为新增模块生成界面截图。\n\n截图用于：\n\ndocs\n帮助文档\n\n\n--------------------------------------------------\n\n第八步：统一 UI 设计规范\n\n所有页面必须遵守统一 UI 规范。\n\n\n设计原则：\n\n极简\n专业\n低视觉噪音\n统一风格\n\n\n布局结构：\n\nSidebar | Workspace | AI Panel\n\n\n颜色规范：\n\n背景色\n#fafafa\n\n边框\n#e5e5e5\n\n主文字\n#111\n\n次级文字\n#666\n\nhover\n#f5f5f5\n\n\n组件类型：\n\nCard\nPanel\nToolbar\nList\nInput\nModal\n\n\n禁止：\n\nemoji\n彩色按钮泛滥\n复杂装饰\n不统一组件\n\n\nUI 风格参考：\n\nLinear\nNotion\nRaycast\nVercel Dashboard\n\n\n--------------------------------------------------\n\n第九步：帮助文档系统\n\n每个模块必须提供帮助文档。\n\n文档位置：\n\ndocs/modules/\n\n\n文档内容：\n\n模块介绍\n功能说明\n使用方法\n示例\n截图\n\n\n截图来自 screenshot MCP。\n\n\n--------------------------------------------------\n\n第十步：MCP 文档\n\n创建：\n\ndocs/mcp.md\n\n记录：\n\n当前 MCP 列表\n每个 MCP 能力\n使用方法\n调用示例\n\n\n在 docs/base.md 中记录 MCP 支持情况。\n\n\n--------------------------------------------------\n\n第十一步：更新文档\n\n\n更新：\n\ndocs/update.md\n\n记录：\n\n日期\n模块或功能名称\n简要说明\n\n\n更新：\n\ndocs/todo.md\n\n标记完成\n添加新任务\n\n\n--------------------------------------------------\n\n第十二步：提交 Git\n\n\n执行：\n\ngit add .\ngit commit -m \"feat: add module or improve system\"\n\n\n如果进行了架构优化：\n\ngit commit -m \"refactor: improve workspace architecture\"\n\n\n--------------------------------------------------\n\n第十三步：完成通知\n\n执行：\n\nscripts/notify.js\n\n\n通知内容：\n\n本次新增模块或系统能力\n简要说明\n使用示例\n\n\n--------------------------------------------------\n\n长期目标\n\n系统逐步演化为：\n\n一个可扩展 Web 工作空间\n\n具备：\n\n模块系统\nAI 协作\n自动化能力\nMCP 工具生态\n统一 UI\n完整文档"
+    }
+  ]
+}

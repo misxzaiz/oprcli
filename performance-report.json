@@ -1,0 +1,103 @@
+{
+  "timestamp": "2026-03-05T11:21:51.735Z",
+  "hostname": "qusc",
+  "summary": {
+    "totalIssues": 2,
+    "totalRecommendations": 3,
+    "securityVulnerabilities": 0,
+    "healthStatus": "warning"
+  },
+  "details": {
+    "timestamp": "2026-03-05T11:21:51.735Z",
+    "hostname": "qusc",
+    "platform": "win32",
+    "nodeVersion": "v24.13.0",
+    "performance": {
+      "memory": {
+        "heap": {
+          "used": "5.22 MB",
+          "total": "6.56 MB",
+          "external": "1.81 MB"
+        },
+        "rss": "54.75 MB",
+        "system": {
+          "total": "21.85 GB",
+          "used": "19.31 GB",
+          "free": "2.54 GB",
+          "usagePercent": "88.39%"
+        }
+      },
+      "system": {
+        "cpuCount": 12,
+        "loadAverage": {
+          "1min": "0.00",
+          "5min": "0.00",
+          "15min": "0.00"
+        },
+        "uptime": "96.75 hours"
+      },
+      "codeQuality": {
+        "stats": {
+          "totalJsFiles": 68,
+          "totalLines": 19710,
+          "avgLinesPerFile": "290"
+        }
+      }
+    },
+    "health": {
+      "dependencies": {
+        "outdated": 3,
+        "outdatedPackages": [
+          "compression",
+          "express",
+          "node-cron"
+        ],
+        "vulnerabilities": {
+          "low": 0,
+          "moderate": 0,
+          "high": 0,
+          "critical": 0
+        }
+      },
+      "environment": {
+        "required": {
+          "present": [
+            "PORT"
+          ],
+          "missing": [
+            "CLAUDE_API_KEY",
+            "NODE_ENV"
+          ]
+        },
+        "optional": {
+          "present": [
+            "NOTIFICATION_DINGTALK_WEBHOOK",
+            "NOTIFICATION_DINGTALK_SECRET",
+            "LOG_LEVEL"
+          ]
+        },
+        "mode": "development"
+      }
+    },
+    "recommendations": [
+      {
+        "type": "warning",
+        "category": "内存",
+        "message": "系统内存使用率过高 (88.39%)",
+        "suggestion": "建议检查是否有内存泄漏，考虑增加物理内存或优化内存使用"
+      },
+      {
+        "type": "info",
+        "category": "依赖",
+        "message": "发现 3 个过期的依赖包",
+        "suggestion": "建议运行 `npm update` 更新依赖包，或手动检查重要更新"
+      },
+      {
+        "type": "error",
+        "category": "环境",
+        "message": "缺少必需的环境变量: CLAUDE_API_KEY, NODE_ENV",
+        "suggestion": "请在 .env 文件中配置这些必需的环境变量"
+      }
+    ]
+  }
+}

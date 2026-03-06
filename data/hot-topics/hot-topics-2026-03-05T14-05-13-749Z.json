@@ -1,0 +1,158 @@
+{
+  "timestamp": "2026-03-05T14:03:19.745Z",
+  "domestic": [
+    {
+      "source": "微博热搜",
+      "url": "https://s.weibo.com/top/summary",
+      "topics": [
+        {
+          "rank": 1,
+          "title": "Sina Visitor System",
+          "url": "https://s.weibo.com/top/summary"
+        }
+      ]
+    },
+    {
+      "source": "今日头条",
+      "url": "https://www.toutiao.com/c/user/token/",
+      "topics": [
+        {
+          "rank": 1,
+          "title": "404错误页",
+          "url": "https://www.toutiao.com/c/user/token/"
+        }
+      ]
+    }
+  ],
+  "international": [
+    {
+      "source": "Hacker News",
+      "url": "https://news.ycombinator.com/",
+      "topics": [
+        {
+          "rank": 1,
+          "title": "Example HN Post",
+          "url": "https://news.ycombinator.com"
+        }
+      ]
+    }
+  ],
+  "ai": [
+    {
+      "source": "AI News",
+      "url": "https://www.artificialintelligence-news.com/",
+      "topics": [
+        {
+          "rank": 1,
+          "title": "403 - Forbidden",
+          "url": "https://www.artificialintelligence-news.com/"
+        },
+        {
+          "rank": 2,
+          "title": "bg_error_lines",
+          "url": "https://www.artificialintelligence-news.com/"
+        },
+        {
+          "rank": 3,
+          "title": "circle_dots",
+          "url": "https://www.artificialintelligence-news.com/"
+        },
+        {
+          "rank": 4,
+          "title": "clouds_shape",
+          "url": "https://www.artificialintelligence-news.com/"
+        }
+      ]
+    },
+    {
+      "source": "ProductHunt AI",
+      "url": "https://www.producthunt.com/discussions?topic=artificial-intelligence",
+      "topics": [
+        {
+          "rank": 1,
+          "title": "Just a moment...",
+          "url": "https://www.producthunt.com/discussions?topic=artificial-intelligence"
+        }
+      ]
+    }
+  ],
+  "programmer": [
+    {
+      "source": "GitHub Trending",
+      "url": "https://github.com/trending",
+      "topics": [
+        {
+          "rank": 1,
+          "title": "Trending  repositories on GitHub today · GitHub",
+          "url": "https://github.com/trending"
+        },
+        {
+          "rank": 2,
+          "title": "Skip to content",
+          "url": "https://github.com/trending"
+        },
+        {
+          "rank": 3,
+          "title": "Navigation Menu",
+          "url": "https://github.com/trending"
+        },
+        {
+          "rank": 4,
+          "title": "Search code, repositories, users, issues, pull requests...",
+          "url": "https://github.com/trending"
+        }
+      ]
+    }
+  ],
+  "tech": [
+    {
+      "source": "36氪",
+      "url": "https://36kr.com/newsflashes",
+      "topics": [
+        {
+          "rank": 1,
+          "title": "快讯_融资_互联网_资本_科技_合并_最新快讯_36氪",
+          "url": "https://36kr.com/newsflashes"
+        }
+      ]
+    },
+    {
+      "source": "TechCrunch",
+      "url": "https://techcrunch.com/",
+      "topics": [
+        {
+          "rank": 1,
+          "title": "TechCrunch | Startup and Technology News",
+          "url": "https://techcrunch.com/"
+        },
+        {
+          "rank": 2,
+          "title": "Register Now.",
+          "url": "https://techcrunch.com/"
+        }
+      ]
+    },
+    {
+      "source": "InfoQ",
+      "url": "https://www.infoq.cn/",
+      "topics": [
+        {
+          "rank": 1,
+          "title": "InfoQ - 促进软件开发及相关领域知识与创新的传播-极客邦",
+          "url": "https://www.infoq.cn/"
+        },
+        {
+          "rank": 2,
+          "title": "AI&amp;大模型",
+          "url": "https://www.infoq.cn/"
+        },
+        {
+          "rank": 3,
+          "title": "Baidu AICLOUD",
+          "url": "https://www.infoq.cn/"
+        }
+      ]
+    }
+  ],
+  "summary": "📊 热点信息摘要\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🇨🇳 国内热点\n\n【微博热搜】\n1. Sina Visitor System\n\n【今日头条】\n1. 404错误页\n\n🌍 国际热点\n\n【Hacker News】\n1. Example HN Post\n\n🤖 AI 动态\n\n【AI News】\n1. 403 - Forbidden\n2. bg_error_lines\n3. circle_dots\n4. clouds_shape\n\n【ProductHunt AI】\n1. Just a moment...\n\n👨‍💻 程序员热点\n\n【GitHub Trending】\n1. Trending  repositories on GitHub today · GitHub\n2. Skip to content\n3. Navigation Menu\n4. Search code, repositories, users, issues, pull requests...\n\n💡 科技新闻\n\n【36氪】\n1. 快讯_融资_互联网_资本_科技_合并_最新快讯_36氪\n\n【TechCrunch】\n1. TechCrunch | Startup and Technology News\n2. Register Now.\n\n【InfoQ】\n1. InfoQ - 促进软件开发及相关领域知识与创新的传播-极客邦\n2. AI&amp;大模型\n3. Baidu AICLOUD\n"
+}

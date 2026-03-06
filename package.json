@@ -1,29 +1,38 @@
 {
-  "name": "claude-connector",
-  "version": "1.0.0",
-  "description": "独立 Node.js 模块，用于与 Claude Code CLI 交互",
-  "main": "claude-connector.js",
+  "name": "oprcli",
+  "version": "2.0.7",
+  "description": "统一 AI CLI 连接器服务器 - 支持 Claude Code 和 IFlow",
+  "main": "server.js",
   "scripts": {
-    "test": "node test-simple.js",
-    "test:full": "node test-connector.js",
-    "test:agents": "node test-agents.js",
-    "test:perf": "node test-performance.js",
-    "diagnose": "node diagnose-stuck.js",
-    "check:subscription": "node check-sdk-subscription.js",
-    "web": "node web-server.js",
-    "start": "node web-server.js",
-    "dingtalk": "node dingtalk-stream.js",
-    "dingtalk:multi": "node dingtalk-stream-multi-agent.js",
-    "dingtalk:webhook": "node dingtalk-webhook.js",
-    "check:dingtalk": "node check-dingtalk-config.js"
+    "start": "node server.js",
+    "dev": "node server.js",
+    "check-deps": "node scripts/check-deps.js",
+    "validate-env": "node scripts/validate-env.js",
+    "diagnose": "node scripts/diagnose.js",
+    "view-logs": "node scripts/view-logs.js",
+    "audit": "npm audit",
+    "audit:fix": "npm audit fix",
+    "outdated": "npm outdated",
+    "analyze": "node scripts/performance-analyzer.js",
+    "health": "node scripts/dependency-health-check.js",
+    "health:fix": "node scripts/dependency-health-check.js --fix",
+    "version:check": "node scripts/version-manager.js --check",
+    "version:bump": "node scripts/version-manager.js --bump",
+    "project:health": "node scripts/project-health.js",
+    "news:collect": "node scripts/news-collector.js",
+    "news:test": "node scripts/news-collector.js --test"
   },
   "keywords": [
     "claude",
     "claude-code",
+    "iflow",
     "anthropic",
     "ai",
     "cli",
-    "connector"
+    "connector",
+    "dingtalk",
+    "钉钉",
+    "unified"
   ],
   "author": "",
   "license": "MIT",
@@ -31,11 +40,12 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
+    "axios": "^1.7.0",
+    "compression": "^1.7.4",
     "dingtalk-stream": "^2.1.4",
     "dotenv": "^17.3.1",
-    "express": "^4.18.2"
-  },
-  "devDependencies": {
-    "jest": "^29.0.0"
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "node-cron": "^3.0.3"
   }
 }

@@ -1,0 +1,169 @@
+{
+  "timestamp": "2026-03-05T16:04:16.774Z",
+  "opportunities": [
+    {
+      "category": "logging_levels",
+      "priority": "low",
+      "title": "完善日志级别",
+      "description": "缺少日志级别: warn",
+      "recommendation": "实现完整的日志级别体系",
+      "affectedFiles": [
+        "integrations/logger.js"
+      ],
+      "estimatedBenefit": "更好的日志控制"
+    },
+    {
+      "category": "custom_error_types",
+      "priority": "medium",
+      "title": "创建自定义错误类型",
+      "description": "缺少业务特定的错误类型",
+      "recommendation": "定义 AppError, ConfigError 等自定义错误",
+      "affectedFiles": [
+        "utils/error-handler.js"
+      ],
+      "estimatedBenefit": "更精确的错误分类和处理"
+    },
+    {
+      "category": "message_templates",
+      "priority": "medium",
+      "title": "添加消息模板支持",
+      "description": "缺少消息模板机制",
+      "recommendation": "实现可复用的消息模板",
+      "affectedFiles": [
+        "utils/message-formatter.js"
+      ],
+      "estimatedBenefit": "简化消息格式化，提高复用性"
+    }
+  ],
+  "designPatterns": [
+    {
+      "name": "Factory Pattern",
+      "opportunity": "连接器工厂",
+      "description": "创建不同类型的连接器",
+      "location": "connectors/connector-factory.js",
+      "priority": "medium",
+      "benefit": "简化连接器创建和管理"
+    },
+    {
+      "name": "Strategy Pattern",
+      "opportunity": "消息格式化策略",
+      "description": "不同平台使用不同的格式化策略",
+      "location": "utils/message-formatter.js",
+      "priority": "low",
+      "benefit": "支持多平台消息格式"
+    },
+    {
+      "name": "Observer Pattern",
+      "opportunity": "事件监听器",
+      "description": "监听连接器和系统事件",
+      "location": "utils/event-emitter.js",
+      "priority": "medium",
+      "benefit": "解耦事件处理逻辑"
+    },
+    {
+      "name": "Adapter Pattern",
+      "opportunity": "API 适配器",
+      "description": "统一不同 AI 服务的 API",
+      "location": "connectors/api-adapter.js",
+      "priority": "high",
+      "benefit": "统一接口，便于扩展"
+    },
+    {
+      "name": "Singleton Pattern",
+      "opportunity": "配置管理器",
+      "description": "全局唯一的配置实例",
+      "location": "utils/config-manager.js",
+      "priority": "low",
+      "benefit": "避免配置不一致"
+    }
+  ],
+  "interfaces": [
+    {
+      "type": "connector_interface",
+      "methods": [
+        "constructor",
+        "connect",
+        "startSession",
+        "_connectInternal",
+        "_startSessionInternal",
+        "_continueSessionInternal",
+        "_interruptSessionInternal",
+        "_registerSession",
+        "_unregisterSession",
+        "_getSession",
+        "_generateTempId",
+        "_terminateProcess",
+        "_testCommandGeneric"
+      ],
+      "implementations": 2,
+      "coverage": 130,
+      "status": "partially_implemented"
+    },
+    {
+      "type": "config_management",
+      "status": "implemented",
+      "components": [
+        "config.js",
+        "env-manager.js"
+      ],
+      "coverage": 100
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "medium",
+      "category": "custom_error_types",
+      "title": "创建自定义错误类型",
+      "description": "缺少业务特定的错误类型",
+      "recommendation": "定义 AppError, ConfigError 等自定义错误",
+      "affectedFiles": [
+        "utils/error-handler.js"
+      ],
+      "estimatedBenefit": "更精确的错误分类和处理",
+      "implementation": {
+        "steps": [
+          "分析现有实现",
+          "设计抽象方案",
+          "实现抽象类/接口",
+          "重构现有代码",
+          "测试验证"
+        ],
+        "estimatedTime": "1-2 天",
+        "risk": "low"
+      }
+    },
+    {
+      "priority": "medium",
+      "category": "message_templates",
+      "title": "添加消息模板支持",
+      "description": "缺少消息模板机制",
+      "recommendation": "实现可复用的消息模板",
+      "affectedFiles": [
+        "utils/message-formatter.js"
+      ],
+      "estimatedBenefit": "简化消息格式化，提高复用性",
+      "implementation": {
+        "steps": [
+          "分析现有实现",
+          "设计抽象方案",
+          "实现抽象类/接口",
+          "重构现有代码",
+          "测试验证"
+        ],
+        "estimatedTime": "1-2 天",
+        "risk": "low"
+      }
+    }
+  ],
+  "summary": {
+    "totalOpportunities": 3,
+    "highPriority": 0,
+    "mediumPriority": 2,
+    "lowPriority": 1,
+    "designPatterns": 5,
+    "interfaces": 2,
+    "recommendations": 2,
+    "abstractionPotential": "low"
+  },
+  "generatedAt": "2026/3/6 00:04:16"
+}

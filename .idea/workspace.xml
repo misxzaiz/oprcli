@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="移除无效内容">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/integrations/dingtalk.js" beforeDir="false" afterPath="$PROJECT_DIR$/integrations/dingtalk.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scheduler/tasks.json" beforeDir="false" afterPath="$PROJECT_DIR$/scheduler/tasks.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/docs/plugins/config-manager.md" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/docs/plugins/config-manager.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/docs/plugins/context-memory.md" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/docs/plugins/context-memory.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/cache-manager.js" beforeDir="false" afterPath="$PROJECT_DIR$/utils/cache-manager.js" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <excluded-from-favorite>
+      <branch-storage>
+        <map>
+          <entry type="LOCAL">
+            <value>
+              <list>
+                <branch-info repo="$PROJECT_DIR$" source="main" />
+              </list>
+            </value>
+          </entry>
+        </map>
+      </branch-storage>
+    </excluded-from-favorite>
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="master" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="RESET_MODE" value="MIXED" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 1
+}</component>
+  <component name="ProjectId" id="3ALH6fZSLMTjwMAvZ8TCEiQzaDK" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/temp/oprcli&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Project&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.0&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.lookFeel&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;D:\\app\\JetBrains\\IntelliJ IDEA 2025.3.2\\plugins\\javascript-plugin\\jsLanguageServicesImpl\\external&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\temp\oprcli" />
+    </key>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-2fc7cc6b9a17-intellij.indexing.shared.core-IU-253.30387.90" />
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-IU-253.30387.90" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="" />
+      <created>1772364760402</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1772364760402</updated>
+      <workItem from="1772364760405" duration="1152000" />
+      <workItem from="1772370670760" duration="1995000" />
+      <workItem from="1772459132182" duration="2944000" />
+      <workItem from="1772465954095" duration="5507000" />
+      <workItem from="1772631636263" duration="421000" />
+    </task>
+    <task id="LOCAL-00001" summary="2132312">
+      <option name="closed" value="true" />
+      <created>1772466072197</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1772466072197</updated>
+    </task>
+    <task id="LOCAL-00002" summary="2132312">
+      <option name="closed" value="true" />
+      <created>1772467112157</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1772467112157</updated>
+    </task>
+    <task id="LOCAL-00003" summary="2132312">
+      <option name="closed" value="true" />
+      <created>1772468536211</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1772468536211</updated>
+    </task>
+    <task id="LOCAL-00004" summary="2132312">
+      <option name="closed" value="true" />
+      <created>1772468899106</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1772468899106</updated>
+    </task>
+    <task id="LOCAL-00005" summary="2132312">
+      <option name="closed" value="true" />
+      <created>1772469392116</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1772469392116</updated>
+    </task>
+    <task id="LOCAL-00006" summary="2132312">
+      <option name="closed" value="true" />
+      <created>1772470701465</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1772470701465</updated>
+    </task>
+    <task id="LOCAL-00007" summary="2132312">
+      <option name="closed" value="true" />
+      <created>1772471939572</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1772471939572</updated>
+    </task>
+    <task id="LOCAL-00008" summary="2132312">
+      <option name="closed" value="true" />
+      <created>1772472868484</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1772472868484</updated>
+    </task>
+    <task id="LOCAL-00009" summary="2132312">
+      <option name="closed" value="true" />
+      <created>1772473405982</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1772473405982</updated>
+    </task>
+    <task id="LOCAL-00010" summary="支持系统提示词">
+      <option name="closed" value="true" />
+      <created>1772554564348</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1772554564348</updated>
+    </task>
+    <task id="LOCAL-00011" summary="修复工具调用失败的问题（实际是显示错误）没完全修复">
+      <option name="closed" value="true" />
+      <created>1772554884682</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1772554884682</updated>
+    </task>
+    <task id="LOCAL-00012" summary="修复系统提示词失效的问题">
+      <option name="closed" value="true" />
+      <created>1772556696469</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1772556696469</updated>
+    </task>
+    <task id="LOCAL-00013" summary="移除无效内容">
+      <option name="closed" value="true" />
+      <created>1772636488386</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1772636488386</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="FILTERS">
+                <map>
+                  <entry key="branch">
+                    <value>
+                      <list>
+                        <option value="main" />
+                      </list>
+                    </value>
+                  </entry>
+                </map>
+              </option>
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="2132312" />
+    <MESSAGE value="支持系统提示词" />
+    <MESSAGE value="修复工具调用失败的问题（实际是显示错误）没完全修复" />
+    <MESSAGE value="移除无效内容" />
+    <option name="LAST_COMMIT_MESSAGE" value="移除无效内容" />
+  </component>
+</project>
