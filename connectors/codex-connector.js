@@ -206,6 +206,7 @@ class CodexConnector extends BaseConnector {
     let stdoutBuffer = '';
     let stderrBuffer = '';
     let realSessionId = null;
+    let hasParsedEvents = false; // 🔍 标志：是否已解析到事件
 
     // 处理标准输出
     child.stdout.on('data', (data) => {
@@ -214,7 +215,10 @@ class CodexConnector extends BaseConnector {
       stdoutBuffer += text;
 
       // 尝试实时解析输出
-      this._processOutput(text, sessionId, options);
+      const parsedEvents = this._processOutput(text, sessionId, options);
+      if (parsedEvents > 0) {
+        hasParsedEvents = true; // ✅ 标记已解析到事件
+      }
     });
 
     // 处理标准错误
@@ -237,15 +241,20 @@ class CodexConnector extends BaseConnector {
     child.on('close', (code) => {
       const finalSessionId = realSessionId || sessionId;
       this.logger.log(`[CodexConnector] 进程结束: ${finalSessionId}, code: ${code}`);
+      this.logger.log(`[CodexConnector] hasParsedEvents: ${hasParsedEvents}`);
 
-      // 如果没有解析到事件，使用原始输出
-      if (stdoutBuffer.trim() && onEvent) {
+      // 🔍 只有没有解析到事件时，才使用原始输出作为降级方案
+      // 这样可以避免重复推送（已通过 JSONL 解析推送的内容）
+      if (!hasParsedEvents && stdoutBuffer.trim() && onEvent) {
+        this.logger.warning('[CodexConnector] 未解析到 JSONL 事件，使用原始输出作为降级方案');
         onEvent({
           type: 'assistant',
           message: {
             content: [{ type: 'text', text: stdoutBuffer.trim() }]
           }
         });
+      } else if (hasParsedEvents) {
+        this.logger.log('[CodexConnector] 已解析到 JSONL 事件，跳过原始输出（避免重复）');
       }
 
       // 发送会话结束事件
@@ -272,9 +281,11 @@ class CodexConnector extends BaseConnector {
   /**
    * 处理输出并转换为事件流
    * Codex exec 输出 JSONL 格式
+   * @returns {number} 解析到的事件数量
    */
   _processOutput(text, sessionId, options) {
     const { onEvent } = options;
+    let eventCount = 0;
 
     // Codex exec 输出 JSONL（每行一个 JSON 对象）
     const lines = text.split('\n');
@@ -287,12 +298,15 @@ class CodexConnector extends BaseConnector {
         const event = this._parseCodexExecEvent(data, sessionId);
         if (event && onEvent) {
           onEvent(event);
+          eventCount++;
         }
       } catch (e) {
         // 不是 JSON，忽略（Codex exec 应该只输出 JSONL）
         this.logger.log(`[CodexConnector] 忽略非 JSON 行: ${line.substring(0, 50)}`);
       }
     }
+
+    return eventCount;
   }
 
   /**
