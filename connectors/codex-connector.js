@@ -533,6 +533,16 @@ class CodexConnector extends BaseConnector {
         this.currentSessionId = realId;
         this.logger.log(`[CodexConnector] 会话 ID 更新: ${tempId} -> ${realId}`);
       }
+
+      // 🆕 迁移对话历史（关键修复！）
+      const history = this.conversationHistory.get(tempId);
+      if (history) {
+        this.conversationHistory.set(realId, history);
+        this.conversationHistory.delete(tempId);
+        this.logger.log(`[CodexConnector] 历史记录已迁移: ${tempId} -> ${realId} (${history.length} 条消息)`);
+      } else {
+        this.logger.warning(`[CodexConnector] 未找到临时会话的历史记录: ${tempId}`);
+      }
     }
 
     // 触发回调通知 server.js
