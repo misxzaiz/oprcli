@@ -452,22 +452,29 @@ class Config {
    * @returns {Object} - 脱敏后的配置对象
    */
   getSafeConfig() {
-    const config = {
+    // 使用 sanitizer 统一脱敏所有敏感字段
+    const rawConfig = {
       provider: this.provider,
       port: this.port,
       promptMode: this.promptMode,
       claude: {
         ...this.claude,
-        cmdPath: this.claude.cmdPath ? sanitizer.sanitizeValue(this.claude.cmdPath, 'cmdPath') : null,
-        gitBinPath: this.claude.gitBinPath ? sanitizer.sanitizeValue(this.claude.gitBinPath, 'gitBinPath') : null,
+        // 脱敏路径信息（可能包含用户信息）
+        cmdPath: this.claude.cmdPath ? '[PATH HIDDEN]' : null,
+        workDir: this.claude.workDir ? '[PATH HIDDEN]' : null,
+        gitBinPath: this.claude.gitBinPath ? '[PATH HIDDEN]' : null,
         systemPrompt: this.claude.systemPrompt ? '[SYSTEM PROMPT HIDDEN]' : null
       },
       iflow: {
         ...this.iflow,
+        // 脱敏路径信息
+        path: this.iflow.path ? '[PATH HIDDEN]' : null,
+        workDir: this.iflow.workDir ? '[PATH HIDDEN]' : null,
+        includeDirs: this.iflow.includeDirs ? '[DIRS HIDDEN]' : null,
         systemPrompt: this.iflow.systemPrompt ? '[SYSTEM PROMPT HIDDEN]' : null
       },
       dingtalk: {
-        ...this.dingtalk,
+        enabled: this.dingtalk.enabled,
         clientId: this.dingtalk.clientId ? sanitizer.sanitizeValue(this.dingtalk.clientId, 'clientId') : null,
         clientSecret: this.dingtalk.clientSecret ? '[SECRET HIDDEN]' : null
       },
@@ -479,10 +486,15 @@ class Config {
           webhook: this.notification.dingtalk.webhook ? sanitizer.sanitizeValue(this.notification.dingtalk.webhook, 'webhook') : null,
           secret: this.notification.dingtalk.secret ? '[SECRET HIDDEN]' : null
         }
+      },
+      systemPrompts: {
+        global: this.systemPrompts.global ? '[SYSTEM PROMPT HIDDEN]' : null,
+        promptsDir: this.systemPrompts.promptsDir ? '[PATH HIDDEN]' : null
       }
     }
 
-    return config
+    // 使用 sanitizer 进行深度脱敏（捕获所有可能的敏感字段）
+    return sanitizer.sanitizeObject(rawConfig)
   }
 
   /**
