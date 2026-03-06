@@ -1,6 +1,6 @@
 {
-  "lastScan": "2026-03-06T25:00:00Z",
-  "version": "2.0.14",
+  "lastScan": "2026-03-06T25:20:00Z",
+  "version": "2.0.15",
   "files": {
     "utils/config-validator.js": {
       "path": "utils/config-validator.js",
@@ -117,16 +117,43 @@
         {"id": "ISS-019", "type": "异步预热", "line": "171-210", "status": "fixed"},
         {"id": "ISS-022", "type": "异步文件操作", "line": "142-247", "status": "fixed"}
       ]
+    },
+    "evolution/evolution-manager.js": {
+      "path": "evolution/evolution-manager.js",
+      "size": 388,
+      "lastModified": "2026-03-06",
+      "complexity": "medium",
+      "risk": "low",
+      "issues": [],
+      "optimizations": []
+    },
+    "evolution/intelligent-upgrader.js": {
+      "path": "evolution/intelligent-upgrader.js",
+      "size": 421,
+      "lastModified": "2026-03-06",
+      "complexity": "medium",
+      "risk": "low",
+      "issues": [],
+      "optimizations": []
+    },
+    "scheduler/task-manager.js": {
+      "path": "scheduler/task-manager.js",
+      "size": 624,
+      "lastModified": "2026-03-06",
+      "complexity": "medium",
+      "risk": "low",
+      "issues": [],
+      "optimizations": []
     }
   },
   "summary": {
-    "totalFiles": 57,
+    "totalFiles": 60,
     "highComplexity": 5,
-    "mediumComplexity": 9,
+    "mediumComplexity": 12,
     "lowComplexity": 43,
     "highRisk": 5,
     "mediumRisk": 8,
-    "lowRisk": 44
+    "lowRisk": 47
   },
   "issues": [
     {"id": "ISS-009", "title": "Promise错误处理缺陷", "severity": "high", "status": "fixed"},
@@ -148,6 +175,7 @@
     {"id": "ISS-017", "title": "代码风格不一致", "severity": "medium", "status": "open"},
     {"id": "ISS-018", "title": "notification-queue.js同步文件操作", "severity": "medium", "status": "fixed"},
     {"id": "ISS-020", "title": "server.js启动日志不统一", "severity": "low", "status": "fixed"},
-    {"id": "ISS-019", "title": "config.js提示词读取阻塞", "severity": "medium", "status": "fixed"}
+    {"id": "ISS-019", "title": "config.js提示词读取阻塞", "severity": "medium", "status": "fixed"},
+    {"id": "ISS-039", "title": "自进化系统模块", "severity": "low", "status": "reviewed"}
   ]
 }
