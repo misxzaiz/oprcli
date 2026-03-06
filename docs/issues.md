@@ -1,10 +1,30 @@
 # OPRCLI 系统问题清单
 
-最后更新：2026-03-06 23:00
+最后更新：2026-03-06 23:40
 
 ## 当前问题
 
 ### 高优先级 ⚠️
+
+#### ISS-033: 敏感信息脱敏不完整 🔴
+- **文件**: `utils/config.js` (行 454-486)
+- **问题**: getSafeConfig 仅脱敏部分字段，敏感信息可能泄露
+- **严重程度**: 高
+- **影响**: 安全性、敏感信息泄露
+- **修复建议**: 审计 sanitizer 实现，使用正则替换所有 token/secret 参数
+- **优化价值**: 高（安全风险）
+
+#### ISS-021: 日志系统混用 🔴
+- **文件**:
+  - `connectors/iflow-connector.js` (32处)
+  - `connectors/claude-connector.js` (24处)
+  - `utils/cache-manager.js` (1处)
+  - `utils/notification-queue.js` (2处)
+- **问题**: 大量使用 console.log/error/warn，未使用统一的 Logger 系统
+- **严重程度**: 高
+- **影响**: 日志系统、调试效率、生产环境监控
+- **修复建议**: 将所有 console.* 替换为 this.logger.*，在构造函数中注入 Logger 实例
+- **优化价值**: 高（统一日志管理）
 
 无
 - **文件**: `utils/cache-manager.js` (行359-369)
@@ -23,6 +43,53 @@
 - **优化价值**: 高（防止内存泄漏）
 
 ### 中优先级
+
+#### ISS-022: 同步文件操作阻塞事件循环
+- **文件**: `utils/config.js` (行 153, 409, 421)
+- **问题**: _loadSystemPromptFromFile 使用 fs.readFileSync，阻塞读取文件
+- **严重程度**: 中
+- **影响**: 配置加载性能、系统响应性
+- **修复建议**: 改用 fs.promises.readFile，将 getSystemPrompt 改为异步方法
+- **优化价值**: 高（提升并发性能）
+
+#### ISS-026: 配置热重载缺少输入验证
+- **文件**: `plugins/core/config-manager.js` (行 563-619)
+- **问题**: handleFileChange 和 debouncedReload 缺少文件内容验证
+- **严重程度**: 中
+- **影响**: 安全性、稳定性
+- **修复建议**: 在重载前先验证 JSON 格式和配置 schema，验证失败时保留旧配置
+- **优化价值**: 中（提升配置安全性）
+
+#### ISS-032: 配置验证规则硬编码重复
+- **文件**:
+  - `utils/config.js` (行 259-401)
+  - `plugins/core/config-manager.js` (行 865-973)
+- **问题**: 两个文件中都有配置验证逻辑，规则重复且不共享
+- **严重程度**: 中
+- **影响**: 代码维护性、配置验证一致性
+- **修复建议**: 提取独立的 config-validator.js 模块，定义 JSON Schema 验证规则
+- **优化价值**: 中（减少代码重复）
+
+#### ISS-034: 连接器进程信号处理缺失
+- **文件**:
+  - `connectors/iflow-connector.js` (行 269-302)
+  - `connectors/claude-connector.js` (行 327-346)
+- **问题**: 子进程的 close 和 error 事件未处理 SIGTERM/SIGINT 信号
+- **严重程度**: 中
+- **影响**: 资源清理、优雅关闭
+- **修复建议**: 在服务器 graceful-shutdown 中遍历所有活动会话，先 interruptSession 再退出
+- **优化价值**: 中（防止僵尸进程）
+
+#### ISS-023: 定时器泄漏风险 - 缺乏统一清理机制
+- **文件**:
+  - `connectors/iflow-connector.js` (行 115-124)
+  - `utils/cache-manager.js` (行 269-273)
+  - `utils/notification-queue.js` (行 257-270, 322-326)
+- **问题**: 多处手动管理 setTimeout/setInterval，缺乏统一的定时器生命周期管理
+- **严重程度**: 中
+- **影响**: 内存泄漏、长时间运行稳定性
+- **修复建议**: 实现 TimerManager 工具类，统一管理所有定时器的创建和清理
+- **优化价值**: 中（防止内存泄漏）
 
 #### ISS-018: notification-queue.js 同步文件操作 ✅ 已修复
 - **文件**: `utils/notification-queue.js` (行70-282)
@@ -136,6 +203,78 @@
 - **优化价值**: 中（提升可读性）
 
 ### 低优先级
+
+#### ISS-024: 缓存预热异步计数不准确
+- **文件**: `utils/cache-manager.js` (行 369-377)
+- **问题**: warmup 方法中异步 loader 的 results.succeeded++ 在 Promise 回调中执行
+- **严重程度**: 低
+- **影响**: 缓存预热统计准确性
+- **修复建议**: 将异步 warmup 改为 async/await 并使用 Promise.all
+- **优化价值**: 低
+
+#### ISS-025: 重复的文件存在性检查逻辑
+- **文件**: `utils/config.js` (行 407-425)
+- **问题**: _checkFileExists 和 _checkDirectoryExists 有相似的 try-catch 逻辑
+- **严重程度**: 低
+- **影响**: 代码可维护性
+- **修复建议**: 提取为 _checkPathExists(filePath, type = 'any')
+- **优化价值**: 低
+
+#### ISS-027: 插件文档生成的异常静默忽略
+- **文件**: `plugins/core/plugin-manager.js` (行 246-248)
+- **问题**: generatePluginDoc 失败时仅记录 warning，插件注册仍会成功
+- **严重程度**: 低
+- **影响**: 文档完整性
+- **修复建议**: 在开发模式下抛出异常，生产模式下记录警告
+- **优化价值**: 低
+
+#### ISS-028: 健康检查的超时定时器清理不完整
+- **文件**: `utils/health-enhanced.js` (行 94-106, 119-123)
+- **问题**: checkAll 中超时定时器在成功和失败分支都需要清理
+- **严重程度**: 低
+- **影响**: 内存泄漏风险
+- **修复建议**: 使用 Promise.finally 确保定时器一定被清理
+- **优化价值**: 低
+
+#### ISS-029: 错误恢复中缺少日志上下文
+- **文件**: `utils/error-recovery.js` (行 258-263)
+- **问题**: 熔断器状态转换日志仅使用 console.log
+- **严重程度**: 低
+- **影响**: 日志系统完整性
+- **修复建议**: 使用传入的 this.logger 记录所有状态转换
+- **优化价值**: 低
+
+#### ISS-030: 缓存 LRU 实现效率问题
+- **文件**: `utils/cache-manager.js` (行 127-130)
+- **问题**: 真正的 LRU 实现（delete + reinsert）在每次 get 时都执行 Map 操作
+- **严重程度**: 低
+- **影响**: 缓存性能
+- **修复建议**: 考虑使用 Map 的迭代顺序特性，或使用专门的 LRU 库
+- **优化价值**: 低
+
+#### ISS-031: 通知队列的失败缓存可能无限增长
+- **文件**: `utils/notification-queue.js` (行 277-280)
+- **问题**: retryFailed 中先清空再添加，如果重试全部失败会瞬间超过限制
+- **严重程度**: 低
+- **影响**: 内存使用
+- **修复建议**: 在重试前检查 failedCache.length，超过限制时丢弃最旧的条目
+- **优化价值**: 低
+
+#### ISS-035: 缓存大小估算不准确
+- **文件**: `utils/cache-manager.js` (行 287-294)
+- **问题**: _estimateSize 仅估算字符串原始大小，未考虑对象引用、Map 元数据开销
+- **严重程度**: 低
+- **影响**: 内存管理准确性
+- **修复建议**: 添加警告注释说明这是粗略估算
+- **优化价值**: 低
+
+#### ISS-036: 配置监听器回调异常未隔离
+- **文件**: `plugins/core/config-manager.js` (行 338-348, 669-677)
+- **问题**: notifyChange 和 notifyConfigChange 中单个监听器抛异常会影响后续监听器
+- **严重程度**: 低
+- **影响**: 插件间通信可靠性
+- **修复建议**: 记录异常后继续执行下一个监听器
+- **优化价值**: 低
 
 #### ISS-006: 缺少单元测试
 - **文件**: 大部分模块
