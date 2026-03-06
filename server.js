@@ -979,7 +979,7 @@ class UnifiedServer {
     const providerName = provider.toUpperCase()
     try {
       this.logger.info('CONNECTOR', `正在初始化 ${providerName}...`)
-      const options = config.getConnectorOptions(provider)
+      const options = await config.getConnectorOptions(provider)
       const connector = new ConnectorClass(options)
       const result = await connector.connect()
 
