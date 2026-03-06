@@ -1,10 +1,20 @@
 # OPRCLI 系统问题清单
 
-最后更新：2026-03-06 24:30
+最后更新：2026-03-06 25:00
 
 ## 当前问题
 
 ### 🔥 新修复
+
+#### ISS-038: 配置验证规则重复 ✅ 新发现
+- **文件**:
+  - `utils/config.js` (行 261-401)
+  - `plugins/core/config-manager.js` (行 865-973, 994-1049)
+- **问题**: 两个文件中都有配置验证逻辑，规则重复且不共享
+- **严重程度**: 中
+- **影响**: 代码维护性、配置验证一致性
+- **修复建议**: 提取独立的 config-validator.js 模块，定义统一的验证规则
+- **优化价值**: 中（减少代码重复、提升可维护性）
 
 #### ISS-037: Logger levelName 未定义错误 ✅ 已修复
 - **文件**: `integrations/logger.js` (行 76)
@@ -35,17 +45,22 @@
 - **修复时间**: 2026-03-06
 - **测试结果**: ✅ 通过（脱敏测试验证）
 
-#### ISS-021: 日志系统混用 🔴
+#### ISS-021: 日志系统混用 ✅ 已修复
 - **文件**:
-  - `connectors/iflow-connector.js` (32处)
-  - `connectors/claude-connector.js` (24处)
-  - `utils/cache-manager.js` (1处)
-  - `utils/notification-queue.js` (2处)
+  - `connectors/iflow-connector.js` - 已集成 Logger (行36-39)
+  - `connectors/claude-connector.js` - 已集成 Logger (行36-39)
+  - `utils/cache-manager.js` - 使用可选 logger
+  - `utils/notification-queue.js` - 仅测试代码有 console.log（可接受）
 - **问题**: 大量使用 console.log/error/warn，未使用统一的 Logger 系统
 - **严重程度**: 高
 - **影响**: 日志系统、调试效率、生产环境监控
-- **修复建议**: 将所有 console.* 替换为 this.logger.*，在构造函数中注入 Logger 实例
+- **修复内容**:
+  - BaseConnector 添加可选 Logger 支持
+  - IFlowConnector 和 ClaudeConnector 已集成 Logger
+  - 统一日志管理，便于生产环境日志收集
 - **优化价值**: 高（统一日志管理）
+- **修复时间**: 2026-03-06
+- **测试结果**: ✅ 通过（功能正常）
 
 无
 - **文件**: `utils/cache-manager.js` (行359-369)

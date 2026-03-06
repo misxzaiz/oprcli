@@ -1,6 +1,7 @@
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
+const { checkPortRange, isValidProvider } = require('../../utils/config-validator');
 
 /**
  * 配置管理器
@@ -888,8 +889,12 @@ class ConfigManager {
       } else {
         if (!this.config.server.port) {
           errors.push('缺少 server.port 配置');
-        } else if (this.config.server.port < 1024 || this.config.server.port > 65535) {
-          errors.push('端口号必须在 1024-65535 之间');
+        } else {
+          // 🆕 ISS-038: 使用统一的端口范围检查
+          const portCheck = checkPortRange(this.config.server.port);
+          if (!portCheck.valid) {
+            errors.push('端口号必须在 1024-65535 之间');
+          }
         }
 
         if (this.config.server.host) {
@@ -905,8 +910,11 @@ class ConfigManager {
       if (this.config.connectors) {
         if (!this.config.connectors.default) {
           warnings.push('未设置默认连接器');
-        } else if (!['claude', 'iflow'].includes(this.config.connectors.default)) {
-          errors.push('不支持的连接器类型: ' + this.config.connectors.default);
+        } else {
+          // 🆕 ISS-038: 使用统一的 Provider 验证
+          if (!isValidProvider(this.config.connectors.default)) {
+            errors.push('不支持的连接器类型: ' + this.config.connectors.default);
+          }
         }
 
         if (this.config.connectors.timeout) {
@@ -1029,8 +1037,12 @@ class ConfigManager {
           errors.push('缺少必需的 server.port 配置');
         } else if (typeof parsedConfig.server.port !== 'number') {
           errors.push('server.port 必须是数字');
-        } else if (parsedConfig.server.port < 1024 || parsedConfig.server.port > 65535) {
-          errors.push('端口号必须在 1024-65535 之间');
+        } else {
+          // 🆕 ISS-038: 使用统一的端口范围检查
+          const portCheck = checkPortRange(parsedConfig.server.port);
+          if (!portCheck.valid || parsedConfig.server.port < 1024) {
+            errors.push('端口号必须在 1024-65535 之间');
+          }
         }
       } else {
         errors.push('配置文件根节点必须是对象');
