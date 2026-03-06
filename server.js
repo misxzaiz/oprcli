@@ -24,6 +24,7 @@ const DingTalkIntegration = require('./integrations/dingtalk')
 const MessageFormatter = require('./utils/message-formatter')
 const ClaudeConnector = require('./connectors/claude-connector')
 const IFlowConnector = require('./connectors/iflow-connector')
+const CodexConnector = require('./connectors/codex-connector')
 const { simpleHash } = require('./utils/string-helper')
 const SchedulerModule = require('./scheduler')
 
@@ -77,6 +78,7 @@ class UnifiedServer {
   static COMMANDS = {
     'claude': { type: 'switch', provider: 'claude' },
     'iflow': { type: 'switch', provider: 'iflow' },
+    'codex': { type: 'switch', provider: 'codex' },
     'end': { type: 'interrupt' },
     '停止': { type: 'interrupt' },
     'stop': { type: 'interrupt' },
@@ -1054,6 +1056,8 @@ class UnifiedServer {
         return new ClaudeConnector(options)
       case 'iflow':
         return new IFlowConnector(options)
+      case 'codex':
+        return new CodexConnector(options)
       default:
         throw new Error(`Unknown provider: ${config.provider}`)
     }
@@ -1074,6 +1078,11 @@ class UnifiedServer {
     // 准备 IFlow 初始化任务
     if (config.iflow.workDir) {
       initTasks.push(this._initConnector('iflow', IFlowConnector))
+    }
+
+    // 准备 Codex 初始化任务
+    if (config.codex.workDir) {
+      initTasks.push(this._initConnector('codex', CodexConnector))
     }
 
     // 并行执行所有初始化任务

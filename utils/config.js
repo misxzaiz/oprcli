@@ -72,6 +72,15 @@ class Config {
       systemPrompt: process.env.IFLOW_SYSTEM_PROMPT
     }
 
+    // Codex 配置
+    this.codex = {
+      path: process.env.CODEX_PATH || 'codex',
+      workDir: process.env.CODEX_WORK_DIR,
+      systemPromptFile: process.env.CODEX_SYSTEM_PROMPT_FILE,
+      model: process.env.CODEX_MODEL,
+      provider: process.env.CODEX_MODEL_PROVIDER
+    }
+
     // 钉钉配置
     this.dingtalk = {
       clientId: process.env.DINGTALK_CLIENT_ID,
@@ -263,10 +272,10 @@ class Config {
     const warnings = []
 
     // Provider 验证
-    if (!['claude', 'iflow'].includes(this.provider)) {
+    if (!['claude', 'iflow', 'codex'].includes(this.provider)) {
       errors.push({
         field: 'PROVIDER',
-        message: `无效的 PROVIDER 值: "${this.provider}"，有效值为: claude, iflow`,
+        message: `无效的 PROVIDER 值: "${this.provider}"，有效值为: claude, iflow, codex`,
         value: this.provider
       })
     }
@@ -444,6 +453,17 @@ class Config {
         includeDirectories: this.iflow.includeDirs,
         systemPrompt
       }
+    } else if (targetProvider === 'codex') {
+      return {
+        codexPath: this.codex.path,
+        workDir: this.codex.workDir,
+        systemPromptFile: this.codex.systemPromptFile,
+        modelConfig: {
+          model: this.codex.model,
+          provider: this.codex.provider
+        },
+        systemPrompt
+      }
     }
     throw new Error(`Unknown provider: ${targetProvider}`)
   }
@@ -474,6 +494,15 @@ class Config {
         workDir: this.iflow.workDir ? '[PATH HIDDEN]' : null,
         includeDirs: this.iflow.includeDirs ? '[DIRS HIDDEN]' : null,
         systemPrompt: this.iflow.systemPrompt ? '[SYSTEM PROMPT HIDDEN]' : null
+      },
+      codex: {
+        ...this.codex,
+        // 脱敏路径信息
+        path: this.codex.path ? '[PATH HIDDEN]' : null,
+        workDir: this.codex.workDir ? '[PATH HIDDEN]' : null,
+        systemPromptFile: this.codex.systemPromptFile ? '[PATH HIDDEN]' : null,
+        model: this.codex.model,
+        provider: this.codex.provider
       },
       dingtalk: {
         enabled: this.dingtalk.enabled,

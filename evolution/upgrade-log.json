@@ -1,0 +1,80 @@
+[
+  {
+    "id": "upgrade-mme8u1ps-e9wxb",
+    "timestamp": "2026-03-06T01:56:26.800Z",
+    "type": "skill",
+    "action": "add",
+    "name": "notification",
+    "description": "添加钉钉通知技能",
+    "details": {
+      "usage": "使用 notification 插件发送通知",
+      "scope": "项目级别"
+    },
+    "status": "completed"
+  },
+  {
+    "id": "upgrade-mme8u1ok-5flsn",
+    "timestamp": "2026-03-06T01:56:26.756Z",
+    "type": "mcp",
+    "action": "add",
+    "name": "mcp-browser",
+    "description": "添加浏览器自动化能力",
+    "details": {
+      "usage": "使用 MCP Browser 工具进行网页操作",
+      "scope": "所有会话"
+    },
+    "status": "completed"
+  },
+  {
+    "id": "upgrade-mme8tvw9-m98f2",
+    "timestamp": "2026-03-06T01:56:19.257Z",
+    "type": "skill",
+    "action": "add",
+    "name": "notification",
+    "description": "添加钉钉通知技能",
+    "details": {
+      "usage": "使用 notification 插件发送通知",
+      "scope": "项目级别"
+    },
+    "status": "completed"
+  },
+  {
+    "id": "upgrade-mme8tvva-21ive",
+    "timestamp": "2026-03-06T01:56:19.222Z",
+    "type": "mcp",
+    "action": "add",
+    "name": "mcp-browser",
+    "description": "添加浏览器自动化能力",
+    "details": {
+      "usage": "使用 MCP Browser 工具进行网页操作",
+      "scope": "所有会话"
+    },
+    "status": "completed"
+  },
+  {
+    "id": "upgrade-mme79bj3-jwrqw",
+    "timestamp": "2026-03-06T01:12:20.127Z",
+    "type": "skill",
+    "action": "add",
+    "name": "notification",
+    "description": "添加钉钉通知技能",
+    "details": {
+      "usage": "使用 notification 插件发送通知",
+      "scope": "项目级别"
+    },
+    "status": "completed"
+  },
+  {
+    "id": "upgrade-mme79bi3-3p4mf",
+    "timestamp": "2026-03-06T01:12:20.091Z",
+    "type": "mcp",
+    "action": "add",
+    "name": "mcp-browser",
+    "description": "添加浏览器自动化能力",
+    "details": {
+      "usage": "使用 MCP Browser 工具进行网页操作",
+      "scope": "所有会话"
+    },
+    "status": "completed"
+  }
+]

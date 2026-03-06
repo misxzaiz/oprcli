@@ -1,6 +1,10 @@
 /**
  * 定时任务管理器
  * 负责任务调度和执行，Agent 自主处理通知
+ * 
+ * 🆕 自进化系统集成：
+ * - 任务完成后自动检测升级指令
+ * - 智能分析任务执行过程，提出升级建议
  */
 
 const cron = require('node-cron')
@@ -15,6 +19,10 @@ class TaskManager {
     this.scheduledJobs = new Map()
     this.enabled = false
     this.configPath = null
+    
+    // 🆕 自进化系统
+    this.evolutionEnabled = process.env.EVOLUTION_ENABLED !== 'false'
+    this.autoSuggestUpgrades = process.env.EVOLUTION_AUTO_SUGGEST === 'true'
   }
 
   /**
@@ -151,12 +159,92 @@ class TaskManager {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
       this.logger.success('SCHEDULER', `任务 ${task.name} 完成，耗时: ${elapsed}s`)
 
+      // 🆕 自进化系统：检查升级指令
+      if (this.evolutionEnabled && this.server.evolution) {
+        await this.checkForUpgrades(task, result)
+      }
+
       return { success: true, elapsed, result }
     } catch (error) {
       this.logger.error('SCHEDULER', `任务 ${task.name} 失败`, {
         error: error.message
       })
+      
+      // 🆕 自进化系统：分析失败原因
+      if (this.evolutionEnabled && this.server.intelligentUpgrader) {
+        await this.analyzeFailure(task, error)
+      }
+      
       return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * 🆕 检查升级指令
+   */
+  async checkForUpgrades(task, result) {
+    try {
+      // 1. 解析任务消息中的升级指令
+      const upgradeCmd = this.server.evolution.parseUpgradeCommand(task.message)
+
+      if (upgradeCmd) {
+        this.logger.info('EVOLUTION', `检测到升级指令: ${upgradeCmd.action} ${upgradeCmd.type} ${upgradeCmd.name}`)
+
+        // 记录升级
+        await this.server.evolution.recordUpgrade(upgradeCmd)
+
+        this.logger.success('EVOLUTION', '升级指令已执行并记录')
+      }
+
+      // 2. 智能升级建议（如果启用）
+      if (this.autoSuggestUpgrades && this.server.intelligentUpgrader) {
+        const suggestions = await this.server.intelligentUpgrader.analyzeAndSuggest(task, result)
+
+        if (suggestions.length > 0) {
+          this.logger.info('EVOLUTION', `发现 ${suggestions.length} 个升级建议`)
+
+          // 记录建议到上下文记忆
+          if (this.server.contextMemory) {
+            await this.server.contextMemory.set(
+              `suggestions:${task.id}`,
+              {
+                taskId: task.id,
+                suggestions,
+                timestamp: Date.now()
+              },
+              { ttl: 24 * 60 * 60 * 1000 }  // 保留1天
+            )
+          }
+
+          // 自动应用高优先级建议
+          const highPrioritySuggestions = suggestions.filter(s => s.priority === 'high')
+
+          for (const suggestion of highPrioritySuggestions.slice(0, 1)) {  // 只自动应用第一个高优先级建议
+            this.logger.info('EVOLUTION', `自动应用高优先级建议: ${suggestion.description}`)
+            await this.server.intelligentUpgrader.applySuggestion(suggestion)
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.error('EVOLUTION', '检查升级失败', { error: error.message })
+    }
+  }
+
+  /**
+   * 🆕 分析任务失败原因
+   */
+  async analyzeFailure(task, error) {
+    try {
+      const suggestion = await this.server.intelligentUpgrader.analyzeAndSuggest(task, {
+        success: false,
+        error: error.message
+      })
+
+      if (suggestion.length > 0) {
+        this.logger.info('EVOLUTION', `失败分析完成，发现 ${suggestion.length} 个改进建议`)
+      }
+    } catch (err) {
+      this.logger.error('EVOLUTION', '失败分析出错', { error: err.message })
     }
   }
 

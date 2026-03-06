@@ -1,5 +1,117 @@
 # OPRCLI 进化日志
 
+## 2026-03-06 自进化系统实现 v2.1.0 ⭐⭐⭐⭐
+
+状态: ✅ 成功完成
+时间: 2026-03-06 09:12
+类型: 核心功能增强
+
+### 🎯 任务背景
+
+实现 OPRCLI 自进化系统，使系统能够：
+1. 自动记录升级操作
+2. 动态注入系统提示词
+3. 智能分析任务并提出升级建议
+4. 跨会话"记忆"升级
+
+### 🔧 核心实现
+
+**1. EvolutionManager - 进化管理器**
+- 位置: `evolution/evolution-manager.js`
+- 功能:
+  - 升级记录持久化存储
+  - 自动生成升级文档
+  - 动态更新系统提示词
+  - 支持升级指令解析
+- 代码: ~400 行
+
+**2. IntelligentUpgrader - 智能升级器**
+- 位置: `evolution/intelligent-upgrader.js`
+- 功能:
+  - 分析任务执行过程
+  - 检测能力缺口
+  - 生成升级建议
+  - 支持自动应用高优先级建议
+- 代码: ~350 行
+
+**3. TaskManager 集成**
+- 位置: `scheduler/task-manager.js`
+- 功能:
+  - 任务完成后检查升级指令
+  - 智能分析失败原因
+  - 自动记录升级
+- 改动: +80 行
+
+**4. Server 集成**
+- 位置: `server.js`
+- 功能:
+  - 初始化自进化系统
+  - 添加 API 端点
+  - 集成到启动流程
+- 改动: +100 行
+
+### 📡 API 端点
+
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/evolution/stats` | GET | 获取统计信息 |
+| `/api/evolution/upgrades` | GET | 获取升级记录 |
+| `/api/evolution/upgrade` | POST | 手动记录升级 |
+| `/api/evolution/suggestions` | GET | 获取升级建议 |
+
+### 🧪 测试结果
+
+```
+✅ EvolutionManager 核心功能
+✅ 升级记录和文档生成
+✅ 智能升级建议
+✅ 升级指令解析
+✅ 任务失败分析
+```
+
+### 📁 新增文件
+
+```
+evolution/
+├── evolution-manager.js    (核心管理器)
+├── intelligent-upgrader.js (智能升级器)
+└── upgrade-log.json        (升级记录)
+
+system-prompts/docs/evolution/
+└── README.md               (系统文档)
+```
+
+### 💡 使用方式
+
+**升级指令格式**:
+```
+@upgrade add mcp mcp-name "升级描述"
+@upgrade add skill skill-name "技能描述"
+@upgrade update config config-name "配置描述"
+```
+
+**环境变量**:
+```
+EVOLUTION_ENABLED=true         # 启用自进化
+EVOLUTION_AUTO_SUGGEST=true    # 自动建议
+```
+
+### 🎯 核心特性
+
+1. **动态提示词注入**: 升级记录自动插入系统提示词
+2. **跨会话记忆**: 新会话可以"记住"之前的升级
+3. **智能分析**: 自动检测能力缺口并提出建议
+4. **文档自动生成**: 每次升级自动生成详细文档
+
+### 📈 系统影响
+
+- 新增代码: ~1000 行
+- 新增模块: 2 个核心模块
+- 性能影响: 微小（按需加载）
+- 兼容性: 完全向后兼容
+
+---
+
 ## 2026-03-06 IFlow 连接器性能优化 v2.0.8 ⭐⭐⭐
 
 状态: ✅ 成功完成
