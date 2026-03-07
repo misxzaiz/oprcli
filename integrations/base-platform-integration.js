@@ -49,7 +49,21 @@ class BasePlatformIntegration {
    * @returns {object|null} 会话对象 { sessionId, provider, startTime }
    */
   getSession(conversationId) {
-    return this.conversations.get(conversationId) || null
+    const session = this.conversations.get(conversationId) || null
+
+    // 导入审计日志
+    const AuditLogger = require('./audit-logger')
+    AuditLogger.logAgent('platform.session.get', {
+      conversationId,
+      found: !!session,
+      sessionId: session?.sessionId,
+      provider: session?.provider,
+      totalSessions: this.conversations.size,
+      allKeys: Array.from(this.conversations.keys()),
+      timestamp: new Date().toISOString()
+    })
+
+    return session
   }
 
   /**
@@ -60,19 +74,32 @@ class BasePlatformIntegration {
    */
   setSession(conversationId, sessionId, provider, extra = {}) {
     const existing = this.conversations.get(conversationId) || {}
-    this.conversations.set(conversationId, {
+    const sessionData = {
       ...existing,
       ...extra,
       sessionId,
       provider,
       startTime: existing.startTime || Date.now()
-    })
+    }
+    this.conversations.set(conversationId, sessionData)
 
     this.logger.debug('SESSION', `会话已保存`, {
       conversationId,
       sessionId,
       provider,
-      totalSessions: this.conversations.size
+      totalSessions: this.conversations.size,
+      allConversations: Array.from(this.conversations.entries())
+    })
+
+    // 导入审计日志（避免循环依赖）
+    const AuditLogger = require('./audit-logger')
+    AuditLogger.logAgent('platform.session.set', {
+      conversationId,
+      sessionId,
+      provider,
+      extra,
+      totalSessions: this.conversations.size,
+      timestamp: new Date().toISOString()
     })
   }
 

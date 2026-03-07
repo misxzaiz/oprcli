@@ -798,6 +798,17 @@ class UnifiedServer {
       let session = platform.getSession(conversationId)
       let provider = session?.provider || this.defaultProvider
       let sessionId = session?.sessionId || null
+
+      console.log(`[DEBUG] 读取会话: conversationId=${conversationId}, sessionId=${sessionId}, found=${!!session}`)
+
+      this.auditLogger.logAgent('agent.session.read', {
+        trace_id: traceId,
+        platform: platformName.toLowerCase(),
+        conversation_id: conversationId,
+        found: !!session,
+        session_id: sessionId,
+        provider
+      })
       const mode = this._normalizePromptMode(session?.mode || this.defaultPromptMode)
       const runtimeContext = this._buildRuntimeContext({
         platformName,
@@ -909,11 +920,6 @@ class UnifiedServer {
                 }
               }
 
-              if (event.type === 'system' && event.session_id) {
-                sessionId = event.session_id
-                platform.setSession(conversationId, sessionId, provider, { mode })
-                this.logger.success('SESSION', `✅ 保存SessionID: ${sessionId}`)
-              }
             } catch (error) {
               this.logger.error(platformName, `onEvent 处理失败: ${error.message}`)
               this.auditLogger.logAgent('agent.event.error', {
@@ -992,11 +998,43 @@ class UnifiedServer {
           }
         }
 
+        // ⭐ 设置 sessionId 更新回调（用于 iflow）
+        connector.onSessionIdUpdate((realSessionId) => {
+          console.log(`[DEBUG] 收到 sessionIdUpdateCallback: ${realSessionId}, conversationId: ${conversationId}`)
+          sessionId = realSessionId
+          platform.setSession(conversationId, realSessionId, provider, { mode })
+          this.logger.success('SESSION', `✅ 通过回调保存SessionID: ${realSessionId}`)
+          this.auditLogger.logAgent('agent.session.saved', {
+            trace_id: traceId,
+            platform: platformName.toLowerCase(),
+            conversation_id: conversationId,
+            session_id: realSessionId,
+            provider,
+            mode,
+            source: 'connector_callback'
+          })
+        })
+
         if (sessionId) {
+          console.log(`[DEBUG] 调用 continueSession: ${sessionId}, conversationId: ${conversationId}`)
           this.logger.debug(platformName, `调用 continueSession: ${sessionId}`)
+          this.auditLogger.logAgent('agent.session.continue', {
+            trace_id: traceId,
+            platform: platformName.toLowerCase(),
+            conversation_id: conversationId,
+            session_id: sessionId,
+            provider
+          })
           connector.continueSession(sessionId, contextualMessage, options)
         } else {
+          console.log(`[DEBUG] 调用 startSession (无sessionId), conversationId: ${conversationId}`)
           this.logger.debug(platformName, '调用 startSession')
+          this.auditLogger.logAgent('agent.session.start', {
+            trace_id: traceId,
+            platform: platformName.toLowerCase(),
+            conversation_id: conversationId,
+            provider
+          })
           connector.startSession(contextualMessage, options)
         }
       })
