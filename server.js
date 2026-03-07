@@ -425,7 +425,7 @@ class UnifiedServer {
     }
   }
 
-  _buildContextualMessage(content, runtimeContext) {
+  async _buildContextualMessage(content, runtimeContext) {
     const modeInstructions = {
       universal: '优先按通用全能助手风格回答：先结论，后步骤，跨领域可执行。',
       dev: '优先按工程助手风格回答：给出可执行命令、代码和排障步骤。',
@@ -433,21 +433,23 @@ class UnifiedServer {
     }
 
     const modeBlock = `[MODE_INSTRUCTION]\n${modeInstructions[runtimeContext.mode] || modeInstructions.universal}\n[/MODE_INSTRUCTION]`
+    const modePrompt = await config.getModePrompt(runtimeContext.provider, runtimeContext.mode)
+    const modePromptBlock = modePrompt ? `[MODE_PROMPT]\n${modePrompt}\n[/MODE_PROMPT]` : ''
 
     if (config.systemPrompts?.channelAware === false && config.systemPrompts?.includeSourceContext === false) {
       return content
     }
 
     if (config.systemPrompts?.includeSourceContext === false) {
-      return `${modeBlock}\n\n${content}`
+      return `${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${modeBlock}\n\n${content}`
     }
 
     const contextBlock = `[RUNTIME_CONTEXT]\n${JSON.stringify(runtimeContext)}\n[/RUNTIME_CONTEXT]`
     if (config.systemPrompts?.channelAware === false) {
-      return `${modeBlock}\n\n${content}`
+      return `${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${modeBlock}\n\n${content}`
     }
 
-    return `${contextBlock}\n\n${modeBlock}\n\n${content}`
+    return `${contextBlock}\n\n${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${modeBlock}\n\n${content}`
   }
 
   // ==================== 定时任务命令处理 ====================
@@ -704,7 +706,7 @@ class UnifiedServer {
         provider,
         mode
       })
-      const contextualMessage = this._buildContextualMessage(content, runtimeContext)
+      const contextualMessage = await this._buildContextualMessage(content, runtimeContext)
 
       this.logger.debug(platformName, '使用模型', { provider, mode, hasSessionId: !!sessionId })
 

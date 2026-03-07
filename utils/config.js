@@ -162,6 +162,27 @@ class Config {
     return null
   }
 
+  /**
+   * 获取按模式拆分的提示词（oprcli.<mode>.md），找不到时回退到 oprcli.md
+   * 不读取环境变量覆盖，专用于运行时 mode 注入
+   */
+  async getModePrompt(provider, mode = 'universal') {
+    const normalizedMode = (mode || 'universal').toString().trim().toLowerCase()
+    const modeFile = `oprcli.${normalizedMode}.md`
+    const fallbackFile = 'oprcli.md'
+
+    let content = await this._loadSystemPromptFromFile(modeFile)
+    if (!content && normalizedMode !== 'universal') {
+      content = await this._loadSystemPromptFromFile(fallbackFile)
+    }
+    if (!content && normalizedMode === 'universal') {
+      content = await this._loadSystemPromptFromFile(fallbackFile)
+    }
+
+    if (!content) return null
+    return this._replaceTemplateVars(content, provider)
+  }
+
   validate() {
     const errors = []
     const warnings = []
