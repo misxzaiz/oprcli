@@ -6,17 +6,8 @@
 const fs = require('fs')
 const path = require('path')
 
-// 提示词模式常量
-const PROMPT_MODES = {
-  FULL: 'full',
-  SLIM: 'slim'
-}
-
 class Config {
   constructor() {
-    // 提示词缓存
-    this._promptCache = new Map()
-    this._maxCacheSize = parseInt(process.env.CACHE_MAX_SIZE || '100', 10)
     this.load()
   }
 
@@ -25,27 +16,18 @@ class Config {
     this.provider = process.env.PROVIDER || 'claude'
     this.port = process.env.PORT ? parseInt(process.env.PORT) : null
 
-    // 提示词模式（带验证）
-    this.promptMode = process.env.PROMPT_MODE || PROMPT_MODES.FULL
-    if (!Object.values(PROMPT_MODES).includes(this.promptMode)) {
-      console.warn(`[CONFIG] 警告: 无效的 PROMPT_MODE: "${this.promptMode}"，使用默认值: ${PROMPT_MODES.FULL}`)
-      this.promptMode = PROMPT_MODES.FULL
-    }
-
     // Claude 配置
     this.claude = {
       cmdPath: process.env.CLAUDE_CMD_PATH,
       workDir: process.env.CLAUDE_WORK_DIR,
-      gitBinPath: process.env.CLAUDE_GIT_BIN_PATH,
-      systemPrompt: process.env.CLAUDE_SYSTEM_PROMPT
+      gitBinPath: process.env.CLAUDE_GIT_BIN_PATH
     }
 
     // IFlow 配置
     this.iflow = {
       path: process.env.IFLOW_PATH || 'iflow',
       workDir: process.env.IFLOW_WORK_DIR,
-      includeDirs: this._parseList(process.env.IFLOW_INCLUDE_DIRS),
-      systemPrompt: process.env.IFLOW_SYSTEM_PROMPT
+      includeDirs: this._parseList(process.env.IFLOW_INCLUDE_DIRS)
     }
 
     // Codex 配置
@@ -70,7 +52,6 @@ class Config {
       clientSecret: process.env.QQBOT_CLIENT_SECRET,
       sandbox: process.env.QQBOT_SANDBOX === 'true',
       debug: process.env.QQBOT_DEBUG === 'true',
-      enableAgents: process.env.QQBOT_ENABLE_AGENTS !== 'false',
       commandPrefix: process.env.QQBOT_COMMAND_PREFIX || '/',
       enabled: !!(process.env.QQBOT_APP_ID && process.env.QQBOT_CLIENT_SECRET)
     }
@@ -78,22 +59,12 @@ class Config {
     // 流式输出配置
     this.streaming = {
       enabled: process.env.STREAM_ENABLED === 'true',
-      mode: process.env.STREAM_MODE || 'realtime',
       interval: parseInt(process.env.STREAM_INTERVAL || '2000', 10),
       maxLength: parseInt(process.env.STREAM_MAX_LENGTH || '5000', 10),
       showThinking: process.env.STREAM_SHOW_THINKING !== 'false',
       showTools: process.env.STREAM_SHOW_TOOLS !== 'false',
       showTime: process.env.STREAM_SHOW_TIME !== 'false',
-      showCompletionSummary: process.env.STREAM_SHOW_COMPLETION !== 'false',
-      deduplicateResult: process.env.STREAM_DEDUPLICATE_RESULT !== 'false',  // 去重 result 事件
-      useMarkdown: process.env.STREAM_USE_MARKDOWN === 'true',
-      debugMode: process.env.STREAM_DEBUG_MODE === 'true',  // 调试模式开关
-      toolIcons: {  // 工具图标配置
-        'Bash': '🖥️',
-        'Editor': '📝',
-        'Browser': '🌐',
-        'Computer': '💻'
-      }
+      useMarkdown: process.env.STREAM_USE_MARKDOWN === 'true'
     }
 
     // 日志配置
@@ -112,16 +83,10 @@ class Config {
     this.notification = {
       enabled: process.env.NOTIFICATION_ENABLED === 'true',
       type: process.env.NOTIFICATION_TYPE || 'dingtalk',
-
       dingtalk: {
         webhook: process.env.NOTIFICATION_DINGTALK_WEBHOOK,
         secret: process.env.NOTIFICATION_DINGTALK_SECRET
-      },
-
-      defaultType: process.env.NOTIFICATION_DEFAULT_TYPE || 'text',
-
-      logEnabled: process.env.NOTIFICATION_LOG_ENABLED === 'true',
-      logFile: process.env.NOTIFICATION_LOG_FILE || 'logs/notifications.log'
+      }
     }
   }
 
@@ -131,82 +96,67 @@ class Config {
   }
 
   /**
-   * 从文件加载系统提示词（带缓存）
-   * @private
-   * @param {string} filename - 文件名
-   * @returns {Promise<string|null>} - 提示词内容或 null
+   * 获取当前 provider 的工作目录
    */
-  async _loadSystemPromptFromFile(filename) {
-    if (this._promptCache.has(filename)) {
-      return this._promptCache.get(filename)
-    }
-
-    try {
-      const filepath = path.join(this.systemPrompts.promptsDir, filename)
-      const fsPromises = require('fs').promises
-      const content = await fsPromises.readFile(filepath, 'utf-8')
-
-      // 缓存淘汰：如果缓存已满，删除最旧的条目
-      if (this._promptCache.size >= this._maxCacheSize) {
-        const firstKey = this._promptCache.keys().next().value
-        this._promptCache.delete(firstKey)
-      }
-
-      this._promptCache.set(filename, content.trim())
-      return content.trim()
-    } catch (err) {
-      // 文件读取失败，静默忽略
-    }
-    return null
+  getWorkDir(provider = null) {
+    const p = provider || this.provider
+    return this[p]?.workDir || process.cwd()
   }
 
   /**
-   * 获取指定模型的系统提示词（异步版本）
-   * 优先级：模型专用环境变量 > 全局环境变量 > 模型专用文件 > 默认文件
-   * 支持 PROMPT_MODE: slim 使用精简版提示词（节省 token）
-   * @param {string} provider - 模型名称 (claude/iflow)
-   * @returns {Promise<string|null>} - 系统提示词
+   * 从文件加载系统提示词
    */
-  async getSystemPrompt(provider) {
-    // 1. 检查模型专用环境变量
-    const providerUpper = provider.toUpperCase()
-    const providerEnvKey = `${providerUpper}_SYSTEM_PROMPT`
-    if (process.env[providerEnvKey]) {
-      return this._processEscapedNewlines(process.env[providerEnvKey])
+  async _loadSystemPromptFromFile(filename) {
+    try {
+      const filepath = path.join(this.systemPrompts.promptsDir, filename)
+      const content = await fs.promises.readFile(filepath, 'utf-8')
+      return content.trim()
+    } catch (err) {
+      return null
+    }
+  }
+
+  /**
+   * 替换模板变量
+   * 支持 {{WORK_DIR}}, {{PORT}}, {{PROVIDER}} 等
+   */
+  _replaceTemplateVars(content, provider) {
+    const workDir = this.getWorkDir(provider)
+    const vars = {
+      WORK_DIR: workDir,
+      PORT: this.port || 'N/A',
+      PROVIDER: provider || this.provider,
+      PROVIDER_UPPER: (provider || this.provider).toUpperCase()
     }
 
-    // 1.5. 检查是否使用精简模式
-    if (this.promptMode === 'slim') {
-      const slimFile = `${provider}-slim.txt`
-      const slimPrompt = await this._loadSystemPromptFromFile(slimFile)
-      if (slimPrompt) {
-        return slimPrompt
-      }
+    return content.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+      return vars[key] !== undefined ? vars[key] : match
+    })
+  }
+
+  /**
+   * 获取系统提示词
+   * 优先级：环境变量 > oprcli.md 文件
+   */
+  async getSystemPrompt(provider) {
+    // 1. 检查 provider 专用环境变量
+    const providerEnvKey = `${(provider || this.provider).toUpperCase()}_SYSTEM_PROMPT`
+    if (process.env[providerEnvKey]) {
+      return process.env[providerEnvKey].replace(/\\n/g, '\n')
     }
 
     // 2. 检查全局环境变量
     if (this.systemPrompts.global) {
-      return this._processEscapedNewlines(this.systemPrompts.global)
+      return this.systemPrompts.global.replace(/\\n/g, '\n')
     }
 
-    // 3. 检查模型专用配置文件
-    const providerFile = await this._loadSystemPromptFromFile(`${provider}.txt`)
-    if (providerFile) {
-      return providerFile
+    // 3. 加载默认提示词文件
+    const content = await this._loadSystemPromptFromFile('oprcli.md')
+    if (content) {
+      return this._replaceTemplateVars(content, provider)
     }
 
-    // 4. 检查默认配置文件
-    return await this._loadSystemPromptFromFile('default.txt')
-  }
-
-  /**
-   * 处理转义的换行符
-   * 将 \n 转换为实际换行符
-   * @param {string} str - 输入字符串
-   * @returns {string} - 处理后的字符串
-   */
-  _processEscapedNewlines(str) {
-    return str.replace(/\\n/g, '\n')
+    return null
   }
 
   validate() {
@@ -411,8 +361,5 @@ class Config {
   }
 
 }
-
-// 导出常量供外部使用
-Config.PROMPT_MODES = PROMPT_MODES
 
 module.exports = new Config()

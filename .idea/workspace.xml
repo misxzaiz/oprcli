@@ -2,13 +2,23 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="移除无效内容">
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/server.js" beforeDir="false" afterPath="$PROJECT_DIR$/server.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/docs/architecture.md" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/docs/architecture.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/default.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/news-config.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/schema.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/user.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/session-store.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/start.bat" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/base.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/claude-slim.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/claude.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/codex.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/default-slim.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/default.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/iflow-slim.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/iflow.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/scheduler-guide.md" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/utils/config.js" beforeDir="false" afterPath="$PROJECT_DIR$/utils/config.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/file-helper.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/message-formatter.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/message-rate-limiter.js" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -226,7 +236,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772896670888</updated>
     </task>
-    <option name="localTasksCounter" value="18" />
+    <task id="LOCAL-00018" summary="移除无效内容">
+      <option name="closed" value="true" />
+      <created>1772897224894</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1772897224894</updated>
+    </task>
+    <option name="localTasksCounter" value="19" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
