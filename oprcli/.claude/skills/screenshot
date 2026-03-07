@@ -1,0 +1,39 @@
+#!/usr/bin/env node
+
+/**
+ * Screenshot Skill
+ * A simple skill to capture screenshots
+ */
+
+const { exec } = require('child_process');
+const path = require('path');
+
+async function takeScreenshot() {
+  const scriptPath = path.join('D:/temp', 'screenshot-cli.js');
+
+  return new Promise((resolve, reject) => {
+    exec(`node "${scriptPath}"`, { cwd: 'D:/temp' }, (error, stdout, stderr) => {
+      if (error) {
+        console.error('Error:', error.message);
+        reject(error);
+        return;
+      }
+
+      console.log(stdout);
+      if (stderr) console.error(stderr);
+
+      resolve(stdout);
+    });
+  });
+}
+
+// 执行截图
+takeScreenshot()
+  .then(() => {
+    console.log('\n✅ Screenshot completed!');
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('\n❌ Screenshot failed!');
+    process.exit(1);
+  });
