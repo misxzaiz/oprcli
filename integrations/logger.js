@@ -55,6 +55,28 @@ class Logger {
   }
 
   log(level, category, message, data = null) {
+    // 兼容旧调用：logger.log(message[, data])
+    if (typeof level !== 'number') {
+      const rawMessage = level
+      const rawSecond = category
+      const rawThird = message
+      const rawFourth = data
+
+      if (typeof rawSecond === 'string' && rawThird === undefined && rawFourth === null) {
+        message = `${rawMessage} ${rawSecond}`
+        data = null
+      } else if (rawThird === undefined && rawFourth === null) {
+        message = String(rawMessage)
+        data = rawSecond || null
+      } else {
+        message = String(rawMessage)
+        data = rawThird !== undefined ? rawThird : rawSecond
+      }
+
+      level = this.levels.INFO
+      category = 'GENERAL'
+    }
+
     if (level < this.currentLevel) return
 
     // 🔥 修复：确保 levelName 有效

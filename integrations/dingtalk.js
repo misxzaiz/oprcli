@@ -5,6 +5,7 @@
 
 const axios = require('axios')
 const BoundedMap = require('../utils/bounded-map')
+const { createSessionPersistence } = require('../utils/session-persistence')
 
 class DingTalkIntegration {
   constructor(config, logger, rateLimiter) {
@@ -46,6 +47,8 @@ class DingTalkIntegration {
       lastCleanupTime: null,
       lastCleanupDuration: 0
     }
+
+    this.sessionStore = null
   }
 
   async init(messageHandler = null) {
@@ -61,6 +64,9 @@ class DingTalkIntegration {
     })
 
     try {
+      this.sessionStore = await createSessionPersistence(this.logger)
+      await this._restoreSessions()
+
       const { DWClient, TOPIC_ROBOT } = require('dingtalk-stream')
 
       this.logger.debug('DINGTALK', '创建 DWClient 实例')
@@ -228,10 +234,18 @@ class DingTalkIntegration {
    * @param {string} provider - 提供商（claude/iflow）
    */
   setSession(conversationId, sessionId, provider) {
+    const now = Date.now()
     this.conversations.set(conversationId, {
       sessionId,
       provider,
-      startTime: Date.now()
+      startTime: now
+    })
+
+    this._persistSession(conversationId, {
+      sessionId,
+      provider,
+      startTime: now,
+      updatedAt: now
     })
   }
 
@@ -270,7 +284,9 @@ class DingTalkIntegration {
    * @returns {boolean}
    */
   deleteSession(conversationId) {
-    return this.conversations.delete(conversationId)
+    const deleted = this.conversations.delete(conversationId)
+    this._deletePersistedSession(conversationId)
+    return deleted
   }
 
   /**
@@ -300,6 +316,7 @@ class DingTalkIntegration {
    */
   clearSessions() {
     this.conversations.clear()
+    this._clearPersistedSessions()
   }
 
   async close() {
@@ -416,6 +433,7 @@ class DingTalkIntegration {
     for (const [conversationId, session] of this.conversations.entries()) {
       if (now - session.startTime > sessionAgeLimit) {
         this.conversations.delete(conversationId)
+        this._deletePersistedSession(conversationId)
         cleanedCount++
         this.logger.debug('DINGTALK', `清理过期会话: ${conversationId}`)
       }
@@ -478,6 +496,50 @@ class DingTalkIntegration {
       oldConfig,
       newConfig: this.cleanupConfig
     })
+  }
+  async _restoreSessions() {
+    if (!this.sessionStore) return
+
+    try {
+      const records = await this.sessionStore.loadAll()
+      for (const record of records) {
+        if (!record.conversationId) continue
+        this.conversations.set(record.conversationId, {
+          sessionId: record.sessionId || null,
+          provider: record.provider || null,
+          startTime: record.startTime || Date.now()
+        })
+      }
+      if (records.length > 0) {
+        this.logger.info('DINGTALK', `已恢复历史会话: ${records.length} 条`)
+      }
+    } catch (error) {
+      this.logger.warning('DINGTALK', `恢复历史会话失败: ${error.message}`)
+    }
+  }
+
+  _persistSession(conversationId, sessionData) {
+    if (!this.sessionStore) return
+    this.sessionStore.upsert({ conversationId, ...sessionData })
+      .catch(error => {
+        this.logger.warning('DINGTALK', `会话持久化失败: ${conversationId}, ${error.message}`)
+      })
+  }
+
+  _deletePersistedSession(conversationId) {
+    if (!this.sessionStore) return
+    this.sessionStore.delete(conversationId)
+      .catch(error => {
+        this.logger.warning('DINGTALK', `删除持久化会话失败: ${conversationId}, ${error.message}`)
+      })
+  }
+
+  _clearPersistedSessions() {
+    if (!this.sessionStore) return
+    this.sessionStore.clear()
+      .catch(error => {
+        this.logger.warning('DINGTALK', `清空持久化会话失败: ${error.message}`)
+      })
   }
 }
 

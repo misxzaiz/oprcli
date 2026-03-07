@@ -5,7 +5,7 @@
  */
 
 const BaseAgent = require('./BaseAgent');
-const ClaudeConnector = require('../claude-connector');
+const ClaudeConnector = require('../connectors/claude-connector');
 
 class ClaudeCodeAgent extends BaseAgent {
   constructor(config = {}) {

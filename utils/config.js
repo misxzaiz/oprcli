@@ -88,6 +88,17 @@ class Config {
       enabled: !!(process.env.DINGTALK_CLIENT_ID && process.env.DINGTALK_CLIENT_SECRET)
     }
 
+    // QQ Bot 配置
+    this.qqbot = {
+      appId: process.env.QQBOT_APP_ID,
+      clientSecret: process.env.QQBOT_CLIENT_SECRET,
+      sandbox: process.env.QQBOT_SANDBOX === 'true',
+      debug: process.env.QQBOT_DEBUG === 'true',
+      enableAgents: process.env.QQBOT_ENABLE_AGENTS !== 'false',
+      commandPrefix: process.env.QQBOT_COMMAND_PREFIX || '/',
+      enabled: !!(process.env.QQBOT_APP_ID && process.env.QQBOT_CLIENT_SECRET)
+    }
+
     // 流式输出配置
     this.streaming = {
       enabled: process.env.STREAM_ENABLED === 'true',

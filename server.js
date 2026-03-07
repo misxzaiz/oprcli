@@ -21,6 +21,7 @@ const config = require('./utils/config')
 const Logger = require('./integrations/logger')
 const RateLimiter = require('./utils/message-rate-limiter')
 const DingTalkIntegration = require('./integrations/dingtalk')
+const QQBotIntegration = require('./integrations/qqbot')
 const MessageFormatter = require('./utils/message-formatter')
 const ClaudeConnector = require('./connectors/claude-connector')
 const IFlowConnector = require('./connectors/iflow-connector')
@@ -101,6 +102,7 @@ class UnifiedServer {
     this.logger = new Logger(config.logging)
     this.rateLimiter = new RateLimiter(5, 1000)
     this.dingtalk = new DingTalkIntegration(config.dingtalk, this.logger, this.rateLimiter)
+    this.qqbot = new QQBotIntegration(config.qqbot, this.logger, this.rateLimiter)
     this.messageFormatter = new MessageFormatter(config.streaming, this.logger)
 
     // 多模型支持
@@ -1591,6 +1593,12 @@ class UnifiedServer {
       this.logger.success('DINGTALK', '钉钉集成已启动')
     }
 
+    // 启动 QQ Bot 集成（传入messageHandler，像钉钉一样）
+    const qqbotEnabled = await this.qqbot.init(this.handleQQBotMessage.bind(this))
+    if (qqbotEnabled) {
+      this.logger.success('QQBOT', 'QQ Bot 集成已启动')
+    }
+
     // 启动定时任务模块
     this.scheduler = new SchedulerModule(this, this.logger)
     await this.scheduler.start()
@@ -2122,6 +2130,217 @@ class UnifiedServer {
     } catch (error) {
       this.logger.error('CONFIG', '发送配置变更通知失败', error)
     }
+  }
+
+  // ==================== QQ Bot 消息处理 ====================
+
+  /**
+   * 处理 QQ Bot 消息
+   * @param {Object} message - QQ 消息对象
+   * @param {string} type - 消息类型 (channel/at/direct/c2c)
+   * @param {string} conversationId - 会话 ID
+   */
+  async handleQQBotMessage(message, type, conversationId) {
+    const timestamp = new Date().toISOString()
+    this.logger.success('QQBOT', '========== QQ 消息接收 ==========')
+    this.logger.success('QQBOT', `时间戳: ${timestamp}`)
+    this.logger.success('QQBOT', `消息类型: ${type}`)
+    this.logger.success('QQBOT', `会话 ID: ${conversationId}`)
+
+    // 消息内容
+    const content = message.content?.trim()
+    if (!content) {
+      this.logger.warning('QQBOT', '消息内容为空')
+      return
+    }
+
+    this.logger.success('QQBOT', `消息内容: ${content.substring(0, 50)}...`)
+
+    // 🎯 检查是否是命令
+    const command = this._parseCommand(content)
+    if (command) {
+      this.logger.info('COMMAND', `识别到命令: ${command.type}${command.provider ? ` -> ${command.provider}` : ''}`)
+      // QQ Bot 命令处理（通过 qqbot 集成发送回复）
+      await this._handleQQBotCommand(command, conversationId, message, type)
+      return
+    }
+
+    // 🤖 获取当前会话使用的 provider
+    let session = this.qqbot.getSession(conversationId)
+    let provider = session?.provider
+    let sessionId = session?.sessionId || null
+
+    // 🔧 如果是首次对话（没有 provider），设置并保存
+    if (!provider) {
+      provider = this.defaultProvider
+      this.qqbot.setSession(conversationId, null, provider)
+      this.logger.info('QQBOT', `✅ 首次对话，设置 provider: ${provider}`)
+    }
+
+    const connector = this.connectors.get(provider)
+    this.logger.debug('QQBOT', '使用模型', { provider })
+
+    // 🔍 检查 connector 状态
+    if (!connector || !connector.connected) {
+      this.logger.error('QQBOT', `Connector ${provider} 未连接`)
+      await this._sendQQBotReply(message, type,
+        `❌ ${provider.toUpperCase()} 模型不可用\n\n` +
+        `💡 输入 help 查看可用模型`
+      )
+      return
+    }
+
+    // 🔍 会话管理详细日志
+    this.logger.success('SESSION', '========== 会话管理诊断 ==========')
+    this.logger.success('SESSION', `ConversationID: ${conversationId}`)
+    this.logger.success('SESSION', `Provider: ${provider}`)
+
+    const sessionMapSize = this.qqbot.conversations.size
+    this.logger.success('SESSION', `SessionMap 大小: ${sessionMapSize}`)
+
+    const isResume = !!sessionId
+    this.logger.success('SESSION', `检索到的 SessionID: ${sessionId || 'null'}`)
+    this.logger.success('SESSION', `会话模式: ${isResume ? '继续会话' : '新会话'}`)
+    this.logger.success('SESSION', '====================================')
+
+    // ⭐ 设置 sessionId 更新回调
+    connector.onSessionIdUpdate((realSessionId) => {
+      this.qqbot.setSession(conversationId, realSessionId, provider)
+      this.logger.success('SESSION', '✅ 通过回调保存 SessionID', {
+        conversationId,
+        sessionId: realSessionId,
+        sessionMapSize: this.qqbot.conversations.size
+      })
+    })
+
+    let messageCount = 0
+    let sentMessageCount = 0
+    const startTime = Date.now()
+
+    this.logger.info('QQBOT', `开始调用 ${isResume ? 'continueSession' : 'startSession'}...`)
+
+    try {
+      await new Promise((resolve, reject) => {
+        const options = {
+          onEvent: async (event) => {
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+            const context = { index: ++messageCount, elapsed }
+
+            this.logger.info('EVENT', `#${messageCount} [${event.type}]`)
+
+            // 处理不同类型的事件
+            if (event.type === 'assistant' || event.type === 'result') {
+              const text = event.message?.content
+                ?.filter(c => c.type === 'text')
+                ?.map(c => c.text)
+                ?.join('') || event.result || ''
+
+              if (text) {
+                await this._sendQQBotReply(message, type, text)
+                sentMessageCount++
+              }
+            } else if (event.type === 'error') {
+              this.logger.error('QQBOT', `错误事件: ${event.error}`)
+              await this._sendQQBotReply(message, type, `❌ 处理失败: ${event.error}`)
+              reject(new Error(event.error))
+            } else if (event.type === 'session_end') {
+              if (messageCount > 0 && sentMessageCount === 0) {
+                await this._sendQQBotReply(
+                  message,
+                  type,
+                  '已收到消息，但本次会话没有产出可发送文本。请稍后重试，或发送 /clear 后再试。'
+                )
+              }
+              this.logger.info('QQBOT', '会话结束')
+              resolve()
+            }
+          }
+        }
+
+        // 调用 connector
+        if (isResume && sessionId) {
+          connector.continueSession(sessionId, content, options)
+        } else {
+          connector.startSession(content, options)
+        }
+      })
+    } catch (error) {
+      this.logger.error('QQBOT', `处理消息失败: ${error.message}`)
+      await this._sendQQBotReply(message, type, `❌ 处理失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 发送 QQ Bot 回复
+   */
+  async _sendQQBotReply(originalMessage, type, content) {
+    try {
+      const replyOptions = {
+        msgId: originalMessage?.id,
+        eventId: originalMessage?.event_id
+      }
+
+      switch (type) {
+        case 'channel':
+        case 'at':
+          await this.qqbot.client.sendMessage(originalMessage.channel_id, content, replyOptions)
+          break
+        case 'direct':
+          await this.qqbot.client.sendDirectMessage(originalMessage.guild_id, content, replyOptions)
+          break
+        case 'c2c':
+          await this.qqbot.client.sendC2CMessage(originalMessage.author.user_openid, content, replyOptions)
+          break
+      }
+    } catch (error) {
+      this.logger.error('QQBOT', `发送回复失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 处理 QQ Bot 命令
+   */
+  async _handleQQBotCommand(command, conversationId, message, type) {
+    let response = ''
+
+    switch (command.type) {
+      case 'switch':
+        try {
+          this.qqbot.setSession(conversationId, null, command.provider)
+          response = `✅ 已切换到: ${command.provider.toUpperCase()}`
+        } catch (error) {
+          response = `❌ 切换失败: ${error.message}`
+        }
+        break
+
+      case 'status':
+        const currentAgent = this.qqbot.getSession(conversationId)
+        response = `📊 系统状态\n\n`
+        response += `当前 AI: ${currentAgent?.provider || '未设置'}\n`
+        response += `连接状态: ✅ 正常\n\n`
+        response += `输入 "agents" 查看所有可用 AI`
+        break
+
+      case 'interrupt':
+        response = '⏹️ 任务已停止'
+        break
+
+      case 'help':
+        response = `🤖 QQ AI 助手\n\n`
+        response += `命令列表:\n`
+        response += `  status/状态 - 查看当前状态\n`
+        response += `  claude - 切换到 Claude\n`
+        response += `  iflow - 切换到 IFlow\n`
+        response += `  help/帮助 - 显示帮助\n\n`
+        response += `💬 直接发送消息即可开始对话`
+        break
+
+      default:
+        response = '未知命令，输入 "help" 查看帮助'
+    }
+
+    // 发送回复（使用正确的消息类型）
+    await this._sendQQBotReply(message, type, response)
   }
 }
 
