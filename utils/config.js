@@ -5,7 +5,6 @@
 
 const fs = require('fs')
 const path = require('path')
-const sanitizer = require('./sanitizer')
 
 // 提示词模式常量
 const PROMPT_MODES = {
@@ -13,35 +12,12 @@ const PROMPT_MODES = {
   SLIM: 'slim'
 }
 
-// 🔐 敏感字段列表（用于脱敏）
-const SENSITIVE_FIELDS = [
-  'clientId',
-  'clientSecret',
-  'webhook',
-  'secret',
-  'systemPrompt',
-  'cmdPath',
-  'gitBinPath'
-]
-
 class Config {
   constructor() {
-    // 🆕 提示词缓存（避免重复读取文件）
+    // 提示词缓存
     this._promptCache = new Map()
-    // 🆕 缓存大小限制（防止内存无限增长）
     this._maxCacheSize = parseInt(process.env.CACHE_MAX_SIZE || '100', 10)
-    // 🆕 缓存统计
-    this._cacheHits = 0
-    this._cacheMisses = 0
-    this._cacheEvictions = 0
-    // 🔐 标记敏感字段
-    this._sensitiveFields = SENSITIVE_FIELDS
     this.load()
-
-    // 🔥 异步预热提示词缓存（不阻塞构造函数）
-    this._warmupPromptCache().catch(error => {
-      // 静默失败，不影响主流程
-    })
   }
 
   load() {
@@ -155,78 +131,33 @@ class Config {
   }
 
   /**
-   * 从文件加载系统提示词（带缓存，异步版本）
+   * 从文件加载系统提示词（带缓存）
    * @private
    * @param {string} filename - 文件名
    * @returns {Promise<string|null>} - 提示词内容或 null
    */
   async _loadSystemPromptFromFile(filename) {
-    // 🆕 检查缓存
     if (this._promptCache.has(filename)) {
-      this._cacheHits++
       return this._promptCache.get(filename)
     }
-
-    this._cacheMisses++
 
     try {
       const filepath = path.join(this.systemPrompts.promptsDir, filename)
       const fsPromises = require('fs').promises
       const content = await fsPromises.readFile(filepath, 'utf-8')
 
-      // 🆕 缓存淘汰策略：如果缓存已满，删除最旧的条目
+      // 缓存淘汰：如果缓存已满，删除最旧的条目
       if (this._promptCache.size >= this._maxCacheSize) {
         const firstKey = this._promptCache.keys().next().value
         this._promptCache.delete(firstKey)
-        this._cacheEvictions++
       }
 
-      // 🆕 缓存结果
       this._promptCache.set(filename, content.trim())
-
       return content.trim()
     } catch (err) {
       // 文件读取失败，静默忽略
     }
     return null
-  }
-
-  /**
-   * 🔥 异步预热提示词缓存
-   * 在后台预加载常用提示词文件，避免首次访问时阻塞
-   * @private
-   * @async
-   */
-  async _warmupPromptCache() {
-    try {
-      const fsPromises = require('fs').promises
-
-      // 预加载常用提示词文件
-      const commonFiles = [
-        'default.txt',
-        `${this.provider}.txt`,
-        `${this.provider}-slim.txt`
-      ]
-
-      // 并行加载所有文件
-      await Promise.all(
-        commonFiles.map(async filename => {
-          try {
-            const filepath = path.join(this.systemPrompts.promptsDir, filename)
-            const content = await fsPromises.readFile(filepath, 'utf-8')
-
-            // 缓存结果
-            if (!this._promptCache.has(filename)) {
-              this._promptCache.set(filename, content.trim())
-            }
-          } catch (error) {
-            // 文件不存在是正常情况，忽略
-          }
-        })
-      )
-    } catch (error) {
-      // 静默失败，不影响主流程
-    }
   }
 
   /**
@@ -479,114 +410,6 @@ class Config {
     throw new Error(`Unknown provider: ${targetProvider}`)
   }
 
-  /**
-   * 🔐 获取安全的配置对象（敏感信息已脱敏）
-   * 适用于日志输出和调试
-   * @returns {Object} - 脱敏后的配置对象
-   */
-  getSafeConfig() {
-    // 使用 sanitizer 统一脱敏所有敏感字段
-    const rawConfig = {
-      provider: this.provider,
-      port: this.port,
-      promptMode: this.promptMode,
-      claude: {
-        ...this.claude,
-        // 脱敏路径信息（可能包含用户信息）
-        cmdPath: this.claude.cmdPath ? '[PATH HIDDEN]' : null,
-        workDir: this.claude.workDir ? '[PATH HIDDEN]' : null,
-        gitBinPath: this.claude.gitBinPath ? '[PATH HIDDEN]' : null,
-        systemPrompt: this.claude.systemPrompt ? '[SYSTEM PROMPT HIDDEN]' : null
-      },
-      iflow: {
-        ...this.iflow,
-        // 脱敏路径信息
-        path: this.iflow.path ? '[PATH HIDDEN]' : null,
-        workDir: this.iflow.workDir ? '[PATH HIDDEN]' : null,
-        includeDirs: this.iflow.includeDirs ? '[DIRS HIDDEN]' : null,
-        systemPrompt: this.iflow.systemPrompt ? '[SYSTEM PROMPT HIDDEN]' : null
-      },
-      codex: {
-        ...this.codex,
-        // 脱敏路径信息
-        path: this.codex.path ? '[PATH HIDDEN]' : null,
-        workDir: this.codex.workDir ? '[PATH HIDDEN]' : null,
-        systemPromptFile: this.codex.systemPromptFile ? '[PATH HIDDEN]' : null,
-        model: this.codex.model,
-        provider: this.codex.provider
-      },
-      dingtalk: {
-        enabled: this.dingtalk.enabled,
-        clientId: this.dingtalk.clientId ? sanitizer.sanitizeValue(this.dingtalk.clientId, 'clientId') : null,
-        clientSecret: this.dingtalk.clientSecret ? '[SECRET HIDDEN]' : null
-      },
-      streaming: this.streaming,
-      logging: this.logging,
-      notification: {
-        ...this.notification,
-        dingtalk: {
-          webhook: this.notification.dingtalk.webhook ? sanitizer.sanitizeValue(this.notification.dingtalk.webhook, 'webhook') : null,
-          secret: this.notification.dingtalk.secret ? '[SECRET HIDDEN]' : null
-        }
-      },
-      systemPrompts: {
-        global: this.systemPrompts.global ? '[SYSTEM PROMPT HIDDEN]' : null,
-        promptsDir: this.systemPrompts.promptsDir ? '[PATH HIDDEN]' : null
-      }
-    }
-
-    // 使用 sanitizer 进行深度脱敏（捕获所有可能的敏感字段）
-    return sanitizer.sanitizeObject(rawConfig)
-  }
-
-  /**
-   * 🔐 获取敏感字段列表
-   * @returns {Array<string>} - 敏感字段名数组
-   */
-  getSensitiveFields() {
-    return [...this._sensitiveFields]
-  }
-
-  /**
-   * 🔐 添加自定义敏感字段
-   * @param {string|Array<string>} fields - 字段名或字段名数组
-   */
-  addSensitiveFields(fields) {
-    if (Array.isArray(fields)) {
-      this._sensitiveFields.push(...fields)
-    } else if (typeof fields === 'string') {
-      this._sensitiveFields.push(fields)
-    }
-  }
-
-  /**
-   * 🆕 获取缓存统计信息
-   * @returns {Object} - 缓存统计数据
-   */
-  getCacheStats() {
-    const totalRequests = this._cacheHits + this._cacheMisses
-    return {
-      size: this._promptCache.size,
-      maxSize: this._maxCacheSize,
-      hits: this._cacheHits,
-      misses: this._cacheMisses,
-      evictions: this._cacheEvictions,
-      hitRate: totalRequests > 0
-        ? (this._cacheHits / totalRequests * 100).toFixed(2) + '%'
-        : '0%',
-      usageRate: (this._promptCache.size / this._maxCacheSize * 100).toFixed(2) + '%'
-    }
-  }
-
-  /**
-   * 🆕 清空提示词缓存
-   */
-  clearPromptCache() {
-    this._promptCache.clear()
-    this._cacheHits = 0
-    this._cacheMisses = 0
-    this._cacheEvictions = 0
-  }
 }
 
 // 导出常量供外部使用

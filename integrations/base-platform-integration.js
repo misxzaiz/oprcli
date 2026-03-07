@@ -15,12 +15,11 @@
  */
 
 class BasePlatformIntegration {
-  constructor(config, logger, rateLimiter) {
+  constructor(config, logger) {
     this.config = config
     this.logger = logger
-    this.rateLimiter = rateLimiter
 
-    // 简化的存储（使用普通Map，不用BoundedMap）
+    // 简化的存储
     this.conversations = new Map()
     this.processedMessages = new Map()
   }

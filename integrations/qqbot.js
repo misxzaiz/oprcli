@@ -7,8 +7,8 @@
 const BasePlatformIntegration = require('./base-platform-integration')
 
 class QQBotIntegration extends BasePlatformIntegration {
-  constructor(config, logger, rateLimiter) {
-    super(config, logger, rateLimiter)
+  constructor(config, logger) {
+    super(config, logger)
     this.client = null
   }
 

@@ -77,7 +77,6 @@ oprcli/
 ├── utils/                   # 工具模块
 │   ├── config.js            # 配置加载
 │   ├── rate-limiter.js      # 速率限制
-│   └── message-formatter.js # 消息格式化
 │
 ├── server.js                # 统一服务器 ⭐
 ├── .env                     # 环境配置

@@ -2,44 +2,13 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="移除无效内容">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/server.js" beforeDir="false" afterPath="$PROJECT_DIR$/server.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/app-errors.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/batch-logger.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/bounded-map.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/cache-manager.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/config-validator.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/deduplication-middleware.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/env-manager.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/error-handler.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/error-recovery.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/graceful-shutdown.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/health-enhanced.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/input-validator-middleware.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/input-validator.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/memory-cleaner.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/memory-monitor-enhanced.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/middleware.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/notification-queue.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/performance-tracker.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/platform.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/rate-limit.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/rate-limiter-memory.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/request-deduplication.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/request-stats.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/response-cache.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/response-formatter.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/response-optimizer.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/retry-helper.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/sanitizer.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/security-enhancer.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/session-persistence.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/session-store/index.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/session-store/json-session-store.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/session-store/sqlite-session-store.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/startup-check.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/task-queue.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/validators.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/docs/architecture.md" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/docs/architecture.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/config.js" beforeDir="false" afterPath="$PROJECT_DIR$/utils/config.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/file-helper.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/message-formatter.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/message-rate-limiter.js" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -249,7 +218,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772895550978</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="移除无效内容">
+      <option name="closed" value="true" />
+      <created>1772896670888</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1772896670888</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

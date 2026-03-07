@@ -17,8 +17,6 @@ D:/space/oprcli/              → OPRCLI 工作版本
 │   └── logger.js             → 日志系统
 ├── utils/                    → 工具模块
 │   ├── config.js             → 配置管理
-│   ├── message-formatter.js   → 消息格式化
-│   └── string-helper.js      → 字符串工具
 ├── scheduler/                → 定时任务模块
 │   ├── task-manager.js       → 任务管理器
 │   ├── index.js              → 模块入口

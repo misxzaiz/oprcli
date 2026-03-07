@@ -8,8 +8,8 @@ const axios = require('axios')
 const BasePlatformIntegration = require('./base-platform-integration')
 
 class DingTalkIntegration extends BasePlatformIntegration {
-  constructor(config, logger, rateLimiter) {
-    super(config, logger, rateLimiter)
+  constructor(config, logger) {
+    super(config, logger)
     this.client = null
   }
 
