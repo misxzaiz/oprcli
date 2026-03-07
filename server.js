@@ -748,7 +748,8 @@ class UnifiedServer {
       firstOutputAt: null,
       firstSendAt: null,
       sendCount: 0,
-      finalResponseType: 'empty'
+      finalResponseType: 'empty',
+      endSent: false
     }
 
     try {
@@ -865,7 +866,16 @@ class UnifiedServer {
                 })
               }
 
-              if (this._shouldSendEvent(mappedType, streamCfg)) {
+              if (mappedType === 'end') {
+                this.auditLogger.logAgent('agent.event.end_suppressed', {
+                  trace_id: traceId,
+                  platform: platformName.toLowerCase(),
+                  conversation_id: conversationId,
+                  provider,
+                  event_type: event.type,
+                  mapped_type: mappedType
+                })
+              } else if (this._shouldSendEvent(mappedType, streamCfg)) {
                 const msg = this._formatEventMessage(mappedType, event, extractedText, streamCfg, elapsed)
                 if (msg) {
                   const sendDecision = this._shouldSendMessage(traceId, mappedType, msg)
@@ -918,7 +928,7 @@ class UnifiedServer {
           },
           onComplete: (exitCode) => {
             const total = Date.now() - startAt
-            if (streamCfg.enabled && streamCfg.sendEndSummary && this._shouldSendEvent('end', streamCfg)) {
+            if (!streamState.endSent && streamCfg.enabled && streamCfg.sendEndSummary && this._shouldSendEvent('end', streamCfg)) {
               const ttfb = streamState.firstOutputAt ? (streamState.firstOutputAt - startAt) : -1
               const firstSend = streamState.firstSendAt ? (streamState.firstSendAt - startAt) : -1
               const endEvent = {
@@ -940,6 +950,7 @@ class UnifiedServer {
                 messageType: type || 'default',
                 streamEventType: 'end'
               }).catch(() => {})
+              streamState.endSent = true
             }
             this.logger.success(platformName, `✅ 会话完成，退出码: ${exitCode}`)
             this.auditLogger.logAgent('agent.complete', {
