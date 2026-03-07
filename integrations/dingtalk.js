@@ -2,6 +2,7 @@
  * 钉钉 Stream 集成模块（重构版）
  * 处理钉钉机器人消息收发
  * 继承 BasePlatformIntegration 基类
+ * 开发文档：https://opensource.dingtalk.com/developerpedia/docs/explore/tutorials/overview
  */
 
 const axios = require('axios')

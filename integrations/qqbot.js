@@ -2,6 +2,7 @@
  * QQ 机器人集成模块（重构版）
  * 处理 QQ 机器人消息收发
  * 继承 BasePlatformIntegration 基类
+ * 开发文档：https://bot.q.qq.com/wiki/develop/api-v2/
  */
 
 const BasePlatformIntegration = require('./base-platform-integration')
