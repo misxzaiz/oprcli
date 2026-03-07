@@ -1156,8 +1156,20 @@ class UnifiedServer {
    * @returns {Object|null} 命令对象 { type, provider?, arg? }
    */
   _parseCommand(content) {
-    const trimmed = content.trim()
+    // 🔥 移除可能存在的斜杠前缀（如 /help、/status 等）
+    let trimmed = content.trim()
+
+    // 调试日志：显示原始输入和处理后的结果
+    this.logger.debug('COMMAND', `📥 原始输入: "${content}"`)
+    this.logger.debug('COMMAND', `✂️ Trim后: "${trimmed}"`)
+
+    if (trimmed.startsWith('/')) {
+      trimmed = trimmed.substring(1).trim()
+      this.logger.debug('COMMAND', `✂️ 移除斜杠后: "${trimmed}"`)
+    }
+
     const parts = trimmed.split(/\s+/)
+    this.logger.debug('COMMAND', `🔢 分割结果: [${parts.map(p => `"${p}"`).join(', ')}]`)
 
     // 🔥 从最长到最短尝试匹配（最长匹配原则）
     // 例如：'tasks run 1' -> 先尝试 'tasks run'，再尝试 'tasks'
@@ -1667,280 +1679,193 @@ class UnifiedServer {
     }
   }
 
+  // ==================== 统一的平台消息处理 ====================
+
+  /**
+   * 统一的平台消息处理函数
+   * @param {BasePlatformIntegration} platform - 平台集成实例
+   * @param {object} rawMessage - 原始消息
+   * @param {string} conversationId - 会话ID
+   * @param {object} replyTarget - 回复目标
+   * @param {object} extra - 额外参数 { type }
+   * @returns {Promise<{status: string, message?: string}>}
+   */
+  async _handlePlatformMessage(platform, rawMessage, conversationId, replyTarget, extra = {}) {
+    const platformName = platform.constructor.name.replace('Integration', '').toUpperCase()
+    const { type } = extra
+
+    try {
+      // 1. 提取消息内容
+      const content = platform.extractContent(rawMessage)
+      if (!content) {
+        this.logger.warning(platformName, '消息内容为空')
+        return { status: 'SUCCESS' }
+      }
+
+      this.logger.success(platformName, `📨 原始消息: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"`)
+
+      // 2. 解析命令
+      const command = this._parseCommand(content)
+      if (command) {
+        this.logger.success('COMMAND', `✅ 识别到命令: ${command.type}${command.provider ? ` -> ${command.provider}` : ''}`)
+        return await this._handleCommandUnified(command, conversationId, replyTarget, platform)
+      }
+
+      // 3. 获取会话
+      let session = platform.getSession(conversationId)
+      let provider = session?.provider || this.defaultProvider
+      let sessionId = session?.sessionId || null
+
+      this.logger.debug(platformName, '使用模型', { provider, hasSessionId: !!sessionId })
+
+      // 4. 获取connector
+      const connector = this.connectors.get(provider)
+      if (!connector || !connector.connected) {
+        const errorMsg = `❌ ${provider.toUpperCase()} 模型不可用\n\n💡 输入 help 查看可用模型`
+        await platform.send(replyTarget, errorMsg, rawMessage, type)
+        return { status: 'SUCCESS' }
+      }
+
+      // 5. 调用agent
+      await new Promise((resolve, reject) => {
+        const options = {
+          onEvent: async (event) => {
+            // 只处理核心事件
+            if (event.type === 'assistant' || event.type === 'result') {
+              const text = this._extractTextFromEvent(event)
+              if (text) {
+                this.logger.info(platformName, `📤 发送回复 (${text.length} 字符)`)
+                await platform.send(replyTarget, text, rawMessage, type)
+              }
+            } else if (event.type === 'system' && event.extra?.session_id) {
+              sessionId = event.extra.session_id
+              platform.setSession(conversationId, sessionId, provider)
+              this.logger.success('SESSION', `✅ 保存SessionID: ${sessionId}`)
+            }
+          },
+          onComplete: (exitCode) => {
+            this.logger.success(platformName, `✅ 会话完成，退出码: ${exitCode}`)
+            resolve()
+          },
+          onError: (error) => {
+            this.logger.error(platformName, `❌ 会话错误: ${error.message}`)
+            reject(error)
+          }
+        }
+
+        if (sessionId) {
+          this.logger.debug(platformName, `调用 continueSession: ${sessionId}`)
+          connector.continueSession(sessionId, content, options)
+        } else {
+          this.logger.debug(platformName, '调用 startSession')
+          connector.startSession(content, options)
+        }
+      })
+
+      return { status: 'SUCCESS' }
+    } catch (error) {
+      this.logger.error(platformName, `❌ 处理失败: ${error.message}`)
+      return { status: 'LATER', message: error.message }
+    }
+  }
+
+  /**
+   * 从事件中提取文本
+   * @param {object} event - 事件对象
+   * @returns {string}
+   */
+  _extractTextFromEvent(event) {
+    // 方式1: event.message.content 数组格式
+    if (event.message?.content && Array.isArray(event.message.content)) {
+      return event.message.content
+        .filter(c => c.type === 'text')
+        .map(c => c.text)
+        .join('')
+    }
+
+    // 方式2: event.result 字符串格式
+    if (event.result) {
+      return event.result
+    }
+
+    return ''
+  }
+
+  /**
+   * 统一的命令处理
+   * @param {object} command - 命令对象
+   * @param {string} conversationId - 会话ID
+   * @param {object} replyTarget - 回复目标
+   * @param {BasePlatformIntegration} platform - 平台集成实例
+   * @returns {Promise<{status: string}>}
+   */
+  async _handleCommandUnified(command, conversationId, replyTarget, platform) {
+    const platformName = platform.constructor.name.replace('Integration', '').toUpperCase()
+
+    try {
+      let response = ''
+
+      if (command.type === 'switch') {
+        // 切换模型
+        platform.setSession(conversationId, null, command.provider)
+        response = `✅ 已切换到 ${command.provider.toUpperCase()} 模型`
+      } else if (command.type === 'help') {
+        // 帮助信息
+        response = `🤖 可用命令:\n\n`
+        response += `/switch <model> - 切换模型 (claude/iflow/codex)\n`
+        response += `/help - 显示帮助\n`
+        response += `/status - 查看状态\n\n`
+        response += `当前模型: ${platform.getSession(conversationId)?.provider || this.defaultProvider}`
+      } else if (command.type === 'status') {
+        // 状态信息
+        const session = platform.getSession(conversationId)
+        response = `📊 状态信息:\n\n`
+        response += `会话ID: ${conversationId}\n`
+        response += `当前模型: ${session?.provider || this.defaultProvider}\n`
+        response += `SessionID: ${session?.sessionId || '无'}\n`
+        response += `已处理消息: ${platform.processedMessages.size}`
+      } else {
+        response = `❌ 未知命令: ${command.type}`
+      }
+
+      await platform.send(replyTarget, response, null, null)
+      return { status: 'SUCCESS' }
+    } catch (error) {
+      this.logger.error(platformName, `命令处理失败: ${error.message}`)
+      await platform.send(replyTarget, `❌ 命令执行失败: ${error.message}`, null, null)
+      return { status: 'SUCCESS' }
+    }
+  }
+
+  // ==================== 钉钉消息处理 ====================
+
   async handleDingTalkMessage(message) {
     const timestamp = new Date().toISOString()
     this.logger.success('DINGTALK', '========== 钉钉消息接收 ==========')
     this.logger.success('DINGTALK', `时间戳: ${timestamp}`)
 
-    const { headers, data } = message
+    const { headers } = message
     const { messageId } = headers
 
-    // 🔍 MessageID 和去重信息（直接输出字符串，避免对象不显示）
     this.logger.success('DINGTALK', `MessageID: ${messageId || 'null'}`)
-    this.logger.success('DINGTALK', `已处理消息数: ${this.dingtalk.processedMessages.size}`)
 
-    const isProcessed = messageId ? this.dingtalk.isProcessed(messageId) : null
-    if (messageId) {
-      const status = isProcessed ? '✅ 已处理，跳过' : '❌ 未处理，继续'
-      this.logger.success('DINGTALK', `去重: ${status}`)
-    } else {
-      this.logger.warning('DINGTALK', '⚠️  MessageID 为空，无法去重！')
-    }
-
-    // 消息去重
-    if (messageId && isProcessed) {
+    // 消息去重（基类会处理）
+    if (messageId && this.dingtalk.isProcessed(messageId)) {
       this.logger.warning('DINGTALK', '⚠️  消息已处理，跳过')
       return { status: 'SUCCESS' }
     }
 
+    // 标记为已处理
     if (messageId) {
       this.dingtalk.markAsProcessed(messageId)
-      this.logger.success('DINGTALK', '✅ 标记为已处理')
     }
 
-    try {
-      const robotMessage = JSON.parse(data)
-      this.logger.debug('DINGTALK', '解析后的消息', { message: robotMessage })
+    // 获取回复目标
+    const conversationId = this.dingtalk.getConversationId(message)
+    const replyTarget = this.dingtalk.getReplyTarget(message)
 
-      const { conversationId, senderNick, text, msgtype, sessionWebhook } = robotMessage
-
-      this.logger.success('DINGTALK', `收到消息: ${senderNick}`)
-      this.logger.debug('DINGTALK', '消息详情', {
-        conversationId,
-        senderNick,
-        msgtype,
-        hasText: !!text,
-        hasSessionWebhook: !!sessionWebhook
-      })
-
-      if (msgtype !== 'text') {
-        this.logger.warning('DINGTALK', `不支持的消息类型: ${msgtype}`)
-        return { status: 'SUCCESS' }
-      }
-
-      const messageContent = text?.content?.trim()
-      if (!messageContent) {
-        this.logger.warning('DINGTALK', '消息内容为空')
-        return { status: 'SUCCESS' }
-      }
-
-      this.logger.info('DINGTALK', `消息内容: ${messageContent.substring(0, 50)}...`)
-
-      // 🎯 检查是否是命令
-      const command = this._parseCommand(messageContent)
-      if (command) {
-        this.logger.info('COMMAND', `识别到命令: ${command.type}${command.provider ? ` -> ${command.provider}` : ''}`)
-        return await this._handleCommand(command, conversationId, sessionWebhook)
-      }
-
-      // 🤖 获取当前会话使用的 provider
-      let session = this.dingtalk.getSession(conversationId)
-      let provider = session?.provider
-      let sessionId = session?.sessionId || null
-
-      // 🔧 如果是首次对话（没有 provider），设置并保存
-      if (!provider) {
-        provider = this.defaultProvider
-        this.dingtalk.setSession(conversationId, null, provider)
-        this.logger.info('DINGTALK', `✅ 首次对话，设置 provider: ${provider}`)
-      }
-
-      const connector = this.connectors.get(provider)
-
-      this.logger.debug('DINGTALK', '使用模型', { provider })
-
-      // 🔍 检查 connector 状态
-      if (!connector || !connector.connected) {
-        this.logger.error('DINGTALK', `Connector ${provider} 未连接`)
-        await this._sendReply(sessionWebhook,
-          `❌ ${provider.toUpperCase()} 模型不可用\n\n` +
-          `💡 输入 help 查看可用模型`
-        )
-        return { status: 'SUCCESS' }
-      }
-
-      // 🔍 会话管理详细日志
-      this.logger.success('SESSION', '========== 会话管理诊断 ==========')
-      this.logger.success('SESSION', `ConversationID: ${conversationId}`)
-      this.logger.success('SESSION', `Provider: ${provider}`)
-
-      const sessionMapSize = this.dingtalk.conversations.size
-      this.logger.success('SESSION', `SessionMap 大小: ${sessionMapSize}`)
-
-      if (sessionMapSize > 0) {
-        this.logger.success('SESSION', 'SessionMap 内容:', {
-          entries: Array.from(this.dingtalk.conversations.entries())
-        })
-      }
-
-      const isResume = !!sessionId
-
-      this.logger.success('SESSION', `检索到的 SessionID: ${sessionId || 'null'}`)
-      this.logger.success('SESSION', `会话模式: ${isResume ? '继续会话' : '新会话'}`)
-      this.logger.success('SESSION', '====================================')
-
-      // ⭐ 设置 sessionId 更新回调（用于 Claude 和 IFlow）
-      connector.onSessionIdUpdate((realSessionId) => {
-        this.dingtalk.setSession(conversationId, realSessionId, provider)
-        this.logger.success('SESSION', '✅ 通过回调保存 SessionID', {
-          conversationId,
-          sessionId: realSessionId,
-          sessionMapSize: this.dingtalk.conversations.size
-        })
-      })
-
-      let messageCount = 0
-      let sentMessageCount = 0  // 实际发送的消息数
-      const startTime = Date.now()
-
-      // 🔍 用于去重的状态
-      let assistantContent = null  // assistant 的内容
-      let assistantHash = null     // 内容哈希
-      let sessionEndSent = false   // session_end 是否已发送
-
-      this.logger.info('DINGTALK', `开始调用 ${isResume ? 'continueSession' : 'startSession'}...`)
-
-      await new Promise((resolve, reject) => {
-        const options = {
-          onEvent: async (event) => {
-            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-            const context = { index: ++messageCount, elapsed, sentIndex: sentMessageCount + 1 }
-
-            // 🔍 详细事件日志
-            this.logger.info('EVENT', `#${messageCount} [${event.type}]`)
-
-            // 🎯 session_end 去重：只发送一次
-            if (event.type === 'session_end') {
-              if (sessionEndSent) {
-                this.logger.warning('EVENT', '⚠️  session_end 事件已发送，跳过重复')
-                return
-              }
-              sessionEndSent = true
-              this.logger.info('EVENT', '✅ 首次 session_end 事件，正常处理')
-            }
-
-            // 打印事件内容（用于诊断重复）
-            if (event.type === 'assistant') {
-              const text = event.message?.content
-                ?.filter(c => c.type === 'text')
-                ?.map(c => c.text)
-                ?.join('') || ''
-              this.logger.info('EVENT', `Assistant 内容: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}" (${text.length} 字符)`)
-
-              // 保存 assistant 内容用于去重检测
-              assistantContent = text
-              assistantHash = this._hashContent(text)
-            }
-            else if (event.type === 'result') {
-              const result = event.result || ''
-              this.logger.info('EVENT', `Result 内容: "${result.substring(0, 100)}${result.length > 100 ? '...' : ''}" (${result.length} 字符)`)
-
-              // 🔍 检测是否与 assistant 重复
-              if (config.streaming.deduplicateResult && assistantContent) {
-                const resultHash = this._hashContent(result)
-
-                if (assistantHash === resultHash) {
-                  this.logger.warning('EVENT', `⚠️  Result 与 Assistant 内容相同，跳过发送`)
-                  this.logger.info('EVENT', `  Assistant 哈希: ${assistantHash}`)
-                  this.logger.info('EVENT', `  Result 哈希: ${resultHash}`)
-                  return  // ← 跳过此事件，不发送
-                } else {
-                  this.logger.info('EVENT', `✅ Result 与 Assistant 内容不同，正常发送`)
-                }
-              }
-            }
-            else if (event.type === 'thinking') {
-              const content = event.content?.substring(0, 100) || ''
-              this.logger.debug('EVENT', `Thinking: "${content}..."`)
-            }
-            else if (event.type === 'tool_start') {
-              this.logger.debug('EVENT', `工具开始: ${event.tool}`)
-            }
-            else if (event.type === 'tool_output') {
-              const output = event.output?.substring(0, 100) || ''
-              this.logger.debug('EVENT', `工具输出: "${output}..."`)
-            }
-
-            // 捕获 sessionId
-            if (!isResume && event.type === 'system' && event.extra?.session_id) {
-              sessionId = event.extra.session_id
-              this.dingtalk.setSession(conversationId, sessionId, provider)
-              this.logger.success('SESSION', '✅ 保存 SessionID 到 SessionMap', {
-                conversationId,
-                sessionId,
-                sessionMapSize: this.dingtalk.conversations.size
-              })
-            }
-
-            // 流式发送
-            if (config.streaming.enabled) {
-              const formatted = this.messageFormatter.formatEvent(event, context)
-              if (formatted) {
-                sentMessageCount++
-                this.logger.info('DINGTALK', `✅ 发送消息 #${sentMessageCount}/${messageCount} (${formatted.msgtype})`)
-                try {
-                  await this.dingtalk.send(sessionWebhook, formatted)
-                  this.logger.debug('DINGTALK', `发送成功`)
-                } catch (error) {
-                  this.logger.error('DINGTALK', '发送失败', { error: error.message })
-                }
-              } else {
-                this.logger.debug('EVENT', `事件 ${event.type} 未格式化（跳过）`)
-              }
-            }
-          },
-          onComplete: async (exitCode) => {
-            const totalTime = ((Date.now() - startTime) / 1000).toFixed(1)
-            this.logger.success('SESSION', `✅ 完成，退出码: ${exitCode}, 耗时: ${totalTime}s, 事件数: ${messageCount}, 发送数: ${sentMessageCount}`)
-
-            // 🎯 发送完成消息到钉钉（如果配置启用且还未发送）
-            if (config.streaming.showCompletionSummary && !sessionEndSent) {
-              try {
-                this.logger.info('DINGTALK', '准备发送完成消息（onComplete）')
-                const context = { index: messageCount, elapsed: totalTime }
-                const completionEvent = {
-                  type: 'session_end',
-                  exitCode: exitCode
-                }
-                const formatted = this.messageFormatter.formatEvent(completionEvent, context)
-
-                if (formatted && sessionWebhook) {
-                  await this.dingtalk.send(sessionWebhook, formatted)
-                  this.logger.success('DINGTALK', '✅ 完成消息已发送（onComplete）')
-                }
-              } catch (error) {
-                this.logger.error('DINGTALK', '发送完成消息失败', { error: error.message })
-              }
-            } else if (sessionEndSent) {
-              this.logger.info('DINGTALK', 'ℹ️  session_end 已在 onEvent 中发送，跳过 onComplete 中的发送')
-            } else if (!config.streaming.showCompletionSummary) {
-              this.logger.info('DINGTALK', 'ℹ️  完成总结已禁用，不发送')
-            }
-
-            resolve()
-          },
-          onError: (error) => {
-            this.logger.error('SESSION', '❌ 错误', { error: error.message, stack: error.stack })
-            reject(error)
-          }
-        }
-
-        if (isResume) {
-          this.logger.debug('DINGTALK', `调用 continueSession: ${sessionId}`)
-          connector.continueSession(sessionId, messageContent, options)
-        } else {
-          this.logger.debug('DINGTALK', '调用 startSession')
-          connector.startSession(messageContent, options)
-        }
-
-        this.logger.info('DINGTALK', '✅ Session 方法已调用，等待事件...')
-      })
-
-      return { status: 'SUCCESS' }
-    } catch (error) {
-      this.logger.error('DINGTALK', '处理失败', { error: error.message })
-      return { status: 'LATER', message: error.message }
-    }
+    // 调用统一处理函数
+    return this._handlePlatformMessage(this.dingtalk, message, conversationId, replyTarget)
   }
 
   /**
@@ -2147,46 +2072,16 @@ class UnifiedServer {
     this.logger.success('QQBOT', `消息类型: ${type}`)
     this.logger.success('QQBOT', `会话 ID: ${conversationId}`)
 
-    // 消息内容
-    const content = message.content?.trim()
-    if (!content) {
-      this.logger.warning('QQBOT', '消息内容为空')
-      return
-    }
-
-    this.logger.success('QQBOT', `消息内容: ${content.substring(0, 50)}...`)
-
-    // 🎯 检查是否是命令
-    const command = this._parseCommand(content)
-    if (command) {
-      this.logger.info('COMMAND', `识别到命令: ${command.type}${command.provider ? ` -> ${command.provider}` : ''}`)
-      // QQ Bot 命令处理（通过 qqbot 集成发送回复）
-      await this._handleQQBotCommand(command, conversationId, message, type)
-      return
-    }
-
-    // 🤖 获取当前会话使用的 provider
-    let session = this.qqbot.getSession(conversationId)
-    let provider = session?.provider
-    let sessionId = session?.sessionId || null
-
-    // 🔧 如果是首次对话（没有 provider），设置并保存
-    if (!provider) {
-      provider = this.defaultProvider
-      this.qqbot.setSession(conversationId, null, provider)
-      this.logger.info('QQBOT', `✅ 首次对话，设置 provider: ${provider}`)
-    }
-
-    const connector = this.connectors.get(provider)
-    this.logger.debug('QQBOT', '使用模型', { provider })
-
-    // 🔍 检查 connector 状态
-    if (!connector || !connector.connected) {
-      this.logger.error('QQBOT', `Connector ${provider} 未连接`)
-      await this._sendQQBotReply(message, type,
-        `❌ ${provider.toUpperCase()} 模型不可用\n\n` +
-        `💡 输入 help 查看可用模型`
-      )
+    // QQ的消息去重已在集成模块中处理
+    // 调用统一处理函数
+    return this._handlePlatformMessage(
+      this.qqbot,
+      message,
+      conversationId,
+      message,  // QQ需要原始消息作为回复目标
+      { type }  // 传递type参数
+    )
+  }
       return
     }
 
@@ -2222,13 +2117,25 @@ class UnifiedServer {
 
     try {
       await new Promise((resolve, reject) => {
+        // 🔥 记录所有事件类型用于统计
+        const eventTypes = [];
+
         const options = {
           onEvent: async (event) => {
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
             const context = { index: ++messageCount, elapsed }
 
+            // 记录事件类型用于统计
+            eventTypes.push(event.type);
+
+            // 记录所有事件类型
             this.logger.info('EVENT', `#${messageCount} [${event.type}]`)
-            
+
+            // 🔥 特殊事件类型的醒目日志
+            if (event.type === 'send_file') {
+              this.logger.success('EVENT', `🎯🎯🎯 收到 send_file 事件！文件: ${event.filePath}`)
+            }
+
             // QQ Bot 详细事件日志 - 便于诊断问题
             this.logger.debug('QQBOT', `[${type}] 事件详情: ${JSON.stringify(event, null, 2).substring(0, 500)}`)
 
@@ -2236,7 +2143,9 @@ class UnifiedServer {
             if (event.type === 'assistant' || event.type === 'result') {
               // 尝试多种方式提取文本内容
               let text = ''
-              
+
+              this.logger.info('EVENT', `#${messageCount} [${event.type}] 开始处理`)
+
               // 方式1: event.message.content 数组格式
               if (event.message?.content && Array.isArray(event.message.content)) {
                 text = event.message.content
@@ -2277,6 +2186,47 @@ class UnifiedServer {
               this.logger.error('QQBOT', `错误事件: ${event.error}`)
               await this._sendQQBotReply(message, type, `❌ 处理失败: ${event.error}`)
               reject(new Error(event.error))
+            } else if (event.type === 'send_file') {
+              // ⭐ 新增：处理文件发送事件
+              this.logger.success('QQBOT', `🎯 ========== 收到 send_file 事件 ==========`)
+              this.logger.info('QQBOT', `文件路径: ${event.filePath}`)
+              this.logger.info('QQBOT', `文件类型: ${event.fileType || '未指定'}`)
+              this.logger.info('QQBOT', `说明文字: ${event.caption || '无'}`)
+              this.logger.info('QQBOT', `消息类型: ${type}`)
+              this.logger.info('QQBOT', `会话 ID: ${conversationId}`)
+
+              try {
+                // 上传并发送文件
+                this.logger.info('QQBOT', `开始调用 _uploadAndSendFile...`)
+                const fileInfo = await this._uploadAndSendFile(
+                  message,
+                  type,
+                  event.filePath,
+                  event.fileType || 'file',
+                  event.caption || ''
+                )
+
+                this.logger.success('QQBOT', `✅ 文件发送成功: ${fileInfo.url}`)
+                sentMessageCount++
+
+                // 如果需要，发送后删除本地文件
+                if (event.options?.deleteAfterSend) {
+                  const FileHelper = require('../utils/file-helper')
+                  FileHelper.deleteFile(event.filePath)
+                  this.logger.info('QQBOT', `✅ 已删除本地文件: ${event.filePath}`)
+                }
+
+                this.logger.success('QQBOT', `🎯 ========== send_file 事件处理完成 ==========`)
+
+              } catch (error) {
+                this.logger.error('QQBOT', `文件发送失败: ${error.message}`)
+                this.logger.error('QQBOT', `错误堆栈: ${error.stack}`)
+                await this._sendQQBotReply(
+                  message,
+                  type,
+                  `❌ 文件发送失败: ${error.message}`
+                )
+              }
             } else if (event.type === 'session_end') {
               if (latestReply) {
                 await this._sendQQBotReply(message, type, latestReply)
@@ -2288,7 +2238,20 @@ class UnifiedServer {
                   '已收到消息，但本次会话没有产出可发送文本。请稍后重试，或发送 /clear 后再试。'
                 )
               }
+
+              // 🔥 事件类型统计
+              const eventSummary = eventTypes.join(', ');
+              const hasSendFile = eventTypes.includes('send_file');
+
               this.logger.info('QQBOT', `会话结束，共 ${messageCount} 个事件，发送 ${sentMessageCount} 条消息`)
+              this.logger.info('QQBOT', `事件类型统计: ${eventSummary}`)
+
+              if (hasSendFile) {
+                this.logger.success('QQBOT', `✅✅✅ 本次会话包含了 send_file 事件`)
+              } else {
+                this.logger.warning('QQBOT', `⚠️⚠️⚠️ 本次会话没有 send_file 事件`)
+              }
+
               resolve()
             } else {
               // 其他事件类型也打印日志
@@ -2347,6 +2310,177 @@ class UnifiedServer {
       }
     } catch (error) {
       this.logger.error('QQBOT', `发送回复失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 上传文件到 QQ 并发送
+   * @private
+   * @param {object} originalMessage - 原始消息对象
+   * @param {string} type - 消息类型 (channel/at/direct/c2c)
+   * @param {string} filePath - 本地文件路径
+   * @param {string} fileType - 文件类型 (image/audio/video/file)
+   * @param {string} caption - 说明文字
+   * @returns {Promise<{url: string, type: string}>}
+   */
+  async _uploadAndSendFile(originalMessage, type, filePath, fileType, caption = '') {
+    const FileHelper = require('./utils/file-helper')
+
+    // 1. 验证文件
+    try {
+      FileHelper.validateFile(filePath)
+    } catch (error) {
+      throw new Error(`文件验证失败: ${error.message}`)
+    }
+
+    // 2. 检查文件大小（QQ 限制 100MB）
+    const maxSize = 100 * 1024 * 1024 // 100MB
+    if (FileHelper.isFileSizeExceeded(filePath, maxSize)) {
+      const stats = FileHelper.validateFile(filePath)
+      const fileSize = FileHelper.formatFileSize(stats.size)
+      throw new Error(`文件大小超过限制（${fileSize} > 100MB）`)
+    }
+
+    // 3. 自动检测文件类型（如果未指定）
+    const detectedType = FileHelper.detectFileType(filePath)
+    const finalFileType = fileType || detectedType
+
+    this.logger.info('QQBOT', `文件类型: ${finalFileType}, 文件大小: ${FileHelper.formatFileSize(FileHelper.validateFile(filePath).size)}`)
+
+    // 4. 确定频道 ID
+    let channelId
+    switch (type) {
+      case 'channel':
+      case 'at':
+        channelId = originalMessage.channel_id
+        break
+      case 'direct':
+        channelId = originalMessage.dms_channel_id
+        break
+      case 'c2c':
+        // C2C 需要特殊处理
+        return await this._sendC2CFile(originalMessage.author?.user_openid, filePath, finalFileType, caption)
+      default:
+        throw new Error(`不支持的消息类型: ${type}`)
+    }
+
+    if (!channelId) {
+      throw new Error('无法确定频道 ID')
+    }
+
+    // 5. 上传文件
+    this.logger.info('QQBOT', `开始上传文件: ${filePath}`)
+    const uploadResult = await this.qqbot.client.uploadFile(channelId, filePath, finalFileType)
+    this.logger.success('QQBOT', `✅ 文件上传成功: ${uploadResult.url}`)
+
+    // 6. 构造回复选项
+    let replyOptions = {
+      msgId: originalMessage?.id,
+      eventId: originalMessage?.event_id
+    }
+
+    let messageContent = caption
+
+    // 7. 根据文件类型附加到消息
+    switch (finalFileType) {
+      case 'image':
+        replyOptions.image = uploadResult.url
+        break
+      case 'audio':
+        replyOptions.audio = uploadResult.url
+        break
+      case 'video':
+        replyOptions.video = uploadResult.url
+        break
+      case 'file':
+        // 文件类型在消息中包含 URL
+        messageContent = `${caption}\n\n📎 文件链接：${uploadResult.url}`.trim()
+        break
+    }
+
+    // 8. 发送消息
+    switch (type) {
+      case 'channel':
+      case 'at':
+        await this.qqbot.client.sendMessage(channelId, messageContent, replyOptions)
+        break
+      case 'direct':
+        await this.qqbot.client.sendDirectMessage(originalMessage.guild_id, messageContent, replyOptions)
+        break
+    }
+
+    return { url: uploadResult.url, type: finalFileType }
+  }
+
+  /**
+   * C2C 私信文件发送（特殊处理）
+   * @private
+   * @param {string} openid - 用户 OpenID
+   * @param {string} filePath - 文件路径
+   * @param {string} fileType - 文件类型
+   * @param {string} caption - 说明文字
+   * @returns {Promise<{url: string, type: string}>}
+   */
+  async _sendC2CFile(openid, filePath, fileType, caption) {
+    const FileHelper = require('./utils/file-helper')
+
+    if (!openid) {
+      throw new Error('C2C 消息缺少 user_openid')
+    }
+
+    try {
+      // 1. 验证文件
+      FileHelper.validateFile(filePath)
+
+      // 2. 检查文件大小
+      const maxSize = 100 * 1024 * 1024 // 100MB
+      if (FileHelper.isFileSizeExceeded(filePath, maxSize)) {
+        const stats = FileHelper.validateFile(filePath)
+        const fileSize = FileHelper.formatFileSize(stats.size)
+        throw new Error(`文件大小超过限制（${fileSize} > 100MB）`)
+      }
+
+      this.logger.info('QQBOT', `C2C 文件上传: ${filePath} (${fileType})`)
+      this.logger.info('QQBOT', `文件大小: ${FileHelper.formatFileSize(FileHelper.validateFile(filePath).size)}`)
+
+      // 3. 上传文件到 QQ 服务器
+      const fileUrl = await this.qqbot.client.uploadC2CFile(openid, filePath, fileType)
+      this.logger.success('QQBOT', `✅ C2C 文件上传成功: ${fileUrl}`)
+
+      // 4. 构造消息
+      let messageContent = caption
+      let options = {}
+
+      // 根据文件类型附加到消息
+      switch (fileType) {
+        case 'image':
+          options.image = fileUrl
+          break
+        case 'audio':
+          options.audio = fileUrl
+          break
+        case 'video':
+          options.video = fileUrl
+          break
+        case 'file':
+          messageContent = `${caption}\n\n📎 文件链接：${fileUrl}`.trim()
+          break
+      }
+
+      // 5. 发送富媒体消息
+      await this.qqbot.client.sendC2CMessage(openid, messageContent, options)
+      this.logger.success('QQBOT', `✅ C2C 消息发送成功`)
+
+      return { url: fileUrl, type: fileType }
+
+    } catch (error) {
+      this.logger.error('QQBOT', `C2C 文件发送失败: ${error.message}`)
+
+      // 失败时回退到发送文件路径提示
+      const fallbackMessage = `${caption}\n\n⚠️ 文件上传失败\n\n📎 文件路径：${filePath}\n\n❌ 错误：${error.message}`.trim()
+      await this.qqbot.client.sendC2CMessage(openid, fallbackMessage, {})
+
+      return { url: filePath, type: fileType, error: error.message }
     }
   }
 

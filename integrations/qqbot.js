@@ -1,301 +1,160 @@
 /**
- * QQ 机器人集成模块
+ * QQ 机器人集成模块（重构版）
  * 处理 QQ 机器人消息收发
- * 参考钉钉集成实现，使用connector系统
+ * 继承 BasePlatformIntegration 基类
  */
 
-const axios = require('axios');
-const BoundedMap = require('../utils/bounded-map');
+const BasePlatformIntegration = require('./base-platform-integration')
 
-class QQBotIntegration {
+class QQBotIntegration extends BasePlatformIntegration {
   constructor(config, logger, rateLimiter) {
-    this.config = config;
-    this.logger = logger;
-    this.rateLimiter = rateLimiter;
-    this.client = null;
-
-    // 统一的会话状态管理（与钉钉一致）
-    this.conversations = new Map();
-
-    // 消息去重
-    this.processedMessages = new BoundedMap(1000, {
-      evictionPolicy: 'fifo',
-      onEvict: (key) => {
-        this.logger.debug('QQBOT', `Processed message evicted: ${key}`);
-      }
-    });
-
-    // 自动清理配置
-    this.cleanupConfig = {
-      enabled: true,
-      interval: 5 * 60 * 1000,
-      messageAgeLimit: 60 * 60 * 1000,
-      sessionAgeLimit: 24 * 60 * 60 * 1000
-    };
-
-    this.cleanupTimer = null;
+    super(config, logger, rateLimiter)
+    this.client = null
   }
 
+  // ==================== 实现抽象方法 ====================
+
   /**
-   * 初始化
+   * 连接到QQ平台
+   * @param {Function} messageHandler - 消息处理回调
+   * @returns {Promise<boolean>}
    */
-  async init(messageHandler = null) {
+  async connect(messageHandler) {
     if (!this.config.enabled) {
-      this.logger.warning('QQBOT', '未启用');
-      return false;
+      this.logger.warning('QQBOT', '未启用')
+      return false
     }
 
-    this.logger.info('QQBOT', '开始初始化...');
-    this.logger.debug('QQBOT', '配置信息', {
-      appId: this.config.appId?.substring(0, 10) + '...',
-      hasClientSecret: !!this.config.clientSecret
-    });
-
     try {
-      // 加载 QQ Bot 客户端
-      let QQBotClient;
-      try {
-        QQBotClient = require('./qqbot/qqbot-client');
-      } catch (e) {
-        this.logger.error('QQBOT', '加载 QQBot 客户端失败');
-        return false;
-      }
+      const QQBotClient = require('./qqbot/qqbot-client')
 
-      this.logger.debug('QQBOT', '创建 QQBot 实例');
+      this.logger.info('QQBOT', '正在连接...')
 
       this.client = new QQBotClient({
         appId: this.config.appId,
         clientSecret: this.config.clientSecret,
         sandbox: this.config.sandbox || false,
-        autoReconnect: true,
-        debug: this.config.debug || false
-      });
+        autoReconnect: true
+      })
 
-      this.logger.debug('QQBOT', '注册事件监听器');
+      // 注册消息监听
+      this.client.on('c2c_message', async (message) => {
+        await this._handleMessage(message, 'c2c', messageHandler)
+      })
 
-      // 注册事件
-      this._registerEvents(messageHandler);
+      this.client.on('message', async (message) => {
+        await this._handleMessage(message, 'channel', messageHandler)
+      })
 
-      this.logger.info('QQBOT', '正在连接到 QQ 服务器...');
-      await this.client.connect();
+      this.client.on('at_message', async (message) => {
+        await this._handleMessage(message, 'at', messageHandler)
+      })
 
-      this.logger.success('QQBOT', '初始化成功，客户端已连接');
+      await this.client.connect()
+      this.logger.success('QQBOT', '已连接')
 
-      // 启动自动清理
-      if (this.cleanupConfig.enabled) {
-        this.startAutoCleanup();
-        this.logger.info('QQBOT', '自动内存清理已启用');
-      }
-
-      return true;
-
+      return true
     } catch (error) {
-      this.logger.error('QQBOT', '初始化失败', {
-        error: error.message,
-        stack: error.stack
-      });
-      return false;
+      this.logger.error('QQBOT', '连接失败', { error: error.message })
+      return false
     }
   }
 
   /**
-   * 注册事件监听器
+   * 内部：统一处理消息
+   * @param {object} message - 消息对象
+   * @param {string} type - 消息类型 (c2c/channel/at)
+   * @param {Function} messageHandler - 消息处理回调
    */
-  _registerEvents(messageHandler) {
-    // 保存messageHandler引用
-    this.messageHandler = messageHandler;
+  async _handleMessage(message, type, messageHandler) {
+    const messageId = this.getMessageId(message, type)
 
-    // C2C 私信
-    this.client.on('c2c_message', async (message) => {
-      await this._handleMessage(message, 'c2c');
-    });
+    // 去重检查
+    if (this.isProcessed(messageId)) {
+      return
+    }
+    this.markAsProcessed(messageId)
 
-    // 频道消息
-    this.client.on('message', async (message) => {
-      await this._handleMessage(message, 'channel');
-    });
+    const conversationId = this.getConversationId(message, type)
 
-    // @机器人消息
-    this.client.on('at_message', async (message) => {
-      await this._handleMessage(message, 'at');
-    });
-
-    // 频道私信
-    this.client.on('direct_message', async (message) => {
-      await this._handleMessage(message, 'direct');
-    });
-
-    // 连接状态
-    this.client.on('ready', () => {
-      this.logger.success('QQBOT', '✅ QQ 机器人已就绪');
-    });
-
-    this.client.on('error', (error) => {
-      this.logger.error('QQBOT', '连接错误', { error: error.message });
-    });
+    // 调用消息处理器
+    await messageHandler(message, type, conversationId)
   }
 
   /**
-   * 处理消息
+   * 发送消息到QQ
+   * @param {object} target - 原始消息对象
+   * @param {string} message - 消息内容
+   * @param {object} originalMessage - 原始消息
+   * @param {string} type - 消息类型
+   * @returns {Promise<*>}
    */
-  async _handleMessage(message, type) {
-    const messageId = this._getMessageDedupKey(message, type);
+  async send(target, message, originalMessage, type) {
+    return this.sendWithRetry(target, message, async () => {
+      if (type === 'c2c') {
+        return this.client.sendC2CMessage(
+          originalMessage.author.user_openid,
+          message,
+          {}
+        )
+      } else if (type === 'at' || type === 'channel') {
+        return this.client.sendMessage(
+          originalMessage.channel_id,
+          message,
+          {}
+        )
+      } else {
+        // 私信
+        return this.client.sendDirectMessage(
+          originalMessage.guild_id,
+          message,
+          {}
+        )
+      }
+    })
+  }
 
-    // C2C 消息调试日志 - 确认消息结构
+  /**
+   * 提取消息内容
+   * @param {object} rawMessage - 原始消息
+   * @returns {string}
+   */
+  extractContent(rawMessage) {
+    return rawMessage.content?.trim() || ''
+  }
+
+  /**
+   * 获取会话ID
+   * @param {object} rawMessage - 原始消息
+   * @param {string} type - 消息类型
+   * @returns {string}
+   */
+  getConversationId(rawMessage, type) {
     if (type === 'c2c') {
-      this.logger.debug('QQBOT', `[C2C] 消息完整结构: ${JSON.stringify(message, null, 2)}`);
-      this.logger.info('QQBOT', `[C2C] dedupKey: ${messageId}`);
-    }
-
-    // 去重
-    if (messageId && this.isProcessed(messageId)) {
-      this.logger.debug('QQBOT', `消息已处理过，跳过: ${messageId}`);
-      return;
-    }
-
-    if (messageId) {
-      this.markAsProcessed(messageId);
-    }
-
-    const content = message.content?.trim();
-    if (!content) return;
-
-    const conversationId = this._getConversationId(message, type);
-
-    this.logger.info('QQBOT', `[${type}] 收到消息: ${content}`);
-    this.logger.debug('QQBOT', `[${type}] conversationId: ${conversationId}`);
-
-    try {
-      // 如果有messageHandler，使用它处理（像钉钉一样）
-      if (this.messageHandler) {
-        await this.messageHandler(message, type, conversationId);
-        return;
-      }
-
-      // 没有handler时的降级处理
-      this.logger.warning('QQBOT', '没有消息处理器');
-    } catch (error) {
-      this.logger.error('QQBOT', `[${type}] 处理失败: ${error.message}`);
+      return `c2c_${rawMessage.author.user_openid}`
+    } else {
+      return rawMessage.channel_id || rawMessage.guild_id
     }
   }
 
   /**
-   * 获取会话 ID
+   * 获取回复目标（QQ需要原始消息对象）
+   * @param {object} rawMessage - 原始消息
+   * @returns {object}
    */
-  _getConversationId(message, type) {
-    // C2C 私信
-    if (type === 'c2c' && message.author?.user_openid) {
-      return `c2c:${message.author.user_openid}`;
-    }
-    // 频道消息
-    if (message.channel_id && message.author?.id) {
-      return `channel:${message.channel_id}:${message.author.id}`;
-    }
-    // 频道私信
-    if (message.guild_id && message.author?.id) {
-      return `dms:${message.guild_id}:${message.author.id}`;
-    }
-    return `unknown:${message.id}`;
+  getReplyTarget(rawMessage) {
+    return rawMessage
   }
 
-  _getMessageDedupKey(message, type) {
-    if (message?.id) {
-      return `id:${message.id}`;
-    }
-
-    if (message?.msg_id) {
-      return `msg:${message.msg_id}`;
-    }
-
-    if (message?.event_id) {
-      return `event:${message.event_id}`;
-    }
-
-    const author = message?.author?.user_openid || message?.author?.id || 'unknown';
-    const content = message?.content || '';
-    const timestamp = message?.timestamp || '';
-    return `${type}:${author}:${timestamp}:${content}`;
-  }
-
-  // ==================== 会话状态管理（与钉钉一致） ====================
-
-  setSession(conversationId, sessionId, provider) {
-    const now = Date.now();
-    this.conversations.set(conversationId, {
-      sessionId,
-      provider,
-      startTime: now
-    });
-  }
-
-  getSession(conversationId) {
-    return this.conversations.get(conversationId) || null;
-  }
-
-  deleteSession(conversationId) {
-    return this.conversations.delete(conversationId);
-  }
-
-  hasSession(conversationId) {
-    return this.conversations.has(conversationId);
-  }
-
-  isProcessed(messageId) {
-    return this.processedMessages.has(messageId);
-  }
-
-  markAsProcessed(messageId) {
-    this.processedMessages.set(messageId, Date.now());
-  }
-
-  // ==================== 自动清理（与钉钉一致） ====================
-
-  startAutoCleanup() {
-    if (this.cleanupTimer) return;
-
-    this.cleanupTimer = setInterval(() => {
-      this.performCleanup().catch(error => {
-        this.logger.error('QQBOT', '自动清理失败', { error: error.message });
-      });
-    }, this.cleanupConfig.interval);
-  }
-
-  stopAutoCleanup() {
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
-      this.cleanupTimer = null;
-    }
-  }
-
-  async performCleanup() {
-    const now = Date.now();
-    const messageAgeLimit = this.cleanupConfig.messageAgeLimit;
-    const sessionAgeLimit = this.cleanupConfig.sessionAgeLimit;
-
-    // 清理过期消息
-    for (const [messageId, timestamp] of this.processedMessages.entries()) {
-      if (now - timestamp > messageAgeLimit) {
-        this.processedMessages.delete(messageId);
-      }
-    }
-
-    // 清理过期会话
-    for (const [conversationId, session] of this.conversations.entries()) {
-      if (now - session.startTime > sessionAgeLimit) {
-        this.conversations.delete(conversationId);
-      }
-    }
-  }
-
-  // ==================== 关闭 ====================
-
-  async close() {
-    this.stopAutoCleanup();
-    if (this.client) {
-      // qq-bot-sdk 的关闭方法
-      this.logger.info('QQBOT', '客户端已关闭');
-    }
+  /**
+   * 获取消息ID（用于去重）
+   * @param {object} rawMessage - 原始消息
+   * @param {string} type - 消息类型
+   * @returns {string}
+   */
+  getMessageId(rawMessage, type) {
+    return `${type}_${rawMessage.id}`
   }
 }
 
-module.exports = QQBotIntegration;
+module.exports = QQBotIntegration
