@@ -1192,38 +1192,38 @@ class UnifiedServer {
     return null
   }
 
-  async _handleCommand(command, conversationId, sessionWebhook) {
+  async _handleCommand(command, conversationId, replyTarget, platform, originalMessage, type) {
     switch (command.type) {
       case 'switch':
-        return await this._handleSwitch(command.provider, conversationId, sessionWebhook)
+        return await this._handleSwitch(command.provider, conversationId, replyTarget, platform, originalMessage, type)
 
       case 'interrupt':
-        return await this._handleInterrupt(conversationId, sessionWebhook)
+        return await this._handleInterrupt(conversationId, replyTarget, platform, originalMessage, type)
 
       case 'status':
-        return await this._handleStatus(conversationId, sessionWebhook)
+        return await this._handleStatus(conversationId, replyTarget, platform, originalMessage, type)
 
       case 'help':
-        return await this._handleHelp(sessionWebhook)
+        return await this._handleHelp(replyTarget, platform, originalMessage, type)
 
       // 定时任务命令
       case 'tasks_list':
-        return await this._handleTasksList(conversationId, sessionWebhook)
+        return await this._handleTasksList(conversationId, replyTarget, platform, originalMessage, type)
 
       case 'tasks_status':
-        return await this._handleTasksStatus(conversationId, sessionWebhook)
+        return await this._handleTasksStatus(conversationId, replyTarget, platform, originalMessage, type)
 
       case 'tasks_reload':
-        return await this._handleTasksReload(conversationId, sessionWebhook)
+        return await this._handleTasksReload(conversationId, replyTarget, platform, originalMessage, type)
 
       case 'tasks_run':
-        return await this._handleTasksRun(command.arg, conversationId, sessionWebhook)
+        return await this._handleTasksRun(command.arg, conversationId, replyTarget, platform, originalMessage, type)
 
       case 'tasks_enable':
-        return await this._handleTasksEnable(command.arg, conversationId, sessionWebhook)
+        return await this._handleTasksEnable(command.arg, conversationId, replyTarget, platform, originalMessage, type)
 
       case 'tasks_disable':
-        return await this._handleTasksDisable(command.arg, conversationId, sessionWebhook)
+        return await this._handleTasksDisable(command.arg, conversationId, replyTarget, platform, originalMessage, type)
 
       default:
         this.logger.warning('COMMAND', `未知命令类型: ${command.type}`)
@@ -1231,20 +1231,22 @@ class UnifiedServer {
     }
   }
 
-  async _handleSwitch(provider, conversationId, sessionWebhook) {
+  async _handleSwitch(provider, conversationId, replyTarget, platform, originalMessage, type) {
     // 检查 connector 是否可用
     const connector = this.connectors.get(provider)
     if (!connector || !connector.connected) {
       const availableProviders = Array.from(this.connectors.keys()).map(p => p.toUpperCase()).join(', ')
-      await this._sendReply(sessionWebhook,
-        `❌ ${provider.toUpperCase()} 模型不可用\n\n` +
-        `💡 可用模型：${availableProviders || '无'}`
+      await platform.send(
+        replyTarget,
+        `❌ ${provider.toUpperCase()} 模型不可用\n\n💡 可用模型：${availableProviders || '无'}`,
+        originalMessage,
+        type
       )
       return { status: 'SUCCESS' }
     }
 
     // 中断当前任务（如果有）
-    const currentSession = this.dingtalk.getSession(conversationId)
+    const currentSession = platform.getSession(conversationId)
     if (currentSession?.sessionId) {
       const currentConnector = this.connectors.get(currentSession.provider)
       if (currentConnector) {
@@ -1254,23 +1256,25 @@ class UnifiedServer {
     }
 
     // 切换模型（清空旧 sessionId，保留 provider）
-    this.dingtalk.setSession(conversationId, null, provider)
+    platform.setSession(conversationId, null, provider)
 
     const availableProviders = Array.from(this.connectors.keys()).map(p => p.toUpperCase()).join(', ')
-    await this._sendReply(sessionWebhook,
-      `✅ 已切换到 ${provider.toUpperCase()} 模型\n\n` +
-      `💡 可用模型：${availableProviders}`
+    await platform.send(
+      replyTarget,
+      `✅ 已切换到 ${provider.toUpperCase()} 模型\n\n💡 可用模型：${availableProviders}`,
+      originalMessage,
+      type
     )
 
     this.logger.info('PROVIDER', `会话 ${conversationId} 切换到 ${provider}`)
     return { status: 'SUCCESS' }
   }
 
-  async _handleInterrupt(conversationId, sessionWebhook) {
-    const session = this.dingtalk.getSession(conversationId)
+  async _handleInterrupt(conversationId, replyTarget, platform, originalMessage, type) {
+    const session = platform.getSession(conversationId)
 
     if (!session?.sessionId) {
-      await this._sendReply(sessionWebhook, '⚠️ 没有运行中的任务')
+      await platform.send(replyTarget, '⚠️ 没有运行中的任务', originalMessage, type)
       return { status: 'SUCCESS' }
     }
 
@@ -1278,18 +1282,18 @@ class UnifiedServer {
 
     if (connector) {
       connector.interruptSession(session.sessionId)
-      this.dingtalk.deleteSession(conversationId)
-      await this._sendReply(sessionWebhook, '✅ 任务已中断')
+      platform.deleteSession(conversationId)
+      await platform.send(replyTarget, '✅ 任务已中断', originalMessage, type)
       this.logger.info('PROVIDER', `会话 ${conversationId} 任务已中断`)
     } else {
-      await this._sendReply(sessionWebhook, '❌ 无法中断任务：模型不可用')
+      await platform.send(replyTarget, '❌ 无法中断任务：模型不可用', originalMessage, type)
     }
 
     return { status: 'SUCCESS' }
   }
 
-  async _handleStatus(conversationId, sessionWebhook) {
-    const session = this.dingtalk.getSession(conversationId)
+  async _handleStatus(conversationId, replyTarget, platform, originalMessage, type) {
+    const session = platform.getSession(conversationId)
     const provider = session?.provider || this.defaultProvider
     const sessionId = session?.sessionId || null
     const availableProviders = Array.from(this.connectors.entries())
@@ -1304,12 +1308,12 @@ class UnifiedServer {
     }
 
     const statusText = `📊 系统状态\n\n${Object.entries(status).map(([k, v]) => `• ${k}：${v}`).join('\n')}`
-    await this._sendReply(sessionWebhook, statusText)
+    await platform.send(replyTarget, statusText, originalMessage, type)
 
     return { status: 'SUCCESS' }
   }
 
-  async _handleHelp(sessionWebhook) {
+  async _handleHelp(replyTarget, platform, originalMessage, type) {
     const availableProviders = Array.from(this.connectors.entries())
       .filter(([_, conn]) => conn.connected)
       .map(([p, _]) => p.toUpperCase())
@@ -1340,36 +1344,22 @@ class UnifiedServer {
 
 💡 可用模型：${availableProviders || '无'}`
 
-    await this._sendReply(sessionWebhook, help.trim())
+    await platform.send(replyTarget, help.trim(), originalMessage, type)
     return { status: 'SUCCESS' }
-  }
-
-  async _sendReply(sessionWebhook, text) {
-    const message = {
-      msgtype: 'text',
-      text: { content: text }
-    }
-
-    try {
-      await this.dingtalk.send(sessionWebhook, message)
-      this.logger.debug('DINGTALK', '回复已发送', { length: text.length })
-    } catch (error) {
-      this.logger.error('DINGTALK', '回复发送失败', { error: error.message })
-    }
   }
 
   // ==================== 定时任务命令处理 ====================
 
-  async _handleTasksList(conversationId, sessionWebhook) {
+  async _handleTasksList(conversationId, replyTarget, platform, originalMessage, type) {
     if (!this.scheduler || !this.scheduler.enabled) {
-      await this._sendReply(sessionWebhook, '⚠️ 定时任务功能未启用')
+      await platform.send(replyTarget, '⚠️ 定时任务功能未启用', originalMessage, type)
       return { status: 'SUCCESS' }
     }
 
     const status = this.scheduler.getStatus()
 
     if (status.tasks.length === 0) {
-      await this._sendReply(sessionWebhook, '📋 暂无定时任务')
+      await platform.send(replyTarget, '📋 暂无定时任务', originalMessage, type)
       return { status: 'SUCCESS' }
     }
 
@@ -1390,13 +1380,13 @@ class UnifiedServer {
     lines.push('• tasks enable <id> - 启用任务')
     lines.push('• tasks disable <id> - 禁用任务')
 
-    await this._sendReply(sessionWebhook, lines.join('\n'))
+    await platform.send(replyTarget, lines.join('\n'), originalMessage, type)
     return { status: 'SUCCESS' }
   }
 
-  async _handleTasksStatus(conversationId, sessionWebhook) {
+  async _handleTasksStatus(conversationId, replyTarget, platform, originalMessage, type) {
     if (!this.scheduler) {
-      await this._sendReply(sessionWebhook, '⚠️ 定时任务管理器未初始化')
+      await platform.send(replyTarget, '⚠️ 定时任务管理器未初始化', originalMessage, type)
       return { status: 'SUCCESS' }
     }
 
@@ -1411,34 +1401,34 @@ class UnifiedServer {
       `运行中任务: ${status.scheduledJobs}`
     ]
 
-    await this._sendReply(sessionWebhook, lines.join('\n'))
+    await platform.send(replyTarget, lines.join('\n'), originalMessage, type)
     return { status: 'SUCCESS' }
   }
 
-  async _handleTasksReload(conversationId, sessionWebhook) {
+  async _handleTasksReload(conversationId, replyTarget, platform, originalMessage, type) {
     if (!this.scheduler) {
-      await this._sendReply(sessionWebhook, '⚠️ 定时任务管理器未初始化')
+      await platform.send(replyTarget, '⚠️ 定时任务管理器未初始化', originalMessage, type)
       return { status: 'SUCCESS' }
     }
 
     try {
       await this.scheduler.taskManager.reload()
-      await this._sendReply(sessionWebhook, '✅ 任务配置已重载')
+      await platform.send(replyTarget, '✅ 任务配置已重载', originalMessage, type)
     } catch (error) {
-      await this._sendReply(sessionWebhook, `❌ 重载失败: ${error.message}`)
+      await platform.send(replyTarget, `❌ 重载失败: ${error.message}`, originalMessage, type)
     }
 
     return { status: 'SUCCESS' }
   }
 
-  async _handleTasksRun(taskId, conversationId, sessionWebhook) {
+  async _handleTasksRun(taskId, conversationId, replyTarget, platform, originalMessage, type) {
     if (!this.scheduler || !this.scheduler.enabled) {
-      await this._sendReply(sessionWebhook, '⚠️ 定时任务功能未启用')
+      await platform.send(replyTarget, '⚠️ 定时任务功能未启用', originalMessage, type)
       return { status: 'SUCCESS' }
     }
 
     if (!taskId) {
-      await this._sendReply(sessionWebhook, '❌ 请指定任务 ID：tasks run <id>')
+      await platform.send(replyTarget, '❌ 请指定任务 ID：tasks run <id>', originalMessage, type)
       return { status: 'SUCCESS' }
     }
 
@@ -1446,60 +1436,60 @@ class UnifiedServer {
       const result = await this.scheduler.taskManager.runTask(taskId)
 
       if (result.success) {
-        await this._sendReply(sessionWebhook,
-          `✅ 任务执行完成\n耗时: ${result.elapsed}s`
+        await platform.send(replyTarget,
+          `✅ 任务执行完成\n耗时: ${result.elapsed}s`, originalMessage, type
         )
       } else {
-        await this._sendReply(sessionWebhook,
-          `❌ 任务执行失败: ${result.error}`
+        await platform.send(replyTarget,
+          `❌ 任务执行失败: ${result.error}`, originalMessage, type
         )
       }
     } catch (error) {
-      await this._sendReply(sessionWebhook,
-        `❌ 执行失败: ${error.message}`
+      await platform.send(replyTarget,
+        `❌ 执行失败: ${error.message}`, originalMessage, type
       )
     }
 
     return { status: 'SUCCESS' }
   }
 
-  async _handleTasksEnable(taskId, conversationId, sessionWebhook) {
+  async _handleTasksEnable(taskId, conversationId, replyTarget, platform, originalMessage, type) {
     if (!this.scheduler || !this.scheduler.enabled) {
-      await this._sendReply(sessionWebhook, '⚠️ 定时任务功能未启用')
+      await platform.send(replyTarget, '⚠️ 定时任务功能未启用', originalMessage, type)
       return { status: 'SUCCESS' }
     }
 
     if (!taskId) {
-      await this._sendReply(sessionWebhook, '❌ 请指定任务 ID：tasks enable <id>')
+      await platform.send(replyTarget, '❌ 请指定任务 ID：tasks enable <id>', originalMessage, type)
       return { status: 'SUCCESS' }
     }
 
     try {
       this.scheduler.taskManager.enableTask(taskId)
-      await this._sendReply(sessionWebhook, `✅ 任务已启用: ${taskId}`)
+      await platform.send(replyTarget, `✅ 任务已启用: ${taskId}`, originalMessage, type)
     } catch (error) {
-      await this._sendReply(sessionWebhook, `❌ 启用失败: ${error.message}`)
+      await platform.send(replyTarget, `❌ 启用失败: ${error.message}`, originalMessage, type)
     }
 
     return { status: 'SUCCESS' }
   }
 
-  async _handleTasksDisable(taskId, conversationId, sessionWebhook) {
+  async _handleTasksDisable(taskId, conversationId, replyTarget, platform, originalMessage, type) {
     if (!this.scheduler || !this.scheduler.enabled) {
-      await this._sendReply(sessionWebhook, '⚠️ 定时任务功能未启用')
+      await platform.send(replyTarget, '⚠️ 定时任务功能未启用', originalMessage, type)
       return { status: 'SUCCESS' }
     }
 
     if (!taskId) {
-      await this._sendReply(sessionWebhook, '❌ 请指定任务 ID：tasks disable <id>')
+      await platform.send(replyTarget, '❌ 请指定任务 ID：tasks disable <id>', originalMessage, type)
       return { status: 'SUCCESS' }
     }
 
     try {
       this.scheduler.taskManager.disableTask(taskId)
-      await this._sendReply(sessionWebhook, `✅ 任务已禁用: ${taskId}`)
+      await platform.send(replyTarget, `✅ 任务已禁用: ${taskId}`, originalMessage, type)
     } catch (error) {
-      await this._sendReply(sessionWebhook, `❌ 禁用失败: ${error.message}`)
+      await platform.send(replyTarget, `❌ 禁用失败: ${error.message}`, originalMessage, type)
     }
 
     return { status: 'SUCCESS' }
@@ -1600,13 +1590,13 @@ class UnifiedServer {
     }
 
     // 初始化钉钉（在连接之前注册消息处理器）
-    const dingtalkEnabled = await this.dingtalk.init(this.handleDingTalkMessage.bind(this))
+    const dingtalkEnabled = await this.dingtalk.connect(this.handleDingTalkMessage.bind(this))
     if (dingtalkEnabled) {
       this.logger.success('DINGTALK', '钉钉集成已启动')
     }
 
     // 启动 QQ Bot 集成（传入messageHandler，像钉钉一样）
-    const qqbotEnabled = await this.qqbot.init(this.handleQQBotMessage.bind(this))
+    const qqbotEnabled = await this.qqbot.connect(this.handleQQBotMessage.bind(this))
     if (qqbotEnabled) {
       this.logger.success('QQBOT', 'QQ Bot 集成已启动')
     }
@@ -1708,7 +1698,7 @@ class UnifiedServer {
       const command = this._parseCommand(content)
       if (command) {
         this.logger.success('COMMAND', `✅ 识别到命令: ${command.type}${command.provider ? ` -> ${command.provider}` : ''}`)
-        return await this._handleCommandUnified(command, conversationId, replyTarget, platform)
+        return await this._handleCommand(command, conversationId, replyTarget, platform, rawMessage, type)
       }
 
       // 3. 获取会话
@@ -1799,44 +1789,6 @@ class UnifiedServer {
    * @param {BasePlatformIntegration} platform - 平台集成实例
    * @returns {Promise<{status: string}>}
    */
-  async _handleCommandUnified(command, conversationId, replyTarget, platform) {
-    const platformName = platform.constructor.name.replace('Integration', '').toUpperCase()
-
-    try {
-      let response = ''
-
-      if (command.type === 'switch') {
-        // 切换模型
-        platform.setSession(conversationId, null, command.provider)
-        response = `✅ 已切换到 ${command.provider.toUpperCase()} 模型`
-      } else if (command.type === 'help') {
-        // 帮助信息
-        response = `🤖 可用命令:\n\n`
-        response += `/switch <model> - 切换模型 (claude/iflow/codex)\n`
-        response += `/help - 显示帮助\n`
-        response += `/status - 查看状态\n\n`
-        response += `当前模型: ${platform.getSession(conversationId)?.provider || this.defaultProvider}`
-      } else if (command.type === 'status') {
-        // 状态信息
-        const session = platform.getSession(conversationId)
-        response = `📊 状态信息:\n\n`
-        response += `会话ID: ${conversationId}\n`
-        response += `当前模型: ${session?.provider || this.defaultProvider}\n`
-        response += `SessionID: ${session?.sessionId || '无'}\n`
-        response += `已处理消息: ${platform.processedMessages.size}`
-      } else {
-        response = `❌ 未知命令: ${command.type}`
-      }
-
-      await platform.send(replyTarget, response, null, null)
-      return { status: 'SUCCESS' }
-    } catch (error) {
-      this.logger.error(platformName, `命令处理失败: ${error.message}`)
-      await platform.send(replyTarget, `❌ 命令执行失败: ${error.message}`, null, null)
-      return { status: 'SUCCESS' }
-    }
-  }
-
   // ==================== 钉钉消息处理 ====================
 
   async handleDingTalkMessage(message) {
@@ -2081,196 +2033,6 @@ class UnifiedServer {
       message,  // QQ需要原始消息作为回复目标
       { type }  // 传递type参数
     )
-  }
-      return
-    }
-
-    // 🔍 会话管理详细日志
-    this.logger.success('SESSION', '========== 会话管理诊断 ==========')
-    this.logger.success('SESSION', `ConversationID: ${conversationId}`)
-    this.logger.success('SESSION', `Provider: ${provider}`)
-
-    const sessionMapSize = this.qqbot.conversations.size
-    this.logger.success('SESSION', `SessionMap 大小: ${sessionMapSize}`)
-
-    const isResume = !!sessionId
-    this.logger.success('SESSION', `检索到的 SessionID: ${sessionId || 'null'}`)
-    this.logger.success('SESSION', `会话模式: ${isResume ? '继续会话' : '新会话'}`)
-    this.logger.success('SESSION', '====================================')
-
-    // ⭐ 设置 sessionId 更新回调
-    connector.onSessionIdUpdate((realSessionId) => {
-      this.qqbot.setSession(conversationId, realSessionId, provider)
-      this.logger.success('SESSION', '✅ 通过回调保存 SessionID', {
-        conversationId,
-        sessionId: realSessionId,
-        sessionMapSize: this.qqbot.conversations.size
-      })
-    })
-
-    let messageCount = 0
-    let sentMessageCount = 0
-    let latestReply = ''
-    const startTime = Date.now()
-
-    this.logger.info('QQBOT', `开始调用 ${isResume ? 'continueSession' : 'startSession'}...`)
-
-    try {
-      await new Promise((resolve, reject) => {
-        // 🔥 记录所有事件类型用于统计
-        const eventTypes = [];
-
-        const options = {
-          onEvent: async (event) => {
-            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-            const context = { index: ++messageCount, elapsed }
-
-            // 记录事件类型用于统计
-            eventTypes.push(event.type);
-
-            // 记录所有事件类型
-            this.logger.info('EVENT', `#${messageCount} [${event.type}]`)
-
-            // 🔥 特殊事件类型的醒目日志
-            if (event.type === 'send_file') {
-              this.logger.success('EVENT', `🎯🎯🎯 收到 send_file 事件！文件: ${event.filePath}`)
-            }
-
-            // QQ Bot 详细事件日志 - 便于诊断问题
-            this.logger.debug('QQBOT', `[${type}] 事件详情: ${JSON.stringify(event, null, 2).substring(0, 500)}`)
-
-            // 处理不同类型的事件
-            if (event.type === 'assistant' || event.type === 'result') {
-              // 尝试多种方式提取文本内容
-              let text = ''
-
-              this.logger.info('EVENT', `#${messageCount} [${event.type}] 开始处理`)
-
-              // 方式1: event.message.content 数组格式
-              if (event.message?.content && Array.isArray(event.message.content)) {
-                text = event.message.content
-                  .filter(c => c.type === 'text')
-                  .map(c => c.text)
-                  .join('')
-              }
-              
-              // 方式2: event.result 字符串格式
-              if (!text && event.result) {
-                text = event.result
-              }
-              
-              // 方式3: event.message 字符串格式
-              if (!text && typeof event.message === 'string') {
-                text = event.message
-              }
-              
-              // 方式4: event.content 字符串格式
-              if (!text && event.content) {
-                text = event.content
-              }
-              
-              // 方式5: event.text 字符串格式
-              if (!text && event.text) {
-                text = event.text
-              }
-
-              this.logger.info('QQBOT', `[${type}] 提取文本: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`)
-              
-              if (text) {
-                latestReply = text
-                this.logger.debug('QQBOT', `[${type}] 暂存回复文本，等待 session_end 统一发送`)
-              } else {
-                this.logger.warn('QQBOT', `[${type}] 事件类型 ${event.type} 无法提取文本内容`)
-              }
-            } else if (event.type === 'error') {
-              this.logger.error('QQBOT', `错误事件: ${event.error}`)
-              await this._sendQQBotReply(message, type, `❌ 处理失败: ${event.error}`)
-              reject(new Error(event.error))
-            } else if (event.type === 'send_file') {
-              // ⭐ 新增：处理文件发送事件
-              this.logger.success('QQBOT', `🎯 ========== 收到 send_file 事件 ==========`)
-              this.logger.info('QQBOT', `文件路径: ${event.filePath}`)
-              this.logger.info('QQBOT', `文件类型: ${event.fileType || '未指定'}`)
-              this.logger.info('QQBOT', `说明文字: ${event.caption || '无'}`)
-              this.logger.info('QQBOT', `消息类型: ${type}`)
-              this.logger.info('QQBOT', `会话 ID: ${conversationId}`)
-
-              try {
-                // 上传并发送文件
-                this.logger.info('QQBOT', `开始调用 _uploadAndSendFile...`)
-                const fileInfo = await this._uploadAndSendFile(
-                  message,
-                  type,
-                  event.filePath,
-                  event.fileType || 'file',
-                  event.caption || ''
-                )
-
-                this.logger.success('QQBOT', `✅ 文件发送成功: ${fileInfo.url}`)
-                sentMessageCount++
-
-                // 如果需要，发送后删除本地文件
-                if (event.options?.deleteAfterSend) {
-                  const FileHelper = require('../utils/file-helper')
-                  FileHelper.deleteFile(event.filePath)
-                  this.logger.info('QQBOT', `✅ 已删除本地文件: ${event.filePath}`)
-                }
-
-                this.logger.success('QQBOT', `🎯 ========== send_file 事件处理完成 ==========`)
-
-              } catch (error) {
-                this.logger.error('QQBOT', `文件发送失败: ${error.message}`)
-                this.logger.error('QQBOT', `错误堆栈: ${error.stack}`)
-                await this._sendQQBotReply(
-                  message,
-                  type,
-                  `❌ 文件发送失败: ${error.message}`
-                )
-              }
-            } else if (event.type === 'session_end') {
-              if (latestReply) {
-                await this._sendQQBotReply(message, type, latestReply)
-                sentMessageCount++
-              } else if (messageCount > 0 && sentMessageCount === 0) {
-                await this._sendQQBotReply(
-                  message,
-                  type,
-                  '已收到消息，但本次会话没有产出可发送文本。请稍后重试，或发送 /clear 后再试。'
-                )
-              }
-
-              // 🔥 事件类型统计
-              const eventSummary = eventTypes.join(', ');
-              const hasSendFile = eventTypes.includes('send_file');
-
-              this.logger.info('QQBOT', `会话结束，共 ${messageCount} 个事件，发送 ${sentMessageCount} 条消息`)
-              this.logger.info('QQBOT', `事件类型统计: ${eventSummary}`)
-
-              if (hasSendFile) {
-                this.logger.success('QQBOT', `✅✅✅ 本次会话包含了 send_file 事件`)
-              } else {
-                this.logger.warning('QQBOT', `⚠️⚠️⚠️ 本次会话没有 send_file 事件`)
-              }
-
-              resolve()
-            } else {
-              // 其他事件类型也打印日志
-              this.logger.debug('QQBOT', `[${type}] 未处理的事件类型: ${event.type}`)
-            }
-          }
-        }
-
-        // 调用 connector
-        if (isResume && sessionId) {
-          connector.continueSession(sessionId, content, options)
-        } else {
-          connector.startSession(content, options)
-        }
-      })
-    } catch (error) {
-      this.logger.error('QQBOT', `处理消息失败: ${error.message}`)
-      await this._sendQQBotReply(message, type, `❌ 处理失败: ${error.message}`)
-    }
   }
 
   /**

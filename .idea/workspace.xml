@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="移除无效内容">
-      <change beforePath="$PROJECT_DIR$/integrations/qqbot.js" beforeDir="false" afterPath="$PROJECT_DIR$/integrations/qqbot.js" afterDir="false" />
+    <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="QQ机器人">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/integrations/base-platform-integration.js" beforeDir="false" afterPath="$PROJECT_DIR$/integrations/base-platform-integration.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/integrations/qqbot/qqbot-client.js" beforeDir="false" afterPath="$PROJECT_DIR$/integrations/qqbot/qqbot-client.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/server.js" beforeDir="false" afterPath="$PROJECT_DIR$/server.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/claude.txt" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/claude.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/system-prompts/docs/plugins/config-manager.md" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/docs/plugins/config-manager.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/system-prompts/docs/plugins/context-memory.md" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/docs/plugins/context-memory.md" afterDir="false" />
     </list>
@@ -192,7 +196,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772636488386</updated>
     </task>
-    <option name="localTasksCounter" value="14" />
+    <task id="LOCAL-00014" summary="QQ机器人">
+      <option name="closed" value="true" />
+      <created>1772861689249</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1772861689249</updated>
+    </task>
+    <option name="localTasksCounter" value="15" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -226,6 +238,7 @@
     <MESSAGE value="支持系统提示词" />
     <MESSAGE value="修复工具调用失败的问题（实际是显示错误）没完全修复" />
     <MESSAGE value="移除无效内容" />
-    <option name="LAST_COMMIT_MESSAGE" value="移除无效内容" />
+    <MESSAGE value="QQ机器人" />
+    <option name="LAST_COMMIT_MESSAGE" value="QQ机器人" />
   </component>
 </project>

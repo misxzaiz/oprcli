@@ -733,6 +733,258 @@ class QQBotClient extends EventEmitter {
   }
 
   /**
+   * 上传文件到频道
+   * @param {string} channelId - 频道 ID
+   * @param {string} filePath - 本地文件路径
+   * @param {string} fileType - 文件类型 (image/audio/video/file)
+   * @returns {Promise<{url: string, ttl: number}>}
+   */
+  async uploadFile(channelId, filePath, fileType = 'file') {
+    const fs = require('fs');
+    const path = require('path');
+    const FormData = require('form-data');
+    const https = require('https');
+
+    return new Promise((resolve, reject) => {
+      // 1. 验证文件存在
+      if (!fs.existsSync(filePath)) {
+        this.debugLog(`❌ 文件不存在: ${filePath}`);
+        return reject(new Error(`文件不存在: ${filePath}`));
+      }
+
+      // 2. 构造请求 URL
+      const urlObj = new URL(`/channels/${channelId}/files`, this.apiBase);
+
+      // 3. 构造 multipart/form-data
+      const formData = new FormData();
+      formData.append('file', fs.createReadStream(filePath));
+      formData.append('file_type', this._mapFileType(fileType));
+
+      const formDataHeaders = formData.getHeaders();
+      formDataHeaders['Authorization'] = `QQBot ${this.accessToken}`;
+
+      this.debugLog(`📤 上传文件: ${path.basename(filePath)} (${fileType})`);
+
+      // 4. 发送请求
+      const req = https.request(urlObj, {
+        method: 'POST',
+        headers: formDataHeaders
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            const result = JSON.parse(data);
+            if (result.code === 0) {
+              this.debugLog(`✅ 上传成功: ${result.data.url}`);
+              resolve(result.data);
+            } else {
+              this.debugLog(`❌ 上传失败: ${result.message}`);
+              reject(new Error(`上传失败: ${result.message}`));
+            }
+          } catch (error) {
+            this.debugLog(`❌ 解析响应失败: ${error.message}`);
+            this.debugLog(`响应内容: ${data}`);
+            reject(error);
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        this.debugLog(`❌ 上传错误: ${error.message}`);
+        reject(error);
+      });
+
+      // 5. 发送表单数据
+      formData.pipe(req);
+    });
+  }
+
+  /**
+   * 发送图片消息（从本地文件）
+   * @param {string} channelId - 频道 ID
+   * @param {string} imagePath - 本地图片路径
+   * @param {string} caption - 说明文字
+   * @param {object} options - 其他选项 (msgId, eventId)
+   */
+  async sendImageFromFile(channelId, imagePath, caption = '', options = {}) {
+    try {
+      // 1. 上传图片
+      const uploadResult = await this.uploadFile(channelId, imagePath, 'image');
+
+      // 2. 发送消息（附带图片）
+      return this.sendMessage(channelId, caption, {
+        ...options,
+        image: uploadResult.url
+      });
+    } catch (error) {
+      this.debugLog(`❌ 发送图片失败: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 映射文件类型到 QQ API 格式
+   * @private
+   */
+  _mapFileType(fileType) {
+    const typeMap = {
+      'image': 1,
+      'audio': 2,
+      'video': 3,
+      'file': 4
+    };
+    return typeMap[fileType] || 4;
+  }
+
+  /**
+   * 获取 C2C 文件上传 URL
+   * @param {string} openid - 用户 OpenID
+   * @param {number} fileType - 文件类型 (1=图片, 2=音频, 3=视频, 4=文件)
+   * @returns {Promise<{upload_url: string, ttl: number, key: string}>}
+   */
+  async getC2CUploadUrl(openid, fileType = 1) {
+    const https = require('https');
+
+    return new Promise((resolve, reject) => {
+      // 构造请求 URL
+      const urlObj = new URL(`/v2/users/${openid}/files/c2c`, this.apiBase);
+
+      // 请求体
+      const requestBody = JSON.stringify({
+        file_type: fileType,
+        srv_send_msg: false
+      });
+
+      const options = {
+        method: 'POST',
+        headers: {
+          'Authorization': `QQBot ${this.accessToken}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(requestBody)
+        }
+      };
+
+      this.debugLog(`📡 获取 C2C 上传 URL (类型: ${fileType})...`);
+
+      const req = https.request(urlObj, options, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            const result = JSON.parse(data);
+            if (result.code === 0) {
+              this.debugLog(`✅ 获取上传 URL 成功`);
+              resolve(result.data);
+            } else {
+              this.debugLog(`❌ 获取上传 URL 失败: ${result.message}`);
+              reject(new Error(`获取上传URL失败: ${result.message}`));
+            }
+          } catch (error) {
+            this.debugLog(`❌ 解析响应失败: ${error.message}`);
+            reject(error);
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        this.debugLog(`❌ 请求错误: ${error.message}`);
+        reject(error);
+      });
+
+      req.write(requestBody);
+      req.end();
+    });
+  }
+
+  /**
+   * 上传文件到指定 URL
+   * @param {string} uploadUrl - 上传 URL
+   * @param {string} filePath - 本地文件路径
+   * @returns {Promise<string>} 文件 URL
+   */
+  async uploadToUrl(uploadUrl, filePath) {
+    const fs = require('fs');
+    const FormData = require('form-data');
+    const https = require('https');
+
+    return new Promise((resolve, reject) => {
+      // 验证文件存在
+      if (!fs.existsSync(filePath)) {
+        return reject(new Error(`文件不存在: ${filePath}`));
+      }
+
+      // 构造表单数据
+      const formData = new FormData();
+      formData.append('file', fs.createReadStream(filePath));
+
+      const formDataHeaders = formData.getHeaders();
+
+      this.debugLog(`📤 上传文件到: ${uploadUrl.substring(0, 60)}...`);
+
+      // 解析 URL
+      const urlObj = new URL(uploadUrl);
+
+      const req = https.request(uploadUrl, {
+        method: 'PUT',
+        headers: formDataHeaders
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          if (res.statusCode === 200 || res.statusCode === 201) {
+            // 从响应头获取文件 URL（如果有）
+            const fileUrl = res.headers['x-cos-file-url'] || uploadUrl.split('?')[0];
+            this.debugLog(`✅ 文件上传成功: ${fileUrl}`);
+            resolve(fileUrl);
+          } else {
+            this.debugLog(`❌ 上传失败，状态码: ${res.statusCode}`);
+            this.debugLog(`响应内容: ${data}`);
+            reject(new Error(`上传失败: HTTP ${res.statusCode}`));
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        this.debugLog(`❌ 上传错误: ${error.message}`);
+        reject(error);
+      });
+
+      // 发送表单数据
+      formData.pipe(req);
+    });
+  }
+
+  /**
+   * C2C 文件上传完整流程
+   * @param {string} openid - 用户 OpenID
+   * @param {string} filePath - 本地文件路径
+   * @param {string} fileTypeStr - 文件类型字符串
+   * @returns {Promise<string>} 文件 URL
+   */
+  async uploadC2CFile(openid, filePath, fileTypeStr = 'file') {
+    try {
+      // 映射文件类型到数字
+      const fileTypeNum = this._mapFileType(fileTypeStr);
+
+      this.debugLog(`🔄 开始 C2C 文件上传: ${filePath} (${fileTypeStr})`);
+
+      // 1. 获取上传 URL
+      const uploadInfo = await this.getC2CUploadUrl(openid, fileTypeNum);
+
+      // 2. 上传文件
+      const fileUrl = await this.uploadToUrl(uploadInfo.upload_url, filePath);
+
+      this.debugLog(`✅ C2C 文件上传完成: ${fileUrl}`);
+      return fileUrl;
+
+    } catch (error) {
+      this.debugLog(`❌ C2C 文件上传失败: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
    * 调试日志
    */
   debugLog(message) {

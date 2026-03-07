@@ -75,6 +75,18 @@ class BasePlatformIntegration {
   }
 
   /**
+   * 删除会话
+   * @param {string} conversationId - 会话ID
+   */
+  deleteSession(conversationId) {
+    const deleted = this.conversations.delete(conversationId)
+    if (deleted) {
+      this.logger.debug('SESSION', `会话已删除: ${conversationId}`)
+    }
+    return deleted
+  }
+
+  /**
    * 简化的重试发送机制（指数退避）
    * @param {string} target - 目标（webhook URL 或 channel ID）
    * @param {string} message - 消息内容

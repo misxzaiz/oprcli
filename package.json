@@ -45,6 +45,7 @@
     "dingtalk-stream": "^2.1.4",
     "dotenv": "^17.3.1",
     "express": "^4.18.2",
+    "form-data": "^4.0.5",
     "helmet": "^7.1.0",
     "node-cron": "^3.0.3"
   }
