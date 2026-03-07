@@ -19,6 +19,8 @@ const express = require('express')
 const config = require('./utils/config')
 const Logger = require('./integrations/logger')
 const AuditLogger = require('./integrations/audit-logger')
+const RobotEventFormatter = require('./integrations/robot-event-formatter')
+const RobotDedup = require('./integrations/robot-dedup')
 const DingTalkIntegration = require('./integrations/dingtalk')
 const QQBotIntegration = require('./integrations/qqbot')
 const ClaudeConnector = require('./connectors/claude-connector')
@@ -65,6 +67,8 @@ class UnifiedServer {
     // 定时任务模块
     this.scheduler = null
     this.auditLogger = AuditLogger
+    this.robotFormatter = new RobotEventFormatter({ maxChars: config.robotStream?.maxChars || 1200 })
+    this.robotDedup = new RobotDedup(config.robotStream?.dedupWindowMs || 5000)
 
     this._setupMiddleware()
   }
@@ -494,30 +498,14 @@ class UnifiedServer {
   }
 
   _formatEventMessage(eventType, event, extractedText, cfg, elapsedMs) {
-    const maxChars = cfg.maxChars || 1200
-    if (eventType === 'assistant_chunk' || eventType === 'result') {
-      if (cfg.enabled && (cfg.profile === 'full' || cfg.profile === 'debug')) {
-        return `[ASSISTANT]\n${this._trimText(extractedText, maxChars)}`
-      }
-      return this._trimText(extractedText, maxChars)
-    }
-    if (eventType === 'thinking_exposed') {
-      const thinking = event?.delta?.text || event?.thinking || extractedText || ''
-      return `[THINKING]\n${this._trimText(thinking, maxChars)}`
-    }
-    if (eventType === 'tool_use') {
-      return `[TOOL_USE] ${event.name || 'unknown'}\n${this._trimText(JSON.stringify(event.input || {}), maxChars)}`
-    }
-    if (eventType === 'tool_result') {
-      return `[TOOL_RESULT]\n${this._trimText(event.output || extractedText || '', maxChars)}`
-    }
-    if (eventType === 'error') {
-      return `[ERROR] ${event?.error || event?.message || 'unknown'}`
-    }
-    if (eventType === 'end') {
-      return `[END] 已结束，耗时 ${elapsedMs}ms`
-    }
-    return ''
+    return this.robotFormatter.format(eventType, event, extractedText, {
+      profile: cfg.profile,
+      elapsedMs
+    })
+  }
+
+  _shouldSendMessage(traceId, eventType, msg) {
+    return this.robotDedup.shouldSend(traceId, eventType, msg)
   }
 
   // ==================== 定时任务命令处理 ====================
@@ -753,7 +741,8 @@ class UnifiedServer {
       sendThinking: false,
       sendHttp: false,
       maxChars: 1200,
-      sendEndSummary: true
+      sendEndSummary: true,
+      chunkStrategy: 'throttle'
     }
     const streamState = {
       firstOutputAt: null,
@@ -879,21 +868,34 @@ class UnifiedServer {
               if (this._shouldSendEvent(mappedType, streamCfg)) {
                 const msg = this._formatEventMessage(mappedType, event, extractedText, streamCfg, elapsed)
                 if (msg) {
-                  if (!streamState.firstOutputAt && (mappedType === 'assistant_chunk' || mappedType === 'result' || mappedType === 'tool_result')) {
-                    streamState.firstOutputAt = Date.now()
-                    streamState.finalResponseType = mappedType
+                  const sendDecision = this._shouldSendMessage(traceId, mappedType, msg)
+                  if (!sendDecision.send) {
+                    this.auditLogger.logAgent('agent.event.skip_send', {
+                      trace_id: traceId,
+                      platform: platformName.toLowerCase(),
+                      conversation_id: conversationId,
+                      provider,
+                      mapped_type: mappedType,
+                      reason: sendDecision.reason,
+                      formatted_preview: msg
+                    })
+                  } else {
+                    if (!streamState.firstOutputAt && (mappedType === 'assistant_chunk' || mappedType === 'result' || mappedType === 'tool_result')) {
+                      streamState.firstOutputAt = Date.now()
+                      streamState.finalResponseType = mappedType
+                    }
+                    this.logger.info(platformName, `?? ??????: ${mappedType} (${msg.length} ??)`)
+                    await platform.send(replyTarget, msg, rawMessage, type, {
+                      traceId,
+                      conversationId,
+                      provider,
+                      platform: platformName.toLowerCase(),
+                      messageType: type || 'default',
+                      streamEventType: mappedType
+                    })
+                    if (!streamState.firstSendAt) streamState.firstSendAt = Date.now()
+                    streamState.sendCount++
                   }
-                  this.logger.info(platformName, `📤 发送过程事件 ${mappedType} (${msg.length} 字符)`)
-                  await platform.send(replyTarget, msg, rawMessage, type, {
-                    traceId,
-                    conversationId,
-                    provider,
-                    platform: platformName.toLowerCase(),
-                    messageType: type || 'default',
-                    streamEventType: mappedType
-                  })
-                  if (!streamState.firstSendAt) streamState.firstSendAt = Date.now()
-                  streamState.sendCount++
                 }
               }
 
@@ -919,7 +921,17 @@ class UnifiedServer {
             if (streamCfg.enabled && streamCfg.sendEndSummary && this._shouldSendEvent('end', streamCfg)) {
               const ttfb = streamState.firstOutputAt ? (streamState.firstOutputAt - startAt) : -1
               const firstSend = streamState.firstSendAt ? (streamState.firstSendAt - startAt) : -1
-              const endMsg = `[END] status=completed total=${total}ms t_first_output=${ttfb}ms t_first_send=${firstSend}ms sends=${streamState.sendCount} type=${streamState.finalResponseType}`
+              const endEvent = {
+                status: 'completed',
+                totalMs: total,
+                ttfbMs: ttfb,
+                firstSendMs: firstSend
+              }
+              const endMsg = this.robotFormatter.format('end', endEvent, '', {
+                profile: streamCfg.profile,
+                elapsedMs: total,
+                finalResponseType: streamState.finalResponseType
+              })
               platform.send(replyTarget, endMsg, rawMessage, type, {
                 traceId,
                 conversationId,
@@ -943,7 +955,10 @@ class UnifiedServer {
           onError: (error) => {
             const total = Date.now() - startAt
             if (streamCfg.enabled && this._shouldSendEvent('error', streamCfg)) {
-              const errMsg = `[ERROR] status=error total=${total}ms reason=${error.message}`
+              const errMsg = this.robotFormatter.format('error', { message: error.message }, '', {
+                profile: streamCfg.profile,
+                elapsedMs: total
+              })
               platform.send(replyTarget, errMsg, rawMessage, type, {
                 traceId,
                 conversationId,
