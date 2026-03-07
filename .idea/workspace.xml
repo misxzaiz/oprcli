@@ -3,9 +3,72 @@
   <component name="ChangeListManager">
     <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="QQ机器人">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.polaris/deep-analysis-self-evolution.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.polaris/implementation-plan.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.polaris/implementation-summary.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.polaris/plugin-system-gaps-analysis.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.polaris/self-evolution-analysis.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.polaris/stage2-analysis.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.polaris/todos.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/constants/commands.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/constants/event-types.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/constants/providers.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/dingtalk-sessions.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/hot-topics/hot-topics-2026-03-05T13-55-13-461Z.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/hot-topics/hot-topics-2026-03-05T14-05-06-450Z.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/hot-topics/hot-topics-2026-03-05T14-05-13-749Z.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/AGENT-SYSTEM.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/HEALTH-CHECK.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/NEWS_COLLECTOR_QUICKSTART.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/SECURITY-ENHANCEMENTS.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/ai-news-collector-quickstart.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/code-index.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/codex-connector.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/codex-context-memory-fix.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/codex-implementation-summary.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/iflow-analysis-summary.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/iflow-call-flow.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/iflow-dingtalk-analysis.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/iflow-tool-calling-guide.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/iflow-tool-issue-resolved.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/information-sources-analysis.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/information-sources-quickref.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/issues.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/news-collector-iflow-guide.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/news-collector-quickref-card.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/news-collector-summary.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/news-collector-usage.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/news-collector-versions-comparison.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/optimization-plan.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/qqbot-cleanup-plan.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/qqbot-dingtalk-comparison.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/qqbot-enhancements-summary.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/system-score.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/update.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/机器人调用Agent流程分析.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/流程图-Mermaid.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/重构完成总结.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/advanced-usage.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/routes/health.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/routes/monitoring.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scheduler/task-manager.js" beforeDir="false" afterPath="$PROJECT_DIR$/scheduler/task-manager.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/server.js" beforeDir="false" afterPath="$PROJECT_DIR$/server.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/docs/plugins/config-manager.md" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/docs/plugins/config-manager.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/docs/plugins/context-memory.md" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/docs/plugins/context-memory.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tasks/abstraction-analysis-1772726656849.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tasks/abstraction-analysis-1772728508703.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tasks/code-quality-analysis-1772726529746.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tasks/code-quality-analysis-1772728502400.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tasks/code-quality-analysis-1772728503885.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tasks/iflow-tool-wrapper.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tasks/news-collector-iflow.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tasks/news-collector-prompt.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tasks/news-collector-with-analysis.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tasks/optimization-analysis-1772726706079.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tasks/optimization-analysis-1772726706079.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tasks/performance-analysis-1772726574610.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tasks/performance-analysis-1772728506776.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tasks/test-results-1772726495987.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/README-ADVANCED.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/graceful-shutdown.js" beforeDir="false" afterPath="$PROJECT_DIR$/utils/graceful-shutdown.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

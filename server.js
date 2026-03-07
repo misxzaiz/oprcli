@@ -1409,17 +1409,22 @@ class UnifiedServer {
       await new Promise((resolve, reject) => {
         const options = {
           onEvent: async (event) => {
-            // 只处理核心事件
-            if (event.type === 'assistant' || event.type === 'result') {
-              const text = this._extractTextFromEvent(event)
-              if (text) {
-                this.logger.info(platformName, `📤 发送回复 (${text.length} 字符)`)
-                await platform.send(replyTarget, text, rawMessage, type)
+            try {
+              // 只处理核心事件
+              if (event.type === 'assistant' || event.type === 'result') {
+                const text = this._extractTextFromEvent(event)
+                if (text) {
+                  this.logger.info(platformName, `📤 发送回复 (${text.length} 字符)`)
+                  await platform.send(replyTarget, text, rawMessage, type)
+                }
+              } else if (event.type === 'system' && event.extra?.session_id) {
+                sessionId = event.extra.session_id
+                platform.setSession(conversationId, sessionId, provider)
+                this.logger.success('SESSION', `✅ 保存SessionID: ${sessionId}`)
               }
-            } else if (event.type === 'system' && event.extra?.session_id) {
-              sessionId = event.extra.session_id
-              platform.setSession(conversationId, sessionId, provider)
-              this.logger.success('SESSION', `✅ 保存SessionID: ${sessionId}`)
+            } catch (error) {
+              this.logger.error(platformName, `onEvent 处理失败: ${error.message}`)
+              // 不抛出异常，让会话继续
             }
           },
           onComplete: (exitCode) => {

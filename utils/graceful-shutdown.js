@@ -47,9 +47,10 @@ class GracefulShutdown {
     })
 
     // 监听未处理的 Promise 拒绝
+    // 注意：仅记录日志，不触发关闭，避免因发送失败等非致命错误导致服务崩溃
     process.on('unhandledRejection', (reason, promise) => {
-      this.logger.error('SHUTDOWN', '未处理的 Promise 拒绝', { reason })
-      this.shutdown('UNHANDLED_REJECTION')
+      this.logger.error('SHUTDOWN', '未处理的 Promise 拒绝（已记录，不触发关闭）', { reason })
+      // 不调用 this.shutdown()，让服务继续运行
     })
 
     this.logger.info('SHUTDOWN', '优雅关闭处理器已设置')
