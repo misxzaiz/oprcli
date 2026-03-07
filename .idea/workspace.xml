@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="修改系统提示词">
-      <change beforePath="$PROJECT_DIR$/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/.env.example" afterDir="false" />
+    <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="添加忽略文件">
+      <change afterPath="$PROJECT_DIR$/todo.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/server.js" beforeDir="false" afterPath="$PROJECT_DIR$/server.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/config.js" beforeDir="false" afterPath="$PROJECT_DIR$/utils/config.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -86,6 +85,7 @@
       <workItem from="1772459132182" duration="2944000" />
       <workItem from="1772465954095" duration="5507000" />
       <workItem from="1772631636263" duration="421000" />
+      <workItem from="1772909438077" duration="1653000" />
     </task>
     <task id="LOCAL-00001" summary="2132312">
       <option name="closed" value="true" />
@@ -239,7 +239,31 @@
       <option name="project" value="LOCAL" />
       <updated>1772898459397</updated>
     </task>
-    <option name="localTasksCounter" value="20" />
+    <task id="LOCAL-00020" summary="打印日志">
+      <option name="closed" value="true" />
+      <created>1772904489077</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1772904489077</updated>
+    </task>
+    <task id="LOCAL-00021" summary="文档位置">
+      <option name="closed" value="true" />
+      <created>1772908859494</created>
+      <option name="number" value="00021" />
+      <option name="presentableId" value="LOCAL-00021" />
+      <option name="project" value="LOCAL" />
+      <updated>1772908859494</updated>
+    </task>
+    <task id="LOCAL-00022" summary="添加忽略文件">
+      <option name="closed" value="true" />
+      <created>1772910036495</created>
+      <option name="number" value="00022" />
+      <option name="presentableId" value="LOCAL-00022" />
+      <option name="project" value="LOCAL" />
+      <updated>1772910036495</updated>
+    </task>
+    <option name="localTasksCounter" value="23" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -275,6 +299,9 @@
     <MESSAGE value="QQ机器人" />
     <MESSAGE value="移除无效内容" />
     <MESSAGE value="修改系统提示词" />
-    <option name="LAST_COMMIT_MESSAGE" value="修改系统提示词" />
+    <MESSAGE value="打印日志" />
+    <MESSAGE value="文档位置" />
+    <MESSAGE value="添加忽略文件" />
+    <option name="LAST_COMMIT_MESSAGE" value="添加忽略文件" />
   </component>
 </project>

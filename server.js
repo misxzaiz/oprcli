@@ -909,8 +909,8 @@ class UnifiedServer {
                 }
               }
 
-              if (event.type === 'system' && event.extra?.session_id) {
-                sessionId = event.extra.session_id
+              if (event.type === 'system' && event.session_id) {
+                sessionId = event.session_id
                 platform.setSession(conversationId, sessionId, provider, { mode })
                 this.logger.success('SESSION', `✅ 保存SessionID: ${sessionId}`)
               }
