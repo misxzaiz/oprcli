@@ -29,15 +29,6 @@ const CodexConnector = require('./connectors/codex-connector')
 const { simpleHash } = require('./utils/string-helper')
 const SchedulerModule = require('./scheduler')
 
-// 🆕 核心插件系统
-const PluginManager = require('./plugins/core/plugin-manager')
-const ConfigManager = require('./plugins/core/config-manager')
-const ContextMemory = require('./plugins/core/context-memory')
-
-// 🆕 自进化系统
-const EvolutionManager = require('./evolution/evolution-manager')
-const IntelligentUpgrader = require('./evolution/intelligent-upgrader')
-
 // 🆕 自定义中间件和启动检查
 const {
   requestIdMiddleware,
@@ -111,15 +102,6 @@ class UnifiedServer {
 
     // 定时任务模块
     this.scheduler = null
-
-    // 🆕 核心插件系统
-    this.configManager = new ConfigManager(this.logger)
-    this.pluginManager = new PluginManager(this, this.logger)
-    this.contextMemory = new ContextMemory(this.logger)
-
-    // 🆕 自进化系统（初始化为 null，在 start() 中初始化）
-    this.evolution = null
-    this.intelligentUpgrader = null
 
     // 🆕 性能统计（2026-03-05 新增）
     this.performanceStats = null  // 将在中间件中初始化
@@ -368,253 +350,10 @@ class UnifiedServer {
     this.app.post('/api/tasks/reload', this.handleTasksReload.bind(this))
     this.app.post('/api/tasks/run/:taskId', this.handleTasksRunApi.bind(this))
 
-    // 🆕 插件系统 API
-    this.app.get('/api/plugins', this.handleListPlugins.bind(this))
-    this.app.get('/api/config', this.handleGetConfig.bind(this))
-    this.app.post('/api/config', this.handleSetConfig.bind(this))
-    this.app.get('/api/memory/stats', this.handleMemoryStats.bind(this))
-
-    // 🆕 自进化系统 API
-    this.app.get('/api/evolution/stats', this.handleEvolutionStats.bind(this))
-    this.app.get('/api/evolution/upgrades', this.handleEvolutionUpgrades.bind(this))
-    this.app.post('/api/evolution/upgrade', this.handleEvolutionUpgrade.bind(this))
-    this.app.get('/api/evolution/suggestions', this.handleEvolutionSuggestions.bind(this))
-
     // 🆕 健康检查和监控 API
     this.app.get('/health', this.handleHealthCheck.bind(this))
     this.app.get('/api/health', this.handleHealthCheck.bind(this))
     this.app.get('/api/metrics', this.handleMetrics.bind(this))
-  }
-
-  // ==================== 🆕 插件系统 ====================
-
-  /**
-   * 注册核心插件
-   */
-  async registerCorePlugins() {
-    // 注册配置管理器
-    await this.pluginManager.registerPlugin({
-      name: 'config-manager',
-      version: '1.0.0',
-      description: '配置管理系统',
-      author: 'OPRCLI Team',
-      init: async (server) => {
-        server.logger.info('PLUGIN', '✓ 配置管理器已初始化')
-      },
-      api: {
-        get: (key) => server.configManager.get(key),
-        set: async (key, value) => await server.configManager.set(key, value),
-        addTool: async (config) => await server.configManager.addTool(config)
-      }
-    })
-
-    // 注册上下文记忆
-    await this.pluginManager.registerPlugin({
-      name: 'context-memory',
-      version: '1.0.0',
-      description: '上下文记忆系统',
-      author: 'OPRCLI Team',
-      init: async (server) => {
-        server.logger.info('PLUGIN', '✓ 上下文记忆已初始化')
-      },
-      api: {
-        set: async (key, value) => await server.contextMemory.set(key, value),
-        get: async (key) => await server.contextMemory.get(key),
-        saveSession: async (id, ctx) => await server.contextMemory.saveSession(id, ctx)
-      }
-    })
-
-    // 加载用户自定义插件
-    const path = require('path')
-    const customPluginDir = path.join(__dirname, 'plugins/custom')
-
-    const fs = require('fs')
-    if (fs.existsSync(customPluginDir)) {
-      await this.pluginManager.loadPluginsFromDir(customPluginDir)
-    }
-  }
-
-  /**
-   * API: 列出所有插件
-   */
-  async handleListPlugins(req, res) {
-    const plugins = this.pluginManager.listPlugins()
-
-    res.json({
-      success: true,
-      plugins,
-      stats: this.pluginManager.getStats()
-    })
-  }
-
-  /**
-   * API: 获取配置
-   */
-  async handleGetConfig(req, res) {
-    const { key } = req.query
-
-    try {
-      if (key) {
-        const value = this.configManager.get(key)
-        res.json({ success: true, key, value })
-      } else {
-        const all = this.configManager.getAll()
-        res.json({ success: true, config: all })
-      }
-    } catch (error) {
-      res.status(500).json({ success: false, error: error.message })
-    }
-  }
-
-  /**
-   * API: 设置配置
-   */
-  async handleSetConfig(req, res) {
-    const { key, value } = req.body
-
-    // 🆕 输入验证（2026-03-05 第三轮优化）
-    const keyValidation = this.inputValidator.validateConfigKey(key)
-    if (!keyValidation.valid) {
-      this.logger.warn('API', `配置键验证失败: ${keyValidation.error}`, { requestId: req.id })
-      return res.status(400).json({ success: false, error: keyValidation.error })
-    }
-
-    try {
-      await this.configManager.set(key, value)
-      res.json({ success: true, message: `配置已更新: ${key}` })
-    } catch (error) {
-      res.status(500).json({ success: false, error: error.message })
-    }
-  }
-
-  /**
-   * API: 获取记忆统计
-   */
-  async handleMemoryStats(req, res) {
-    try {
-      const stats = this.contextMemory.getStats()
-      res.json({ success: true, stats })
-    } catch (error) {
-      res.status(500).json({ success: false, error: error.message })
-    }
-  }
-
-  // ==================== 🆕 自进化系统 API ====================
-
-  /**
-   * API: 获取自进化统计信息
-   */
-  async handleEvolutionStats(req, res) {
-    try {
-      if (!this.evolution) {
-        return res.status(503).json({
-          success: false,
-          error: '自进化系统未初始化'
-        })
-      }
-
-      const stats = this.evolution.getStats()
-      const suggestionStats = this.intelligentUpgrader?.getStats() || {}
-
-      res.json({
-        success: true,
-        evolution: stats,
-        suggestions: suggestionStats
-      })
-    } catch (error) {
-      res.status(500).json({ success: false, error: error.message })
-    }
-  }
-
-  /**
-   * API: 获取升级记录
-   */
-  async handleEvolutionUpgrades(req, res) {
-    try {
-      if (!this.evolution) {
-        return res.status(503).json({
-          success: false,
-          error: '自进化系统未初始化'
-        })
-      }
-
-      const { limit = 20, type } = req.query
-      const upgrades = type
-        ? this.evolution.getUpgradesByType(type)
-        : this.evolution.getRecentUpgrades(parseInt(limit))
-
-      res.json({
-        success: true,
-        upgrades,
-        total: upgrades.length
-      })
-    } catch (error) {
-      res.status(500).json({ success: false, error: error.message })
-    }
-  }
-
-  /**
-   * API: 手动记录升级
-   */
-  async handleEvolutionUpgrade(req, res) {
-    try {
-      if (!this.evolution) {
-        return res.status(503).json({
-          success: false,
-          error: '自进化系统未初始化'
-        })
-      }
-
-      const { type, action, name, description, details } = req.body
-
-      if (!type || !name) {
-        return res.status(400).json({
-          success: false,
-          error: '缺少必需参数: type, name'
-        })
-      }
-
-      const entry = await this.evolution.recordUpgrade({
-        type,
-        action: action || 'add',
-        name,
-        description: description || `${action} ${type}: ${name}`,
-        details: details || {}
-      })
-
-      res.json({
-        success: true,
-        entry,
-        message: '升级已记录'
-      })
-    } catch (error) {
-      res.status(500).json({ success: false, error: error.message })
-    }
-  }
-
-  /**
-   * API: 获取升级建议
-   */
-  async handleEvolutionSuggestions(req, res) {
-    try {
-      if (!this.intelligentUpgrader) {
-        return res.status(503).json({
-          success: false,
-          error: '智能升级系统未初始化'
-        })
-      }
-
-      const { limit = 10 } = req.query
-      const suggestions = this.intelligentUpgrader.getRecentSuggestions(parseInt(limit))
-
-      res.json({
-        success: true,
-        suggestions,
-        total: suggestions.length
-      })
-    } catch (error) {
-      res.status(500).json({ success: false, error: error.message })
-    }
   }
 
   async handleConnect(req, res) {
@@ -939,12 +678,6 @@ class UnifiedServer {
 
         // 定时任务状态
         scheduler: this.scheduler?.getStatus() || { enabled: false },
-
-        // 插件统计
-        plugins: this.pluginManager?.getStats() || { loaded: 0 },
-
-        // 上下文记忆统计
-        memory: this.contextMemory?.getStats() || { sessions: 0 },
 
         // 🆕 HTTP 性能统计（2026-03-05 新增）
         http: this.performanceStats ? getPerformanceStats(this.performanceStats) : {
@@ -1326,6 +1059,7 @@ class UnifiedServer {
 🤖 模型切换：
   • claude  - 切换到 Claude 模型
   • iflow  - 切换到 IFlow 模型
+  • codex  - 切换到 Codex 模型
 
 🛑 任务控制：
   • end / 停止 / stop  - 中断当前任务
@@ -1513,7 +1247,6 @@ class UnifiedServer {
     startupCheck.checkNodeVersion('14.0.0')
 
     // 确保必要的目录存在
-    startupCheck.ensureDir('D:/space/tasks', '进化日志目录')
     startupCheck.ensureDir('logs', '日志目录')
 
     // 打印检查结果
@@ -1527,50 +1260,6 @@ class UnifiedServer {
       console.error('❌ 配置错误:')
       validation.errors.forEach(err => console.error(`  - ${err}`))
       process.exit(1)
-    }
-
-    // 🆕 初始化核心插件系统
-    try {
-      this.logger.info('SERVER', '正在初始化核心插件系统...')
-
-      // 初始化配置管理器
-      await this.configManager.init()
-
-      // 🆕 启动配置热重载（2026-03-05 自动升级优化）
-      this.configManager.startWatch()
-
-      // 🆕 添加配置变更监听器
-      this.configManager.addChangeListener((changeInfo) => {
-        this.handleConfigChange(changeInfo)
-      })
-
-      // 初始化上下文记忆
-      await this.contextMemory.init()
-
-      // 注册核心插件
-      await this.registerCorePlugins()
-
-      this.logger.success('SERVER', '✓ 核心插件系统初始化完成')
-    } catch (error) {
-      this.logger.error('SERVER', `核心插件系统初始化失败: ${error.message}`)
-      process.exit(1)
-    }
-
-    // 🆕 初始化自进化系统
-    try {
-      this.logger.info('SERVER', '正在初始化自进化系统...')
-
-      // 初始化进化管理器
-      this.evolution = new EvolutionManager(this, this.logger)
-      await this.evolution.initialize()
-
-      // 初始化智能升级器
-      this.intelligentUpgrader = new IntelligentUpgrader(this.evolution, this)
-
-      this.logger.success('SERVER', '✓ 自进化系统初始化完成')
-    } catch (error) {
-      this.logger.warning('SERVER', `自进化系统初始化失败: ${error.message}，将继续运行`)
-      // 不阻止启动，继续运行
     }
 
     // 初始化所有可用的 connectors
@@ -1909,16 +1598,6 @@ class UnifiedServer {
       await this.dingtalk.close()
       this.logger.info('DINGTALK', '✓ 钉钉连接已关闭')
 
-      // 🆕 保存上下文记忆（如果有）
-      if (this.contextMemory) {
-        try {
-          await this.contextMemory.saveAll()
-          this.logger.info('MEMORY', '✓ 上下文记忆已保存')
-        } catch (error) {
-          this.logger.warning('MEMORY', `保存失败: ${error.message}`)
-        }
-      }
-
       this.logger.success('SERVER', '✓ 服务器已安全关闭')
 
       // 🆕 添加短暂延迟确保日志输出
@@ -1928,84 +1607,6 @@ class UnifiedServer {
     } catch (error) {
       this.logger.error('SERVER', `关闭过程中出错: ${error.message}`)
       process.exit(1)
-    }
-  }
-
-  // ==================== 🆕 配置变更处理（2026-03-05 自动升级优化）====================
-
-  /**
-   * 处理配置变更
-   * @param {Object} changeInfo - 变更信息
-   */
-  async handleConfigChange(changeInfo) {
-    try {
-      if (changeInfo.error) {
-        // 重载失败
-        this.logger.error('CONFIG', `配置重载失败: ${changeInfo.error}`)
-        await this.sendConfigChangeNotification({
-          success: false,
-          error: changeInfo.error,
-          timestamp: changeInfo.timestamp
-        })
-        return
-      }
-
-      if (!changeInfo.hasChanged) {
-        // 配置未变化
-        this.logger.debug('CONFIG', '配置内容未变化')
-        return
-      }
-
-      // 配置成功重载
-      this.logger.success('CONFIG', '✓ 配置已自动更新')
-
-      // 发送通知到钉钉
-      await this.sendConfigChangeNotification({
-        success: true,
-        reloadCount: changeInfo.reloadCount,
-        fileInfo: changeInfo.fileInfo,
-        timestamp: changeInfo.timestamp
-      })
-
-      // 🆕 可以在这里添加更多配置变更后的处理逻辑
-      // 例如：重新加载某些模块、更新连接器配置等
-    } catch (error) {
-      this.logger.error('CONFIG', '处理配置变更失败', error)
-    }
-  }
-
-  /**
-   * 发送配置变更通知到钉钉
-   * @param {Object} data - 通知数据
-   */
-  async sendConfigChangeNotification(data) {
-    try {
-      const timestamp = data.timestamp ? new Date(data.timestamp).toLocaleString('zh-CN') : new Date().toLocaleString('zh-CN')
-
-      let message = ''
-
-      if (data.success) {
-        message = `🔄 **配置自动更新**\n\n`
-        message += `✅ 配置已成功重载\n`
-        message += `📅 时间: ${timestamp}\n`
-        message += `🔢 重载次数: ${data.reloadCount}\n`
-
-        if (data.fileInfo) {
-          message += `📄 文件大小: ${Math.round(data.fileInfo.size / 1024)} KB\n`
-        }
-      } else {
-        message = `⚠️ **配置重载失败**\n\n`
-        message += `❌ 错误: ${data.error}\n`
-        message += `📅 时间: ${timestamp}\n`
-        message += `\n请检查配置文件格式是否正确`
-      }
-
-      // 通过钉钉发送通知
-      await this.dingtalk.sendMarkdown(message)
-
-      this.logger.debug('CONFIG', '配置变更通知已发送')
-    } catch (error) {
-      this.logger.error('CONFIG', '发送配置变更通知失败', error)
     }
   }
 

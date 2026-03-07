@@ -3,12 +3,7 @@
   <component name="ChangeListManager">
     <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="QQ机器人">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/integrations/base-platform-integration.js" beforeDir="false" afterPath="$PROJECT_DIR$/integrations/base-platform-integration.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/integrations/qqbot/qqbot-client.js" beforeDir="false" afterPath="$PROJECT_DIR$/integrations/qqbot/qqbot-client.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/server.js" beforeDir="false" afterPath="$PROJECT_DIR$/server.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/claude.txt" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/claude.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/system-prompts/docs/plugins/config-manager.md" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/docs/plugins/config-manager.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/system-prompts/docs/plugins/context-memory.md" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/docs/plugins/context-memory.md" afterDir="false" />
     </list>
