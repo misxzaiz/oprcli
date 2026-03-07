@@ -18,6 +18,7 @@ require('dotenv').config({ override: true })
 const express = require('express')
 const config = require('./utils/config')
 const Logger = require('./integrations/logger')
+const AuditLogger = require('./integrations/audit-logger')
 const DingTalkIntegration = require('./integrations/dingtalk')
 const QQBotIntegration = require('./integrations/qqbot')
 const ClaudeConnector = require('./connectors/claude-connector')
@@ -63,6 +64,7 @@ class UnifiedServer {
 
     // 定时任务模块
     this.scheduler = null
+    this.auditLogger = AuditLogger
 
     this._setupMiddleware()
   }
@@ -676,21 +678,48 @@ class UnifiedServer {
   async _handlePlatformMessage(platform, rawMessage, conversationId, replyTarget, extra = {}) {
     const platformName = platform.constructor.name.replace('Integration', '').toUpperCase()
     const { type } = extra
+    const traceId = `tr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const startAt = Date.now()
 
     try {
+      this.auditLogger.logAgent('agent.incoming.raw', {
+        trace_id: traceId,
+        platform: platformName.toLowerCase(),
+        conversation_id: conversationId,
+        message_type: type || 'default',
+        raw_message: rawMessage
+      })
+
       // 1. 提取消息内容
       const content = platform.extractContent(rawMessage)
       if (!content) {
         this.logger.warning(platformName, '消息内容为空')
+        this.auditLogger.logAgent('agent.incoming.empty', {
+          trace_id: traceId,
+          platform: platformName.toLowerCase(),
+          conversation_id: conversationId
+        })
         return { status: 'SUCCESS' }
       }
 
       this.logger.success(platformName, `📨 原始消息: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"`)
+      this.auditLogger.logAgent('agent.incoming.extracted', {
+        trace_id: traceId,
+        platform: platformName.toLowerCase(),
+        conversation_id: conversationId,
+        content
+      })
 
       // 2. 解析命令
       const command = this._parseCommand(content)
       if (command) {
         this.logger.success('COMMAND', `✅ 识别到命令: ${command.type}${command.provider ? ` -> ${command.provider}` : ''}`)
+        this.auditLogger.logAgent('agent.command', {
+          trace_id: traceId,
+          platform: platformName.toLowerCase(),
+          conversation_id: conversationId,
+          command
+        })
         return await this._handleCommand(command, conversationId, replyTarget, platform, rawMessage, type)
       }
 
@@ -707,6 +736,15 @@ class UnifiedServer {
         mode
       })
       const contextualMessage = await this._buildContextualMessage(content, runtimeContext)
+      this.auditLogger.logAgent('agent.request', {
+        trace_id: traceId,
+        platform: platformName.toLowerCase(),
+        conversation_id: conversationId,
+        provider,
+        mode,
+        runtime_context: runtimeContext,
+        request_message: contextualMessage
+      })
 
       this.logger.debug(platformName, '使用模型', { provider, mode, hasSessionId: !!sessionId })
 
@@ -714,6 +752,12 @@ class UnifiedServer {
       const connector = this.connectors.get(provider)
       if (!connector || !connector.connected) {
         const errorMsg = `❌ ${provider.toUpperCase()} 模型不可用\n\n💡 输入 help 查看可用模型`
+        this.auditLogger.logAgent('agent.error.connector_unavailable', {
+          trace_id: traceId,
+          platform: platformName.toLowerCase(),
+          conversation_id: conversationId,
+          provider
+        })
         await platform.send(replyTarget, errorMsg, rawMessage, type)
         return { status: 'SUCCESS' }
       }
@@ -726,10 +770,34 @@ class UnifiedServer {
               // 只处理核心事件
               if (event.type === 'assistant' || event.type === 'result') {
                 const text = this._extractTextFromEvent(event)
+                this.auditLogger.logAgent('agent.event.output', {
+                  trace_id: traceId,
+                  platform: platformName.toLowerCase(),
+                  conversation_id: conversationId,
+                  provider,
+                  event_type: event.type,
+                  raw_event: event,
+                  extracted_text: text
+                })
                 if (text) {
                   this.logger.info(platformName, `📤 发送回复 (${text.length} 字符)`)
-                  await platform.send(replyTarget, text, rawMessage, type)
+                  await platform.send(replyTarget, text, rawMessage, type, {
+                    traceId,
+                    conversationId,
+                    provider,
+                    platform: platformName.toLowerCase(),
+                    messageType: type || 'default'
+                  })
                 }
+              } else if (event.type === 'tool_use' || event.type === 'tool_end') {
+                this.auditLogger.logAgent('agent.event.tool', {
+                  trace_id: traceId,
+                  platform: platformName.toLowerCase(),
+                  conversation_id: conversationId,
+                  provider,
+                  event_type: event.type,
+                  raw_event: event
+                })
               } else if (event.type === 'system' && event.extra?.session_id) {
                 sessionId = event.extra.session_id
                 platform.setSession(conversationId, sessionId, provider, { mode })
@@ -737,15 +805,38 @@ class UnifiedServer {
               }
             } catch (error) {
               this.logger.error(platformName, `onEvent 处理失败: ${error.message}`)
+              this.auditLogger.logAgent('agent.event.error', {
+                trace_id: traceId,
+                platform: platformName.toLowerCase(),
+                conversation_id: conversationId,
+                provider,
+                error: error.message
+              })
               // 不抛出异常，让会话继续
             }
           },
           onComplete: (exitCode) => {
             this.logger.success(platformName, `✅ 会话完成，退出码: ${exitCode}`)
+            this.auditLogger.logAgent('agent.complete', {
+              trace_id: traceId,
+              platform: platformName.toLowerCase(),
+              conversation_id: conversationId,
+              provider,
+              exit_code: exitCode,
+              elapsed_ms: Date.now() - startAt
+            })
             resolve()
           },
           onError: (error) => {
             this.logger.error(platformName, `❌ 会话错误: ${error.message}`)
+            this.auditLogger.logAgent('agent.error', {
+              trace_id: traceId,
+              platform: platformName.toLowerCase(),
+              conversation_id: conversationId,
+              provider,
+              error: error.message,
+              elapsed_ms: Date.now() - startAt
+            })
             reject(error)
           }
         }
@@ -762,6 +853,13 @@ class UnifiedServer {
       return { status: 'SUCCESS' }
     } catch (error) {
       this.logger.error(platformName, `❌ 处理失败: ${error.message}`)
+      this.auditLogger.logAgent('agent.fatal', {
+        trace_id: traceId,
+        platform: platformName.toLowerCase(),
+        conversation_id: conversationId,
+        error: error.message,
+        elapsed_ms: Date.now() - startAt
+      })
       return { status: 'LATER', message: error.message }
     }
   }

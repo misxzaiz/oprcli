@@ -5,6 +5,7 @@
  */
 
 const BasePlatformIntegration = require('./base-platform-integration')
+const AuditLogger = require('./audit-logger')
 
 class QQBotIntegration extends BasePlatformIntegration {
   constructor(config, logger) {
@@ -89,29 +90,68 @@ class QQBotIntegration extends BasePlatformIntegration {
    * @param {string} type - 消息类型
    * @returns {Promise<*>}
    */
-  async send(target, message, originalMessage, type) {
-    return this.sendWithRetry(target, message, async () => {
-      if (type === 'c2c') {
-        return this.client.sendC2CMessage(
-          originalMessage.author.user_openid,
-          message,
-          {}
-        )
-      } else if (type === 'at' || type === 'channel') {
-        return this.client.sendMessage(
-          originalMessage.channel_id,
-          message,
-          {}
-        )
-      } else {
-        // 私信
-        return this.client.sendDirectMessage(
-          originalMessage.guild_id,
-          message,
-          {}
-        )
-      }
+  async send(target, message, originalMessage, type, meta = {}) {
+    const traceId = meta.traceId || `tr-${Date.now()}`
+    const conversationId = meta.conversationId || this.getConversationId(originalMessage, type)
+    const payloadPreview = {}
+    AuditLogger.logBot('bot.before_transform', {
+      trace_id: traceId,
+      platform: 'qq',
+      conversation_id: conversationId,
+      message_type: meta.messageType || type || 'default',
+      original_message: message
     })
+
+    try {
+      return await this.sendWithRetry(target, message, async () => {
+        if (type === 'c2c') {
+          payloadPreview.api = 'sendC2CMessage'
+          payloadPreview.target = originalMessage.author.user_openid
+          payloadPreview.content = message
+          AuditLogger.logBot('bot.after_transform', { trace_id: traceId, platform: 'qq', payload: payloadPreview })
+
+          const result = await this.client.sendC2CMessage(
+            originalMessage.author.user_openid,
+            message,
+            {}
+          )
+          AuditLogger.logBot('bot.send_result', { trace_id: traceId, platform: 'qq', response: result })
+          return result
+        } else if (type === 'at' || type === 'channel') {
+          payloadPreview.api = 'sendMessage'
+          payloadPreview.target = originalMessage.channel_id
+          payloadPreview.content = message
+          AuditLogger.logBot('bot.after_transform', { trace_id: traceId, platform: 'qq', payload: payloadPreview })
+          const result = await this.client.sendMessage(
+            originalMessage.channel_id,
+            message,
+            {}
+          )
+          AuditLogger.logBot('bot.send_result', { trace_id: traceId, platform: 'qq', response: result })
+          return result
+        } else {
+          // 私信
+          payloadPreview.api = 'sendDirectMessage'
+          payloadPreview.target = originalMessage.guild_id
+          payloadPreview.content = message
+          AuditLogger.logBot('bot.after_transform', { trace_id: traceId, platform: 'qq', payload: payloadPreview })
+          const result = await this.client.sendDirectMessage(
+            originalMessage.guild_id,
+            message,
+            {}
+          )
+          AuditLogger.logBot('bot.send_result', { trace_id: traceId, platform: 'qq', response: result })
+          return result
+        }
+      })
+    } catch (error) {
+      AuditLogger.logBot('bot.send_error', {
+        trace_id: traceId,
+        platform: 'qq',
+        error: error.message
+      })
+      throw error
+    }
   }
 
   /**

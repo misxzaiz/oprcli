@@ -6,6 +6,7 @@
 
 const axios = require('axios')
 const BasePlatformIntegration = require('./base-platform-integration')
+const AuditLogger = require('./audit-logger')
 
 class DingTalkIntegration extends BasePlatformIntegration {
   constructor(config, logger) {
@@ -83,17 +84,46 @@ class DingTalkIntegration extends BasePlatformIntegration {
    * @param {string} type - 类型（不使用）
    * @returns {Promise<*>}
    */
-  async send(webhookUrl, message, originalMessage, type) {
-    return this.sendWithRetry(webhookUrl, message, async (url, msg) => {
-      const response = await axios.post(url, {
-        msgtype: 'text',
-        text: { content: msg }
-      }, {
-        timeout: 10000,
-        headers: { 'Content-Type': 'application/json' }
-      })
-      return response.data
+  async send(webhookUrl, message, originalMessage, type, meta = {}) {
+    const traceId = meta.traceId || `tr-${Date.now()}`
+    const payload = {
+      msgtype: 'text',
+      text: { content: message }
+    }
+    AuditLogger.logBot('bot.before_transform', {
+      trace_id: traceId,
+      platform: 'dingtalk',
+      conversation_id: meta.conversationId || this.getConversationId(originalMessage),
+      message_type: meta.messageType || type || 'default',
+      original_message: message,
+      original_target: webhookUrl
     })
+    AuditLogger.logBot('bot.after_transform', {
+      trace_id: traceId,
+      platform: 'dingtalk',
+      payload
+    })
+    try {
+      return await this.sendWithRetry(webhookUrl, message, async (url, msg) => {
+        const response = await axios.post(url, payload, {
+          timeout: 10000,
+          headers: { 'Content-Type': 'application/json' }
+        })
+        AuditLogger.logBot('bot.send_result', {
+          trace_id: traceId,
+          platform: 'dingtalk',
+          response: response.data
+        })
+        return response.data
+      })
+    } catch (error) {
+      AuditLogger.logBot('bot.send_error', {
+        trace_id: traceId,
+        platform: 'dingtalk',
+        error: error.message
+      })
+      throw error
+    }
   }
 
   /**

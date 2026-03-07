@@ -91,6 +91,16 @@ class Config {
         secret: process.env.NOTIFICATION_DINGTALK_SECRET
       }
     }
+
+    // 审计日志配置
+    this.audit = {
+      enabled: process.env.AUDIT_LOG_ENABLED !== 'false',
+      dir: process.env.AUDIT_LOG_DIR || './logs',
+      agentIO: process.env.AUDIT_LOG_AGENT_IO !== 'false',
+      botTransform: process.env.AUDIT_LOG_BOT_TRANSFORM !== 'false',
+      maxFieldLength: parseInt(process.env.AUDIT_LOG_MAX_FIELD_LENGTH || '8000', 10),
+      redactKeys: this._parseList(process.env.AUDIT_LOG_REDACT_KEYS || 'clientSecret,token,authorization,webhook,secret')
+    }
   }
 
   _parseList(str) {
