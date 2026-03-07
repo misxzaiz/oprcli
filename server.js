@@ -16,7 +16,6 @@
 require('dotenv').config({ override: true })
 
 const express = require('express')
-const helmet = require('helmet')
 const config = require('./utils/config')
 const Logger = require('./integrations/logger')
 const RateLimiter = require('./utils/message-rate-limiter')
@@ -28,42 +27,6 @@ const IFlowConnector = require('./connectors/iflow-connector')
 const CodexConnector = require('./connectors/codex-connector')
 const { simpleHash } = require('./utils/string-helper')
 const SchedulerModule = require('./scheduler')
-
-// 🆕 自定义中间件和启动检查
-const {
-  requestIdMiddleware,
-  errorHandlerMiddleware,
-  notFoundMiddleware,
-  securityHeadersMiddleware,
-  corsMiddleware,
-  requestTimeoutMiddleware,
-  cacheControlMiddleware,
-  performanceMonitorMiddleware,
-  getPerformanceStats
-} = require('./utils/middleware')
-const StartupCheck = require('./utils/startup-check')
-
-// 🆕 新增功能（2026-03-05）
-const { createLooseRateLimit, createMediumRateLimit } = require('./utils/rate-limit')
-const createHealthRoutes = require('./routes/health')
-const { AppError } = require('./utils/app-errors')
-
-// 🆕 性能和稳定性增强（2026-03-05 第二轮优化）
-const { CacheManager, createCacheMiddleware } = require('./utils/cache-manager')
-const GracefulShutdown = require('./utils/graceful-shutdown')
-const MemoryMonitorEnhanced = require('./utils/memory-monitor-enhanced')
-const { createAxiosRetryInterceptor } = require('./utils/retry-helper')
-
-// 🆕 安全增强（2026-03-05 第三轮优化）
-const InputValidator = require('./utils/input-validator')
-const SecurityEnhancer = require('./utils/security-enhancer')
-
-// 🆕 安全增强（2026-03-05 第四轮优化）
-const { quickSecurityCheck, validateRequest } = require('./utils/input-validator-middleware')
-const { requestSizeLimitMiddleware } = require('./utils/middleware')
-const { getGlobalMemoryCleaner, memoryCheckMiddleware } = require('./utils/memory-cleaner')
-const { requestDeduplication } = require('./utils/request-deduplication')
-const { responseCache, cacheStrategies } = require('./utils/response-cache')
 
 class UnifiedServer {
   // 命令配置表
@@ -94,7 +57,6 @@ class UnifiedServer {
     this.rateLimiter = new RateLimiter(5, 1000)
     this.dingtalk = new DingTalkIntegration(config.dingtalk, this.logger, this.rateLimiter)
     this.qqbot = new QQBotIntegration(config.qqbot, this.logger, this.rateLimiter)
-    this.messageFormatter = new MessageFormatter(config.streaming, this.logger)
 
     // 多模型支持
     this.connectors = new Map()  // 'claude' | 'iflow' -> connector instance
@@ -103,276 +65,13 @@ class UnifiedServer {
     // 定时任务模块
     this.scheduler = null
 
-    // 🆕 性能统计（2026-03-05 新增）
-    this.performanceStats = null  // 将在中间件中初始化
-
-    // 🆕 内存清理器（2026-03-05 第五轮优化）
-    this.memoryCleaner = getGlobalMemoryCleaner({
-      logger: this.logger,
-      enabled: process.env.MEMORY_CLEANER_ENABLED !== 'false',
-      heapUsedPercent: 80,
-      rssMemory: 500 * 1024 * 1024,
-      triggerCleanup: 70,
-      checkInterval: 60000
-    })
-
-    // 🆕 缓存管理器（2026-03-05 第二轮优化）
-    this.cacheManager = new CacheManager({
-      enabled: process.env.CACHE_ENABLED !== 'false',
-      defaultTTL: parseInt(process.env.CACHE_TTL || '60000', 10),
-      maxEntries: parseInt(process.env.CACHE_MAX_ENTRIES || '1000', 10)
-    })
-
-    // 🆕 增强型内存监控器（2026-03-06 优化）
-    this.memoryMonitor = new MemoryMonitorEnhanced(this.logger, {
-      intervalMs: parseInt(process.env.MEMORY_MONITOR_INTERVAL || '60000', 10),
-      warningThreshold: parseFloat(process.env.MEMORY_WARNING_THRESHOLD || '0.7'), // 70%
-      criticalThreshold: parseFloat(process.env.MEMORY_CRITICAL_THRESHOLD || '0.85'), // 85%
-      maxHistorySize: parseInt(process.env.MEMORY_HISTORY_SIZE || '60', 10),
-      leakDetectionEnabled: process.env.MEMORY_LEAK_DETECTION !== 'false',
-      trackGC: process.env.MEMORY_TRACK_GC === 'true'
-    })
-
-    // 🆕 优雅关闭处理器（2026-03-05 第二轮优化）
-    this.gracefulShutdown = null  // 将在 start() 中初始化
-
-    // 🆕 安全增强工具（2026-03-05 第三轮优化）
-    this.inputValidator = new InputValidator(this.logger)
-    this.securityEnhancer = new SecurityEnhancer(this.logger)
-
     this._setupMiddleware()
-    this._setupRoutes()
-    this._setupErrorHandlers()  // 必须在路由之后
   }
 
   _setupMiddleware() {
-    // 🆕 请求 ID 中间件（必须在其他中间件之前）
-    this.app.use(requestIdMiddleware)
-
-    // 🛡️ Helmet 安全中间件（2026-03-05 第四轮优化）
-    this.app.use(helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          scriptSrc: ["'self'"],
-          imgSrc: ["'self'", "data:", "https:"],
-          connectSrc: ["'self'"],
-          fontSrc: ["'self'"],
-          objectSrc: ["'none'"],
-          mediaSrc: ["'self'"],
-          frameSrc: ["'none'"]
-        }
-      },
-      hsts: {
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true
-      },
-      noSniff: true,
-      xssFilter: true,
-      referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
-    }))
-    this.logger.info('SERVER', '✓ Helmet 安全中间件已配置')
-
-    // 🔒 安全头中间件（2026-03-05 新增）
-    this.app.use(securityHeadersMiddleware)
-    this.logger.info('SERVER', '✓ 自定义安全头已配置')
-
-    // 🌐 CORS 中间件（根据环境变量启用，2026-03-05 新增）
-    if (process.env.CORS_ENABLED === 'true') {
-      const corsOrigin = process.env.CORS_ORIGIN || '*'
-      const corsMethods = process.env.CORS_METHODS ? process.env.CORS_METHODS.split(',') : ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-      const corsHeaders = process.env.CORS_HEADERS ? process.env.CORS_HEADERS.split(',') : ['Content-Type', 'Authorization']
-      const corsCredentials = process.env.CORS_CREDENTIALS === 'true'
-
-      this.app.use(corsMiddleware({
-        origin: corsOrigin === '*' ? '*' : corsOrigin,
-        methods: corsMethods,
-        allowedHeaders: corsHeaders,
-        credentials: corsCredentials
-      }))
-      this.logger.info('SERVER', `✓ CORS 已启用 (来源: ${corsOrigin})`)
-    }
-
-    // 🆕 请求体大小限制中间件（2026-03-05 第五轮优化）
-    const maxBodySize = parseInt(process.env.MAX_BODY_SIZE || '10485760', 10) // 默认 10MB
-    this.app.use(requestSizeLimitMiddleware({
-      maxBodySize,
-      maxUrlLength: 2000,
-      throwOnLimit: true
-    }))
-    this.logger.info('SERVER', `✓ 请求体大小限制已配置 (最大: ${(maxBodySize / 1024 / 1024).toFixed(2)}MB)`)
-
-    // 🆕 快速安全检查中间件（2026-03-05 第五轮优化）
-    if (process.env.SECURITY_CHECK_ENABLED !== 'false') {
-      this.app.use(quickSecurityCheck({
-        checkBody: true,
-        checkQuery: true,
-        checkParams: false,
-        throwOnThreat: true,
-        logOnly: process.env.SECURITY_LOG_ONLY === 'true'
-      }))
-      this.logger.info('SERVER', '✓ 快速安全检查已启用')
-    }
-
-    // 安全配置：限制请求大小（防止DoS攻击）
+    // 基础中间件配置
     this.app.use(express.json({ limit: '10mb' }))
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }))
-
-    // 🆕 内存检查中间件（2026-03-05 第五轮优化）
-    const memoryThreshold = parseInt(process.env.MEMORY_THRESHOLD || '90', 10)
-    this.app.use(memoryCheckMiddleware({
-      threshold: memoryThreshold,
-      logger: this.logger,
-      rejectOnHighMemory: process.env.REJECT_ON_HIGH_MEMORY === 'true'
-    }))
-    this.logger.info('SERVER', `✓ 内存检查已配置 (阈值: ${memoryThreshold}%)`)
-
-    // 🆕 请求去重中间件（2026-03-05 第五轮优化）
-    if (process.env.REQUEST_DEDUPLICATION_ENABLED !== 'false') {
-      const dedupTTL = parseInt(process.env.DEDUP_TTL || '5000', 10)
-      this.app.use(requestDeduplication({
-        enabled: true,
-        excludePaths: ['/health', '/api/health'],
-        logDuplicates: true
-      }))
-      this.logger.info('SERVER', `✓ 请求去重已启用 (TTL: ${dedupTTL}ms)`)
-    }
-
-    // 🆕 响应压缩中间件（如果可用）
-    try {
-      const compression = require('compression')
-      this.app.use(compression({
-        filter: (req, res) => {
-          if (req.headers['x-no-compression']) {
-            return false
-          }
-          return compression.filter(req, res)
-        },
-        threshold: 1024 // 只压缩大于1KB的响应
-      }))
-      this.logger.info('SERVER', '✓ 响应压缩已启用')
-    } catch (error) {
-      this.logger.debug('SERVER', 'compression模块不可用，跳过')
-    }
-
-    // ⏱️ 请求超时中间件（2026-03-05 新增）
-    const timeoutMs = parseInt(process.env.REQUEST_TIMEOUT || '30000', 10)
-    this.app.use(requestTimeoutMiddleware(timeoutMs))
-    this.logger.info('SERVER', `✓ 请求超时已设置: ${timeoutMs}ms`)
-
-    // 📊 性能监控中间件（2026-03-05 新增）
-    const perfMiddleware = performanceMonitorMiddleware(this.logger)
-    this.app.use(perfMiddleware)
-    // 保存性能统计对象的引用（通过闭包访问）
-    this.app.use((req, res, next) => {
-      if (!this.performanceStats && req.performanceStats) {
-        this.performanceStats = req.performanceStats
-      }
-      next()
-    })
-    this.logger.info('SERVER', '✓ 性能监控已启用')
-
-    // 🛡️ 速率限制中间件（2026-03-05 新增）
-    const rateLimitEnabled = process.env.RATE_LIMIT_ENABLED !== 'false' // 默认启用
-    if (rateLimitEnabled) {
-      const apiRateLimit = createMediumRateLimit()
-      // 对 API 路由应用速率限制（将在路由中应用）
-      this.apiRateLimit = apiRateLimit
-      this.logger.info('SERVER', '✓ 速率限制已启用')
-    } else {
-      this.logger.info('SERVER', '⚠️  速率限制已禁用')
-    }
-
-    // 🆕 请求日志中间件（增强版，包含请求ID）
-    if (process.env.NODE_ENV === 'production') {
-      this.app.use((req, res, next) => {
-        const start = Date.now()
-        res.on('finish', () => {
-          const duration = Date.now() - start
-          this.logger.debug('HTTP', `[${req.id}] ${req.method} ${req.path} ${res.statusCode} ${duration}ms`)
-        })
-        next()
-      })
-    }
-
-    // 🆕 缓存中间件（2026-03-05 第二轮优化）
-    if (this.cacheManager.enabled) {
-      const cacheMiddleware = createCacheMiddleware(this.cacheManager, {
-        keyGenerator: (req) => `${req.method}:${req.originalUrl}`,
-        ttl: parseInt(process.env.CACHE_TTL || '60000', 10),
-        shouldCache: (req) => {
-          // 只缓存 GET 请求
-          if (req.method !== 'GET') return false
-          // 不缓存包含特定路径的请求
-          const noCachePaths = ['/api/message', '/api/connect', '/api/interrupt']
-          return !noCachePaths.some(path => req.path.startsWith(path))
-        }
-      })
-      this.app.use(cacheMiddleware)
-      this.logger.info('SERVER', '✓ 响应缓存已启用')
-    }
-
-    // 注意：404 和错误处理中间件在 _setupErrorHandlers() 中设置（路由之后）
-  }
-
-  /**
-   * 设置错误处理中间件（必须在所有路由之后）
-   */
-  _setupErrorHandlers() {
-    // 🆕 404 处理中间件（必须在所有路由之后）
-    this.app.use(notFoundMiddleware)
-
-    // 🆕 全局错误处理中间件（必须在最后）
-    this.app.use(errorHandlerMiddleware(this.logger))
-  }
-
-  _setupRoutes() {
-    // 🆕 健康检查路由（2026-03-05 新增）
-    const healthRoutes = createHealthRoutes(this)
-    this.app.use('/', healthRoutes)
-    this.logger.info('SERVER', '✓ 健康检查端点已注册')
-
-    // 🛡️ 对 API 路由应用速率限制
-    if (this.apiRateLimit) {
-      this.app.use('/api', this.apiRateLimit)
-    }
-
-    this.app.post('/api/connect', this.handleConnect.bind(this))
-    this.app.get('/api/status', this.handleStatus.bind(this))
-    this.app.post('/api/message', this.handleMessage.bind(this))
-    this.app.post('/api/interrupt', this.handleInterrupt.bind(this))
-    this.app.post('/api/reset', this.handleReset.bind(this))
-    this.app.get('/api/dingtalk/status', this.handleDingTalkStatus.bind(this))
-
-    // 内部 API：定时任务管理（仅允许本地访问）
-    this.app.post('/api/tasks/reload', this.handleTasksReload.bind(this))
-    this.app.post('/api/tasks/run/:taskId', this.handleTasksRunApi.bind(this))
-
-    // 🆕 健康检查和监控 API
-    this.app.get('/health', this.handleHealthCheck.bind(this))
-    this.app.get('/api/health', this.handleHealthCheck.bind(this))
-    this.app.get('/api/metrics', this.handleMetrics.bind(this))
-  }
-
-  async handleConnect(req, res) {
-    // Connectors 已经在 start() 时初始化，这里返回状态
-    const { providers, versions } = this._getConnectedProvidersInfo()
-
-    if (providers.length === 0) {
-      return res.status(503).json({
-        success: false,
-        error: '没有可用的 connectors'
-      })
-    }
-
-    res.json({
-      success: true,
-      providers,
-      defaultProvider: this.defaultProvider,
-      versions
-    })
   }
 
   async handleStatus(req, res) {
@@ -405,24 +104,6 @@ class UnifiedServer {
 
     const { message, sessionId } = req.body
 
-    // 🆕 输入验证（2026-03-05 第三轮优化）
-    // 验证消息内容
-    const messageValidation = this.inputValidator.validateMessage(message)
-    if (!messageValidation.valid) {
-      this.logger.warn('API', `消息验证失败: ${messageValidation.error}`, { requestId: req.id })
-      return res.status(400).json({ success: false, error: messageValidation.error })
-    }
-
-    // 验证会话 ID
-    const sessionValidation = this.inputValidator.validateSessionId(sessionId)
-    if (!sessionValidation.valid) {
-      this.logger.warn('API', `会话 ID 验证失败: ${sessionValidation.error}`, { requestId: req.id })
-      return res.status(400).json({ success: false, error: sessionValidation.error })
-    }
-
-    // 使用清理后的消息
-    const sanitizedMessage = messageValidation.sanitized
-
     try {
       const events = []
       const isResume = !!sessionId
@@ -450,9 +131,9 @@ class UnifiedServer {
         }
 
         if (isResume) {
-          connector.continueSession(sessionId, sanitizedMessage, options)
+          connector.continueSession(sessionId, message, options)
         } else {
-          const result = connector.startSession(sanitizedMessage, options)
+          const result = connector.startSession(message, options)
           this.currentSessionId = result.sessionId
         }
       })
@@ -647,67 +328,6 @@ class UnifiedServer {
     }
 
     res.json(health)
-  }
-
-  /**
-   * 系统指标端点
-   * 提供详细的性能和统计信息
-   */
-  async handleMetrics(req, res) {
-    try {
-      const metrics = {
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        cpu: process.cpuUsage(),
-
-        // Connectors 状态
-        connectors: {},
-        activeSessions: 0,
-
-        // 速率限制器统计
-        rateLimiter: this.rateLimiter.getStats(),
-
-        // 钉钉统计
-        dingtalk: {
-          enabled: config.dingtalk.enabled,
-          connected: this.dingtalk.client?.connected || false,
-          activeSessions: this.dingtalk.getActiveSessions()?.length || 0,
-          processedMessages: this.dingtalk.processedMessages?.size || 0
-        },
-
-        // 定时任务状态
-        scheduler: this.scheduler?.getStatus() || { enabled: false },
-
-        // 🆕 HTTP 性能统计（2026-03-05 新增）
-        http: this.performanceStats ? getPerformanceStats(this.performanceStats) : {
-          totalRequests: 0,
-          totalErrors: 0,
-          errorRate: '0%',
-          avgResponseTime: '0ms',
-          routes: []
-        },
-
-        // 🆕 缓存统计（2026-03-05 第二轮优化）
-        cache: this.cacheManager.getStats(),
-
-        // 🆕 内存监控统计（2026-03-05 第二轮优化）
-        memoryMonitor: this.memoryMonitor.getStats()
-      }
-
-      // 收集每个 connector 的详细信息
-      const { connectors: connectorMetrics, activeSessions } = this._getAllConnectorMetrics()
-      metrics.connectors = connectorMetrics
-      metrics.activeSessions = activeSessions
-
-      res.json(metrics)
-    } catch (error) {
-      this.logger.error('API', '获取指标失败', { error: error.message })
-      res.status(500).json({
-        success: false,
-        error: error.message
-      })
-    }
   }
 
   /**
@@ -1240,20 +860,6 @@ class UnifiedServer {
   }
 
   async start() {
-    // 🆕 启动前检查
-    const startupCheck = new StartupCheck(this.logger)
-
-    // 检查 Node.js 版本
-    startupCheck.checkNodeVersion('14.0.0')
-
-    // 确保必要的目录存在
-    startupCheck.ensureDir('logs', '日志目录')
-
-    // 打印检查结果
-    if (!startupCheck.printResult()) {
-      process.exit(1)
-    }
-
     // 验证配置
     const validation = config.validate()
     if (!validation.valid) {
@@ -1295,9 +901,8 @@ class UnifiedServer {
     await this.scheduler.start()
 
     // 启动 HTTP 服务器（仅在端口配置时）
-    let server = null
     if (config.port) {
-      server = this.app.listen(config.port, () => {
+      this.app.listen(config.port, () => {
         this.logger.log('\n========================================')
         this.logger.log('  Unified AI CLI Connector Server')
         this.logger.log('========================================')
@@ -1314,47 +919,6 @@ class UnifiedServer {
       this.logger.log(`📱 钉钉: ${dingtalkEnabled ? '✅ 已启用' : '❌ 未启用'}`)
       this.logger.log(`🌐 API: 未启用（未配置端口）`)
       this.logger.log('\n按 Ctrl+C 停止服务器\n')
-    }
-
-    // 🆕 设置优雅关闭（2026-03-05 第二轮优化）
-    if (server) {
-      this.gracefulShutdown = new GracefulShutdown(server, this.logger, {
-        timeout: parseInt(process.env.SHUTDOWN_TIMEOUT || '30000', 10)
-      })
-
-      // 注册清理任务
-      this.gracefulShutdown.registerCleanupTask(async () => {
-        this.logger.info('SHUTDOWN', '清理缓存...')
-        this.cacheManager.clear()
-      })
-
-      this.gracefulShutdown.registerCleanupTask(async () => {
-        this.logger.info('SHUTDOWN', '停止内存监控...')
-        this.memoryMonitor.stop()
-      })
-
-      this.gracefulShutdown.registerCleanupTask(async () => {
-        this.logger.info('SHUTDOWN', '停止定时任务...')
-        if (this.scheduler) {
-          this.scheduler.stop()
-        }
-      })
-
-      // 🆕 中断所有连接器会话（ISS-034: 连接器进程信号处理）
-      this.gracefulShutdown.registerCleanupTask(async () => {
-        this.logger.info('SHUTDOWN', '中断所有连接器会话...')
-        const interruptedCount = this._interruptAllSessions()
-        this.logger.info('SHUTDOWN', `已中断 ${interruptedCount} 个会话`)
-      })
-
-      // 设置信号监听
-      this.gracefulShutdown.setup()
-      this.logger.info('SERVER', '✓ 优雅关闭处理器已设置')
-    }
-
-    // 🆕 启动内存监控（2026-03-05 新增，2026-03-05 第二轮优化）
-    if (process.env.MEMORY_MONITOR_ENABLED !== 'false') {
-      this.memoryMonitor.start()
     }
   }
 
