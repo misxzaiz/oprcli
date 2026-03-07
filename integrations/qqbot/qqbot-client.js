@@ -626,7 +626,9 @@ class QQBotClient extends EventEmitter {
         content: content
       };
 
-      if (options.msgId) {
+      // C2C 私信的 msg_id 参数要求严格，必须是用户发送消息的有效 ID
+      // 只有在明确提供且有效时才传递，避免 40034024 错误
+      if (options.msgId && typeof options.msgId === 'string' && options.msgId.trim() !== '') {
         postData.msg_id = options.msgId;
       }
       if (options.image) {
@@ -635,7 +637,7 @@ class QQBotClient extends EventEmitter {
       if (options.messageReference) {
         postData.message_reference = options.messageReference;
       }
-      if (options.eventId) {
+      if (options.eventId && typeof options.eventId === 'string' && options.eventId.trim() !== '') {
         postData.event_id = options.eventId;
       }
 

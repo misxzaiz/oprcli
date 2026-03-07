@@ -2227,17 +2227,50 @@ class UnifiedServer {
             const context = { index: ++messageCount, elapsed }
 
             this.logger.info('EVENT', `#${messageCount} [${event.type}]`)
+            
+            // QQ Bot 详细事件日志 - 便于诊断问题
+            this.logger.debug('QQBOT', `[${type}] 事件详情: ${JSON.stringify(event, null, 2).substring(0, 500)}`)
 
             // 处理不同类型的事件
             if (event.type === 'assistant' || event.type === 'result') {
-              const text = event.message?.content
-                ?.filter(c => c.type === 'text')
-                ?.map(c => c.text)
-                ?.join('') || event.result || ''
+              // 尝试多种方式提取文本内容
+              let text = ''
+              
+              // 方式1: event.message.content 数组格式
+              if (event.message?.content && Array.isArray(event.message.content)) {
+                text = event.message.content
+                  .filter(c => c.type === 'text')
+                  .map(c => c.text)
+                  .join('')
+              }
+              
+              // 方式2: event.result 字符串格式
+              if (!text && event.result) {
+                text = event.result
+              }
+              
+              // 方式3: event.message 字符串格式
+              if (!text && typeof event.message === 'string') {
+                text = event.message
+              }
+              
+              // 方式4: event.content 字符串格式
+              if (!text && event.content) {
+                text = event.content
+              }
+              
+              // 方式5: event.text 字符串格式
+              if (!text && event.text) {
+                text = event.text
+              }
 
+              this.logger.info('QQBOT', `[${type}] 提取文本: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`)
+              
               if (text) {
                 await this._sendQQBotReply(message, type, text)
                 sentMessageCount++
+              } else {
+                this.logger.warn('QQBOT', `[${type}] 事件类型 ${event.type} 无法提取文本内容`)
               }
             } else if (event.type === 'error') {
               this.logger.error('QQBOT', `错误事件: ${event.error}`)
@@ -2251,8 +2284,11 @@ class UnifiedServer {
                   '已收到消息，但本次会话没有产出可发送文本。请稍后重试，或发送 /clear 后再试。'
                 )
               }
-              this.logger.info('QQBOT', '会话结束')
+              this.logger.info('QQBOT', `会话结束，共 ${messageCount} 个事件，发送 ${sentMessageCount} 条消息`)
               resolve()
+            } else {
+              // 其他事件类型也打印日志
+              this.logger.debug('QQBOT', `[${type}] 未处理的事件类型: ${event.type}`)
             }
           }
         }
@@ -2275,9 +2311,22 @@ class UnifiedServer {
    */
   async _sendQQBotReply(originalMessage, type, content) {
     try {
-      const replyOptions = {
-        msgId: originalMessage?.id,
-        eventId: originalMessage?.event_id
+      // 根据消息类型构造不同的回复选项
+      // C2C 私信的 msg_id 参数要求严格，需要使用正确的消息 ID
+      let replyOptions = {}
+      
+      if (type === 'c2c') {
+        // C2C 私信：使用 message.id 作为被动回复的 msg_id
+        // 如果 msg_id 无效，API 会返回 40034024 错误
+        replyOptions = {
+          msgId: originalMessage?.id
+        }
+      } else {
+        // 频道消息和私信
+        replyOptions = {
+          msgId: originalMessage?.id,
+          eventId: originalMessage?.event_id
+        }
       }
 
       switch (type) {

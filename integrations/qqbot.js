@@ -141,6 +141,12 @@ class QQBotIntegration {
   async _handleMessage(message, type) {
     const messageId = message.id;
 
+    // C2C 消息调试日志 - 确认消息结构
+    if (type === 'c2c') {
+      this.logger.debug('QQBOT', `[C2C] 消息完整结构: ${JSON.stringify(message, null, 2)}`);
+      this.logger.info('QQBOT', `[C2C] message.id: ${message.id}`);
+    }
+
     // 去重
     if (messageId && this.isProcessed(messageId)) {
       this.logger.debug('QQBOT', `消息已处理过，跳过: ${messageId}`);
