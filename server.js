@@ -467,14 +467,14 @@ class UnifiedServer {
   }
 
   _shouldSendByMode(eventType, cfg) {
-    const mode = cfg.mode || 'normal'
-    if (mode === 'minimal') {
+    const profile = cfg.profile || 'standard'
+    if (profile === 'compact') {
       return eventType === 'assistant_chunk' || eventType === 'result'
     }
-    if (mode === 'normal') {
+    if (profile === 'standard') {
       return ['assistant_chunk', 'result', 'tool_result', 'error', 'end'].includes(eventType)
     }
-    return true // full
+    return true // full/debug
   }
 
   _shouldSendEvent(eventType, cfg) {
@@ -496,7 +496,7 @@ class UnifiedServer {
   _formatEventMessage(eventType, event, extractedText, cfg, elapsedMs) {
     const maxChars = cfg.maxChars || 1200
     if (eventType === 'assistant_chunk' || eventType === 'result') {
-      if (cfg.enabled && cfg.mode === 'full') {
+      if (cfg.enabled && (cfg.profile === 'full' || cfg.profile === 'debug')) {
         return `[ASSISTANT]\n${this._trimText(extractedText, maxChars)}`
       }
       return this._trimText(extractedText, maxChars)
@@ -748,7 +748,7 @@ class UnifiedServer {
     const startAt = Date.now()
     const streamCfg = config.robotStream || {
       enabled: false,
-      mode: 'normal',
+      profile: 'standard',
       types: [],
       sendThinking: false,
       sendHttp: false,

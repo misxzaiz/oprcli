@@ -102,15 +102,21 @@ class Config {
       redactKeys: this._parseList(process.env.AUDIT_LOG_REDACT_KEYS || 'clientSecret,token,authorization,webhook,secret')
     }
 
-    // 机器人过程输出配置
+    // 机器人过程输出配置（仅新配置）
     this.robotStream = {
-      enabled: process.env.ROBOT_STREAM_ENABLED === 'true',
-      mode: (process.env.ROBOT_STREAM_MODE || 'normal').toLowerCase(), // minimal | normal | full
-      types: this._parseList(process.env.ROBOT_STREAM_TYPES || 'assistant_chunk,result,thinking_exposed,tool_use,tool_result,http_request,http_response,error,end'),
-      sendThinking: process.env.ROBOT_STREAM_SEND_THINKING === 'true',
-      sendHttp: process.env.ROBOT_STREAM_SEND_HTTP === 'true',
-      maxChars: parseInt(process.env.ROBOT_STREAM_MAX_CHARS || '1200', 10),
-      sendEndSummary: process.env.ROBOT_STREAM_SEND_END_SUMMARY !== 'false'
+      enabled: process.env.ROBOT_OUTPUT_ENABLED !== 'false',
+      profile: (() => {
+        const rawProfile = (process.env.ROBOT_OUTPUT_PROFILE || 'standard').toLowerCase()
+        const allowedProfiles = ['compact', 'standard', 'full', 'debug']
+        return allowedProfiles.includes(rawProfile) ? rawProfile : 'standard'
+      })(),
+      types: this._parseList(process.env.ROBOT_SHOW_TYPES || 'assistant_chunk,result,thinking_exposed,tool_use,tool_result,http_request,http_response,error,end'),
+      sendThinking: process.env.ROBOT_SHOW_THINKING === 'true',
+      sendHttp: process.env.ROBOT_SHOW_NETWORK === 'true',
+      maxChars: parseInt(process.env.ROBOT_MAX_CHARS || '1200', 10),
+      sendEndSummary: process.env.ROBOT_END_SUMMARY !== 'false',
+      dedupWindowMs: parseInt(process.env.ROBOT_DEDUP_WINDOW_MS || '5000', 10),
+      chunkStrategy: (process.env.ROBOT_CHUNK_STRATEGY || 'throttle').toLowerCase()
     }
   }
 
