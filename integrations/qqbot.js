@@ -139,12 +139,12 @@ class QQBotIntegration {
    * 处理消息
    */
   async _handleMessage(message, type) {
-    const messageId = message.id;
+    const messageId = this._getMessageDedupKey(message, type);
 
     // C2C 消息调试日志 - 确认消息结构
     if (type === 'c2c') {
       this.logger.debug('QQBOT', `[C2C] 消息完整结构: ${JSON.stringify(message, null, 2)}`);
-      this.logger.info('QQBOT', `[C2C] message.id: ${message.id}`);
+      this.logger.info('QQBOT', `[C2C] dedupKey: ${messageId}`);
     }
 
     // 去重
@@ -196,6 +196,25 @@ class QQBotIntegration {
       return `dms:${message.guild_id}:${message.author.id}`;
     }
     return `unknown:${message.id}`;
+  }
+
+  _getMessageDedupKey(message, type) {
+    if (message?.id) {
+      return `id:${message.id}`;
+    }
+
+    if (message?.msg_id) {
+      return `msg:${message.msg_id}`;
+    }
+
+    if (message?.event_id) {
+      return `event:${message.event_id}`;
+    }
+
+    const author = message?.author?.user_openid || message?.author?.id || 'unknown';
+    const content = message?.content || '';
+    const timestamp = message?.timestamp || '';
+    return `${type}:${author}:${timestamp}:${content}`;
   }
 
   // ==================== 会话状态管理（与钉钉一致） ====================

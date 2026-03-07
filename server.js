@@ -2215,6 +2215,7 @@ class UnifiedServer {
 
     let messageCount = 0
     let sentMessageCount = 0
+    let latestReply = ''
     const startTime = Date.now()
 
     this.logger.info('QQBOT', `开始调用 ${isResume ? 'continueSession' : 'startSession'}...`)
@@ -2267,8 +2268,8 @@ class UnifiedServer {
               this.logger.info('QQBOT', `[${type}] 提取文本: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`)
               
               if (text) {
-                await this._sendQQBotReply(message, type, text)
-                sentMessageCount++
+                latestReply = text
+                this.logger.debug('QQBOT', `[${type}] 暂存回复文本，等待 session_end 统一发送`)
               } else {
                 this.logger.warn('QQBOT', `[${type}] 事件类型 ${event.type} 无法提取文本内容`)
               }
@@ -2277,7 +2278,10 @@ class UnifiedServer {
               await this._sendQQBotReply(message, type, `❌ 处理失败: ${event.error}`)
               reject(new Error(event.error))
             } else if (event.type === 'session_end') {
-              if (messageCount > 0 && sentMessageCount === 0) {
+              if (latestReply) {
+                await this._sendQQBotReply(message, type, latestReply)
+                sentMessageCount++
+              } else if (messageCount > 0 && sentMessageCount === 0) {
                 await this._sendQQBotReply(
                   message,
                   type,
@@ -2319,7 +2323,7 @@ class UnifiedServer {
         // C2C 私信：使用 message.id 作为被动回复的 msg_id
         // 如果 msg_id 无效，API 会返回 40034024 错误
         replyOptions = {
-          msgId: originalMessage?.id
+          msgId: undefined
         }
       } else {
         // 频道消息和私信
