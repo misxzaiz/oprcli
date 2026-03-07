@@ -84,3 +84,4 @@ memory/
 
 # 配置备份文件
 backups/
+data/
