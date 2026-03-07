@@ -58,11 +58,14 @@ class BasePlatformIntegration {
    * @param {string} sessionId - SessionID
    * @param {string} provider - Provider名称
    */
-  setSession(conversationId, sessionId, provider) {
+  setSession(conversationId, sessionId, provider, extra = {}) {
+    const existing = this.conversations.get(conversationId) || {}
     this.conversations.set(conversationId, {
+      ...existing,
+      ...extra,
       sessionId,
       provider,
-      startTime: Date.now()
+      startTime: existing.startTime || Date.now()
     })
 
     this.logger.debug('SESSION', `会话已保存`, {

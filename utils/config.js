@@ -76,7 +76,10 @@ class Config {
     // 系统提示词配置
     this.systemPrompts = {
       global: process.env.SYSTEM_PROMPT,
-      promptsDir: process.env.SYSTEM_PROMPTS_DIR || path.join(__dirname, '../system-prompts')
+      promptsDir: process.env.SYSTEM_PROMPTS_DIR || path.join(__dirname, '../system-prompts'),
+      mode: (process.env.PROMPT_MODE || 'universal').toLowerCase(),
+      channelAware: process.env.PROMPT_CHANNEL_AWARE !== 'false',
+      includeSourceContext: process.env.PROMPT_INCLUDE_SOURCE_CONTEXT !== 'false'
     }
 
     // 通知配置

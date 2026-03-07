@@ -38,6 +38,8 @@ class UnifiedServer {
     '状态': { type: 'status' },
     'help': { type: 'help' },
     '帮助': { type: 'help' },
+    'mode': { type: 'mode', hasArg: true },
+    '模式': { type: 'mode', hasArg: true },
 
     // 定时任务命令
     'tasks': { type: 'tasks_list' },
@@ -57,6 +59,7 @@ class UnifiedServer {
     // 多模型支持
     this.connectors = new Map()  // 'claude' | 'iflow' -> connector instance
     this.defaultProvider = config.provider
+    this.defaultPromptMode = this._normalizePromptMode(config.systemPrompts?.mode)
 
     // 定时任务模块
     this.scheduler = null
@@ -211,6 +214,9 @@ class UnifiedServer {
       case 'help':
         return await this._handleHelp(replyTarget, platform, originalMessage, type)
 
+      case 'mode':
+        return await this._handleMode(command.arg, conversationId, replyTarget, platform, originalMessage, type)
+
       // 定时任务命令
       case 'tasks_list':
         return await this._handleTasksList(conversationId, replyTarget, platform, originalMessage, type)
@@ -261,7 +267,7 @@ class UnifiedServer {
     }
 
     // 切换模型（清空旧 sessionId，保留 provider）
-    platform.setSession(conversationId, null, provider)
+    platform.setSession(conversationId, null, provider, { mode: currentSession?.mode || this.defaultPromptMode })
 
     const availableProviders = Array.from(this.connectors.keys()).map(p => p.toUpperCase()).join(', ')
     await platform.send(
@@ -300,6 +306,7 @@ class UnifiedServer {
   async _handleStatus(conversationId, replyTarget, platform, originalMessage, type) {
     const session = platform.getSession(conversationId)
     const provider = session?.provider || this.defaultProvider
+    const mode = this._normalizePromptMode(session?.mode || this.defaultPromptMode)
     const sessionId = session?.sessionId || null
     const availableProviders = Array.from(this.connectors.entries())
       .filter(([_, conn]) => conn.connected)
@@ -308,6 +315,7 @@ class UnifiedServer {
 
     const status = {
       当前模型: provider.toUpperCase(),
+      对话模式: mode,
       会话状态: sessionId ? '运行中' : '空闲',
       可用模型: availableProviders || '无'
     }
@@ -346,12 +354,100 @@ class UnifiedServer {
 
 ℹ️ 信息查询：
   • status / 状态  - 查看当前状态
+  • mode [universal|dev|ops]  - 查看或切换对话模式
   • help / 帮助  - 显示此帮助
 
 💡 可用模型：${availableProviders || '无'}`
 
     await platform.send(replyTarget, help.trim(), originalMessage, type)
     return { status: 'SUCCESS' }
+  }
+
+  _normalizePromptMode(mode) {
+    const value = (mode || '').toString().trim().toLowerCase()
+    const aliases = {
+      all: 'universal',
+      general: 'universal',
+      full: 'universal',
+      universal: 'universal',
+      dev: 'dev',
+      developer: 'dev',
+      coding: 'dev',
+      ops: 'ops',
+      operation: 'ops'
+    }
+    return aliases[value] || 'universal'
+  }
+
+  async _handleMode(modeArg, conversationId, replyTarget, platform, originalMessage, type) {
+    const session = platform.getSession(conversationId)
+    const currentProvider = session?.provider || this.defaultProvider
+    const currentMode = this._normalizePromptMode(session?.mode || this.defaultPromptMode)
+
+    if (!modeArg) {
+      await platform.send(
+        replyTarget,
+        `🧭 当前模式：${currentMode}\n\n可选模式：universal / dev / ops\n命令示例：mode universal`,
+        originalMessage,
+        type
+      )
+      return { status: 'SUCCESS' }
+    }
+
+    const rawMode = modeArg.trim().toLowerCase()
+    const normalized = this._normalizePromptMode(rawMode)
+    const isValidMode = ['universal', 'dev', 'ops', 'all', 'general', 'full', 'developer', 'coding', 'operation'].includes(rawMode)
+
+    if (!isValidMode) {
+      await platform.send(
+        replyTarget,
+        `❌ 不支持的模式：${modeArg}\n可选模式：universal / dev / ops`,
+        originalMessage,
+        type
+      )
+      return { status: 'SUCCESS' }
+    }
+
+    platform.setSession(conversationId, session?.sessionId || null, currentProvider, { mode: normalized })
+    await platform.send(replyTarget, `✅ 已切换对话模式：${normalized}`, originalMessage, type)
+    return { status: 'SUCCESS' }
+  }
+
+  _buildRuntimeContext({ platformName, type, conversationId, provider, mode }) {
+    return {
+      platform: (platformName || 'UNKNOWN').toLowerCase(),
+      message_type: type || 'default',
+      conversation_id: conversationId,
+      provider,
+      mode,
+      work_dir: config.getWorkDir(provider),
+      timestamp: new Date().toISOString()
+    }
+  }
+
+  _buildContextualMessage(content, runtimeContext) {
+    const modeInstructions = {
+      universal: '优先按通用全能助手风格回答：先结论，后步骤，跨领域可执行。',
+      dev: '优先按工程助手风格回答：给出可执行命令、代码和排障步骤。',
+      ops: '优先按运维助手风格回答：强调稳定性、风险、回滚与监控建议。'
+    }
+
+    const modeBlock = `[MODE_INSTRUCTION]\n${modeInstructions[runtimeContext.mode] || modeInstructions.universal}\n[/MODE_INSTRUCTION]`
+
+    if (config.systemPrompts?.channelAware === false && config.systemPrompts?.includeSourceContext === false) {
+      return content
+    }
+
+    if (config.systemPrompts?.includeSourceContext === false) {
+      return `${modeBlock}\n\n${content}`
+    }
+
+    const contextBlock = `[RUNTIME_CONTEXT]\n${JSON.stringify(runtimeContext)}\n[/RUNTIME_CONTEXT]`
+    if (config.systemPrompts?.channelAware === false) {
+      return `${modeBlock}\n\n${content}`
+    }
+
+    return `${contextBlock}\n\n${modeBlock}\n\n${content}`
   }
 
   // ==================== 定时任务命令处理 ====================
@@ -600,8 +696,17 @@ class UnifiedServer {
       let session = platform.getSession(conversationId)
       let provider = session?.provider || this.defaultProvider
       let sessionId = session?.sessionId || null
+      const mode = this._normalizePromptMode(session?.mode || this.defaultPromptMode)
+      const runtimeContext = this._buildRuntimeContext({
+        platformName,
+        type,
+        conversationId,
+        provider,
+        mode
+      })
+      const contextualMessage = this._buildContextualMessage(content, runtimeContext)
 
-      this.logger.debug(platformName, '使用模型', { provider, hasSessionId: !!sessionId })
+      this.logger.debug(platformName, '使用模型', { provider, mode, hasSessionId: !!sessionId })
 
       // 4. 获取connector
       const connector = this.connectors.get(provider)
@@ -625,7 +730,7 @@ class UnifiedServer {
                 }
               } else if (event.type === 'system' && event.extra?.session_id) {
                 sessionId = event.extra.session_id
-                platform.setSession(conversationId, sessionId, provider)
+                platform.setSession(conversationId, sessionId, provider, { mode })
                 this.logger.success('SESSION', `✅ 保存SessionID: ${sessionId}`)
               }
             } catch (error) {
@@ -645,10 +750,10 @@ class UnifiedServer {
 
         if (sessionId) {
           this.logger.debug(platformName, `调用 continueSession: ${sessionId}`)
-          connector.continueSession(sessionId, content, options)
+          connector.continueSession(sessionId, contextualMessage, options)
         } else {
           this.logger.debug(platformName, '调用 startSession')
-          connector.startSession(content, options)
+          connector.startSession(contextualMessage, options)
         }
       })
 
