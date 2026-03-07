@@ -454,6 +454,72 @@ class UnifiedServer {
     return `${contextBlock}\n\n${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${modeBlock}\n\n${content}`
   }
 
+  _mapProviderEventType(event) {
+    if (!event || !event.type) return 'unknown'
+    if (event.type === 'assistant') return 'assistant_chunk'
+    if (event.type === 'result') return 'result'
+    if (event.type === 'tool_use') return 'tool_use'
+    if (event.type === 'tool_end' || event.type === 'tool_result') return 'tool_result'
+    if (event.type === 'session_end') return 'end'
+    if (event.type === 'error') return 'error'
+    if (event.type.includes('thinking')) return 'thinking_exposed'
+    return event.type
+  }
+
+  _shouldSendByMode(eventType, cfg) {
+    const mode = cfg.mode || 'normal'
+    if (mode === 'minimal') {
+      return eventType === 'assistant_chunk' || eventType === 'result'
+    }
+    if (mode === 'normal') {
+      return ['assistant_chunk', 'result', 'tool_result', 'error', 'end'].includes(eventType)
+    }
+    return true // full
+  }
+
+  _shouldSendEvent(eventType, cfg) {
+    if (!cfg.enabled) return eventType === 'assistant_chunk' || eventType === 'result'
+    if (!this._shouldSendByMode(eventType, cfg)) return false
+    if (cfg.types && cfg.types.length > 0 && !cfg.types.includes(eventType)) return false
+    if (eventType === 'thinking_exposed' && !cfg.sendThinking) return false
+    if ((eventType === 'http_request' || eventType === 'http_response') && !cfg.sendHttp) return false
+    return true
+  }
+
+  _trimText(text, maxChars) {
+    if (!text) return ''
+    const raw = String(text)
+    if (raw.length <= maxChars) return raw
+    return `${raw.slice(0, maxChars)}...[截断:${raw.length}]`
+  }
+
+  _formatEventMessage(eventType, event, extractedText, cfg, elapsedMs) {
+    const maxChars = cfg.maxChars || 1200
+    if (eventType === 'assistant_chunk' || eventType === 'result') {
+      if (cfg.enabled && cfg.mode === 'full') {
+        return `[ASSISTANT]\n${this._trimText(extractedText, maxChars)}`
+      }
+      return this._trimText(extractedText, maxChars)
+    }
+    if (eventType === 'thinking_exposed') {
+      const thinking = event?.delta?.text || event?.thinking || extractedText || ''
+      return `[THINKING]\n${this._trimText(thinking, maxChars)}`
+    }
+    if (eventType === 'tool_use') {
+      return `[TOOL_USE] ${event.name || 'unknown'}\n${this._trimText(JSON.stringify(event.input || {}), maxChars)}`
+    }
+    if (eventType === 'tool_result') {
+      return `[TOOL_RESULT]\n${this._trimText(event.output || extractedText || '', maxChars)}`
+    }
+    if (eventType === 'error') {
+      return `[ERROR] ${event?.error || event?.message || 'unknown'}`
+    }
+    if (eventType === 'end') {
+      return `[END] 已结束，耗时 ${elapsedMs}ms`
+    }
+    return ''
+  }
+
   // ==================== 定时任务命令处理 ====================
 
   async _handleTasksList(conversationId, replyTarget, platform, originalMessage, type) {
@@ -680,6 +746,21 @@ class UnifiedServer {
     const { type } = extra
     const traceId = `tr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const startAt = Date.now()
+    const streamCfg = config.robotStream || {
+      enabled: false,
+      mode: 'normal',
+      types: [],
+      sendThinking: false,
+      sendHttp: false,
+      maxChars: 1200,
+      sendEndSummary: true
+    }
+    const streamState = {
+      firstOutputAt: null,
+      firstSendAt: null,
+      sendCount: 0,
+      finalResponseType: 'empty'
+    }
 
     try {
       this.auditLogger.logAgent('agent.incoming.raw', {
@@ -768,37 +849,55 @@ class UnifiedServer {
           onEvent: async (event) => {
             try {
               // 只处理核心事件
-              if (event.type === 'assistant' || event.type === 'result') {
-                const text = this._extractTextFromEvent(event)
+              const mappedType = this._mapProviderEventType(event)
+              const extractedText = this._extractTextFromEvent(event)
+              const elapsed = Date.now() - startAt
+
+              if (mappedType === 'assistant_chunk' || mappedType === 'result') {
                 this.auditLogger.logAgent('agent.event.output', {
                   trace_id: traceId,
                   platform: platformName.toLowerCase(),
                   conversation_id: conversationId,
                   provider,
                   event_type: event.type,
+                  mapped_type: mappedType,
                   raw_event: event,
-                  extracted_text: text
+                  extracted_text: extractedText
                 })
-                if (text) {
-                  this.logger.info(platformName, `📤 发送回复 (${text.length} 字符)`)
-                  await platform.send(replyTarget, text, rawMessage, type, {
-                    traceId,
-                    conversationId,
-                    provider,
-                    platform: platformName.toLowerCase(),
-                    messageType: type || 'default'
-                  })
-                }
-              } else if (event.type === 'tool_use' || event.type === 'tool_end') {
+              } else if (mappedType === 'tool_use' || mappedType === 'tool_result') {
                 this.auditLogger.logAgent('agent.event.tool', {
                   trace_id: traceId,
                   platform: platformName.toLowerCase(),
                   conversation_id: conversationId,
                   provider,
                   event_type: event.type,
+                  mapped_type: mappedType,
                   raw_event: event
                 })
-              } else if (event.type === 'system' && event.extra?.session_id) {
+              }
+
+              if (this._shouldSendEvent(mappedType, streamCfg)) {
+                const msg = this._formatEventMessage(mappedType, event, extractedText, streamCfg, elapsed)
+                if (msg) {
+                  if (!streamState.firstOutputAt && (mappedType === 'assistant_chunk' || mappedType === 'result' || mappedType === 'tool_result')) {
+                    streamState.firstOutputAt = Date.now()
+                    streamState.finalResponseType = mappedType
+                  }
+                  this.logger.info(platformName, `📤 发送过程事件 ${mappedType} (${msg.length} 字符)`)
+                  await platform.send(replyTarget, msg, rawMessage, type, {
+                    traceId,
+                    conversationId,
+                    provider,
+                    platform: platformName.toLowerCase(),
+                    messageType: type || 'default',
+                    streamEventType: mappedType
+                  })
+                  if (!streamState.firstSendAt) streamState.firstSendAt = Date.now()
+                  streamState.sendCount++
+                }
+              }
+
+              if (event.type === 'system' && event.extra?.session_id) {
                 sessionId = event.extra.session_id
                 platform.setSession(conversationId, sessionId, provider, { mode })
                 this.logger.success('SESSION', `✅ 保存SessionID: ${sessionId}`)
@@ -816,6 +915,20 @@ class UnifiedServer {
             }
           },
           onComplete: (exitCode) => {
+            const total = Date.now() - startAt
+            if (streamCfg.enabled && streamCfg.sendEndSummary && this._shouldSendEvent('end', streamCfg)) {
+              const ttfb = streamState.firstOutputAt ? (streamState.firstOutputAt - startAt) : -1
+              const firstSend = streamState.firstSendAt ? (streamState.firstSendAt - startAt) : -1
+              const endMsg = `[END] status=completed total=${total}ms t_first_output=${ttfb}ms t_first_send=${firstSend}ms sends=${streamState.sendCount} type=${streamState.finalResponseType}`
+              platform.send(replyTarget, endMsg, rawMessage, type, {
+                traceId,
+                conversationId,
+                provider,
+                platform: platformName.toLowerCase(),
+                messageType: type || 'default',
+                streamEventType: 'end'
+              }).catch(() => {})
+            }
             this.logger.success(platformName, `✅ 会话完成，退出码: ${exitCode}`)
             this.auditLogger.logAgent('agent.complete', {
               trace_id: traceId,
@@ -828,6 +941,18 @@ class UnifiedServer {
             resolve()
           },
           onError: (error) => {
+            const total = Date.now() - startAt
+            if (streamCfg.enabled && this._shouldSendEvent('error', streamCfg)) {
+              const errMsg = `[ERROR] status=error total=${total}ms reason=${error.message}`
+              platform.send(replyTarget, errMsg, rawMessage, type, {
+                traceId,
+                conversationId,
+                provider,
+                platform: platformName.toLowerCase(),
+                messageType: type || 'default',
+                streamEventType: 'error'
+              }).catch(() => {})
+            }
             this.logger.error(platformName, `❌ 会话错误: ${error.message}`)
             this.auditLogger.logAgent('agent.error', {
               trace_id: traceId,

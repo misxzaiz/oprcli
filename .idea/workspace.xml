@@ -1,23 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="移除无效内容">
+    <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="修改系统提示词">
+      <change beforePath="$PROJECT_DIR$/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/.env.example" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config/default.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/config/news-config.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/config/schema.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/config/user.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/session-store.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/start.bat" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/base.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/claude-slim.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/claude.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/codex.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/default-slim.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/default.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/iflow-slim.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/iflow.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/system-prompts/scheduler-guide.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/server.js" beforeDir="false" afterPath="$PROJECT_DIR$/server.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/utils/config.js" beforeDir="false" afterPath="$PROJECT_DIR$/utils/config.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -244,7 +231,15 @@
       <option name="project" value="LOCAL" />
       <updated>1772897224894</updated>
     </task>
-    <option name="localTasksCounter" value="19" />
+    <task id="LOCAL-00019" summary="修改系统提示词">
+      <option name="closed" value="true" />
+      <created>1772898459397</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1772898459397</updated>
+    </task>
+    <option name="localTasksCounter" value="20" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -279,6 +274,7 @@
     <MESSAGE value="修复工具调用失败的问题（实际是显示错误）没完全修复" />
     <MESSAGE value="QQ机器人" />
     <MESSAGE value="移除无效内容" />
-    <option name="LAST_COMMIT_MESSAGE" value="移除无效内容" />
+    <MESSAGE value="修改系统提示词" />
+    <option name="LAST_COMMIT_MESSAGE" value="修改系统提示词" />
   </component>
 </project>

@@ -101,6 +101,17 @@ class Config {
       maxFieldLength: parseInt(process.env.AUDIT_LOG_MAX_FIELD_LENGTH || '8000', 10),
       redactKeys: this._parseList(process.env.AUDIT_LOG_REDACT_KEYS || 'clientSecret,token,authorization,webhook,secret')
     }
+
+    // 机器人过程输出配置
+    this.robotStream = {
+      enabled: process.env.ROBOT_STREAM_ENABLED === 'true',
+      mode: (process.env.ROBOT_STREAM_MODE || 'normal').toLowerCase(), // minimal | normal | full
+      types: this._parseList(process.env.ROBOT_STREAM_TYPES || 'assistant_chunk,result,thinking_exposed,tool_use,tool_result,http_request,http_response,error,end'),
+      sendThinking: process.env.ROBOT_STREAM_SEND_THINKING === 'true',
+      sendHttp: process.env.ROBOT_STREAM_SEND_HTTP === 'true',
+      maxChars: parseInt(process.env.ROBOT_STREAM_MAX_CHARS || '1200', 10),
+      sendEndSummary: process.env.ROBOT_STREAM_SEND_END_SUMMARY !== 'false'
+    }
   }
 
   _parseList(str) {
