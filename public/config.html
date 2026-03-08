@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OPRCLI 配置管理</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #e0e0e0;
+      padding: 20px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #00d9ff;
+      font-weight: 300;
+      letter-spacing: 2px;
+    }
+    .section {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .section-title {
+      font-size: 14px;
+      color: #00d9ff;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 15px;
+    }
+    .form-group { margin-bottom: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label {
+      display: block;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 5px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #00d9ff;
+    }
+    textarea { min-height: 80px; resize: vertical; font-family: inherit; }
+    .actions {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      margin-top: 30px;
+    }
+    button {
+      padding: 12px 30px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #00d9ff 0%, #00a8cc 100%);
+      color: #000;
+      font-weight: 500;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,217,255,0.3); }
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.2); }
+    .status {
+      text-align: center;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+      display: none;
+    }
+    .status.success { background: rgba(0,200,83,0.2); color: #00c853; display: block; }
+    .status.error { background: rgba(255,82,82,0.2); color: #ff5252; display: block; }
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #00d9ff;
+    }
+    .hint { font-size: 11px; color: #666; margin-top: 3px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>OPRCLI 配置管理</h1>
+    
+    <form id="configForm">
+      <!-- 核心配置 -->
+      <div class="section">
+        <div class="section-title">核心配置</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>默认模型</label>
+            <select id="PROVIDER">
+              <option value="claude">Claude</option>
+              <option value="iflow">IFlow</option>
+              <option value="codex">Codex</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>服务端口</label>
+            <input type="number" id="PORT" placeholder="13579">
+          </div>
+          <div class="form-group full">
+            <label>默认工作目录</label>
+            <input type="text" id="DEFAULT_WORK_DIR" placeholder="D:/space">
+          </div>
+        </div>
+      </div>
+
+      <!-- 钉钉集成 -->
+      <div class="section">
+        <div class="section-title">钉钉集成</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Client ID</label>
+            <input type="text" id="DINGTALK_CLIENT_ID" placeholder="钉钉应用 Client ID">
+          </div>
+          <div class="form-group">
+            <label>Client Secret</label>
+            <input type="password" id="DINGTALK_CLIENT_SECRET" placeholder="钉钉应用 Client Secret">
+          </div>
+        </div>
+      </div>
+
+      <!-- QQ Bot 集成 -->
+      <div class="section">
+        <div class="section-title">QQ Bot 集成</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>App ID</label>
+            <input type="text" id="QQBOT_APP_ID" placeholder="QQ Bot App ID">
+          </div>
+          <div class="form-group">
+            <label>Client Secret</label>
+            <input type="password" id="QQBOT_CLIENT_SECRET" placeholder="QQ Bot Client Secret">
+          </div>
+          <div class="form-group">
+            <label>命令前缀</label>
+            <input type="text" id="QQBOT_COMMAND_PREFIX" placeholder="/">
+          </div>
+          <div class="form-group">
+            <label class="checkbox-group">
+              <input type="checkbox" id="QQBOT_SANDBOX">
+              沙盒模式
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 通知配置 -->
+      <div class="section">
+        <div class="section-title">通知配置</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="checkbox-group">
+              <input type="checkbox" id="NOTIFICATION_ENABLED">
+              启用通知
+            </label>
+          </div>
+          <div class="form-group">
+            <label>通知类型</label>
+            <select id="NOTIFICATION_TYPE">
+              <option value="dingtalk">钉钉</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <label>钉钉 Webhook</label>
+            <input type="text" id="NOTIFICATION_DINGTALK_WEBHOOK" placeholder="https://oapi.dingtalk.com/robot/send?access_token=xxx">
+          </div>
+          <div class="form-group full">
+            <label>钉钉 Secret</label>
+            <input type="password" id="NOTIFICATION_DINGTALK_SECRET" placeholder="SECxxxxxxxx">
+          </div>
+        </div>
+      </div>
+
+      <!-- 定时任务 -->
+      <div class="section">
+        <div class="section-title">定时任务</div>
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>任务配置文件</label>
+            <input type="text" id="TASKS_FILE_PATH" placeholder="./scheduler/tasks.json">
+          </div>
+        </div>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="actions">
+        <button type="button" class="btn-secondary" onclick="loadConfig()">刷新配置</button>
+        <button type="submit" class="btn-primary">保存并重启</button>
+      </div>
+    </form>
+
+    <div id="status" class="status"></div>
+  </div>
+
+  <script>
+    const configKeys = [
+      'PROVIDER', 'PORT', 'DEFAULT_WORK_DIR',
+      'DINGTALK_CLIENT_ID', 'DINGTALK_CLIENT_SECRET',
+      'QQBOT_APP_ID', 'QQBOT_CLIENT_SECRET', 'QQBOT_COMMAND_PREFIX', 'QQBOT_SANDBOX',
+      'NOTIFICATION_ENABLED', 'NOTIFICATION_TYPE', 'NOTIFICATION_DINGTALK_WEBHOOK', 'NOTIFICATION_DINGTALK_SECRET',
+      'TASKS_FILE_PATH'
+    ]
+
+    async function loadConfig() {
+      try {
+        const res = await fetch('/api/config')
+        const data = await res.json()
+        if (data.success) {
+          configKeys.forEach(key => {
+            const el = document.getElementById(key)
+            if (el) {
+              if (el.type === 'checkbox') {
+                el.checked = data.config[key] === 'true' || data.config[key] === true
+              } else {
+                el.value = data.config[key] || ''
+              }
+            }
+          })
+          showStatus('配置已加载', 'success')
+        }
+      } catch (e) {
+        showStatus('加载配置失败: ' + e.message, 'error')
+      }
+    }
+
+    async function saveConfig(e) {
+      e.preventDefault()
+      const config = {}
+      configKeys.forEach(key => {
+        const el = document.getElementById(key)
+        if (el) {
+          config[key] = el.type === 'checkbox' ? String(el.checked) : el.value
+        }
+      })
+
+      try {
+        // 保存配置
+        const saveRes = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config)
+        })
+        const saveData = await saveRes.json()
+        
+        if (!saveData.success) {
+          showStatus('保存失败: ' + saveData.error, 'error')
+          return
+        }
+
+        showStatus('配置已保存，正在重启...', 'success')
+
+        // 延迟重启
+        setTimeout(async () => {
+          try {
+            await fetch('/api/restart', { method: 'POST' })
+            showStatus('服务已重启，页面即将刷新...', 'success')
+            setTimeout(() => location.reload(), 2000)
+          } catch (e) {
+            showStatus('重启请求已发送，请稍后刷新页面', 'success')
+          }
+        }, 500)
+      } catch (e) {
+        showStatus('保存失败: ' + e.message, 'error')
+      }
+    }
+
+    function showStatus(msg, type) {
+      const el = document.getElementById('status')
+      el.textContent = msg
+      el.className = 'status ' + type
+    }
+
+    document.getElementById('configForm').addEventListener('submit', saveConfig)
+    loadConfig()
+  </script>
+</body>
+</html>

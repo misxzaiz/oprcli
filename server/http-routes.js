@@ -1,4 +1,98 @@
+const fs = require('fs').promises
+const path = require('path')
+
 function setupHttpRoutes(server) {
+  // 静态文件服务
+  server.app.use('/config', require('express').static(path.join(__dirname, '../public')))
+
+  // 获取配置
+  server.app.get('/api/config', async (req, res) => {
+    try {
+      const envPath = path.join(__dirname, '../.env')
+      const content = await fs.readFile(envPath, 'utf-8')
+      const config = {}
+      
+      content.split('\n').forEach(line => {
+        const trimmed = line.trim()
+        if (trimmed && !trimmed.startsWith('#')) {
+          const eqIndex = trimmed.indexOf('=')
+          if (eqIndex > 0) {
+            const key = trimmed.substring(0, eqIndex).trim()
+            let value = trimmed.substring(eqIndex + 1).trim()
+            // 移除引号
+            if ((value.startsWith('"') && value.endsWith('"')) ||
+                (value.startsWith("'") && value.endsWith("'"))) {
+              value = value.slice(1, -1)
+            }
+            config[key] = value
+          }
+        }
+      })
+
+      res.json({ success: true, config })
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message })
+    }
+  })
+
+  // 保存配置
+  server.app.post('/api/config', async (req, res) => {
+    try {
+      const newConfig = req.body
+      const envPath = path.join(__dirname, '../.env')
+      
+      // 读取现有内容
+      let content = ''
+      try {
+        content = await fs.readFile(envPath, 'utf-8')
+      } catch (e) {
+        // 文件不存在，使用空内容
+      }
+
+      const lines = content.split('\n')
+      const updatedKeys = new Set()
+
+      // 更新现有行
+      const updatedLines = lines.map(line => {
+        const trimmed = line.trim()
+        if (trimmed && !trimmed.startsWith('#')) {
+          const eqIndex = trimmed.indexOf('=')
+          if (eqIndex > 0) {
+            const key = trimmed.substring(0, eqIndex).trim()
+            if (newConfig.hasOwnProperty(key)) {
+              updatedKeys.add(key)
+              const value = newConfig[key]
+              return `${key}=${value}`
+            }
+          }
+        }
+        return line
+      })
+
+      // 添加新配置项
+      Object.keys(newConfig).forEach(key => {
+        if (!updatedKeys.has(key) && newConfig[key] !== undefined && newConfig[key] !== '') {
+          updatedLines.push(`${key}=${newConfig[key]}`)
+        }
+      })
+
+      await fs.writeFile(envPath, updatedLines.join('\n'), 'utf-8')
+      res.json({ success: true })
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message })
+    }
+  })
+
+  // 重启服务
+  server.app.post('/api/restart', async (req, res) => {
+    res.json({ success: true, message: '正在重启...' })
+    
+    // 延迟重启，让响应先发送
+    setTimeout(() => {
+      process.exit(0) // PM2 或其他进程管理器会自动重启
+    }, 500)
+  })
+
   server.app.get('/api/status', (req, res) => {
     const provider = server.config.provider
     const connector = server.connectors.get(provider)
