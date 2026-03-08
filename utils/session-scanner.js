@@ -112,7 +112,8 @@ class SessionScanner {
 
     for (const entry of entries) {
       if (entry.isFile() && entry.name.startsWith('session-') && entry.name.endsWith('.jsonl')) {
-        const sessionId = entry.name.replace('session-', '').replace('.jsonl', '');
+        // IFlow 需要 session- 前缀
+        const sessionId = entry.name.replace('.jsonl', '');
         const filePath = path.join(iflowDir, entry.name);
         const stat = fs.statSync(filePath);
         const preview = this._extractPreview(filePath);
