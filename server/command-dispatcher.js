@@ -24,6 +24,14 @@ async function dispatchCommand(server, command, conversationId, replyTarget, pla
       return server._handleTasksEnable(command.arg, conversationId, replyTarget, platform, originalMessage, type)
     case 'tasks_disable':
       return server._handleTasksDisable(command.arg, conversationId, replyTarget, platform, originalMessage, type)
+    case 'tasks_on':
+      return server._handleTasksOn(conversationId, replyTarget, platform, originalMessage, type)
+    case 'tasks_off':
+      return server._handleTasksOff(conversationId, replyTarget, platform, originalMessage, type)
+    case 'task_add':
+      return server._handleTaskAdd(command.arg, conversationId, replyTarget, platform, originalMessage, type)
+    case 'task_rm':
+      return server._handleTaskRm(command.arg, conversationId, replyTarget, platform, originalMessage, type)
     case 'sessions_list':
       return server._handleSessionsList(conversationId, replyTarget, platform, originalMessage, type)
     case 'sessions_resume':

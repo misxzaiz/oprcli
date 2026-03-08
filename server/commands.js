@@ -35,6 +35,12 @@ const COMMANDS = {
   'tasks run': { type: 'tasks_run', hasArg: true },
   'tasks enable': { type: 'tasks_enable', hasArg: true },
   'tasks disable': { type: 'tasks_disable', hasArg: true },
+  'tasks on': { type: 'tasks_on' },
+  'tasks off': { type: 'tasks_off' },
+
+  // 任务添加/删除
+  'task add': { type: 'task_add', hasArg: true },
+  'task rm': { type: 'task_rm', hasArg: true },
 
   // 会话管理
   sessions: { type: 'sessions_list' },
