@@ -728,15 +728,15 @@ class UnifiedServer {
     }
 
     if (config.systemPrompts?.includeSourceContext === false) {
-      return `${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${modeBlock}\n\n${content}${attachmentBlock}`
+      return `${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${content}${attachmentBlock}`
     }
 
     const contextBlock = `[RUNTIME_CONTEXT]\n${JSON.stringify(runtimeContext)}\n[/RUNTIME_CONTEXT]`
     if (config.systemPrompts?.channelAware === false) {
-      return `${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${modeBlock}\n\n${content}${attachmentBlock}`
+      return `${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${content}${attachmentBlock}`
     }
 
-    return `${contextBlock}\n\n${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${modeBlock}\n\n${content}${attachmentBlock}`
+    return `${contextBlock}\n\n${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${content}${attachmentBlock}`
   }
 
   _mapProviderEventType(event) {
