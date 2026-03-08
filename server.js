@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 统一 AI CLI 连接器服务器
  *
  * 支持多个 AI CLI 工具：
@@ -28,36 +28,13 @@ const IFlowConnector = require('./connectors/iflow-connector')
 const CodexConnector = require('./connectors/codex-connector')
 const AgentConnector = require('./connectors/agent-connector')
 const SchedulerModule = require('./scheduler')
+const { parseCommand } = require('./server/commands')
+const { dispatchCommand } = require('./server/command-dispatcher')
+const { setupHttpRoutes } = require('./server/http-routes')
 
 class UnifiedServer {
-  // 命令配置表
-  static COMMANDS = {
-    'claude': { type: 'switch', provider: 'claude' },
-    'iflow': { type: 'switch', provider: 'iflow' },
-    'codex': { type: 'switch', provider: 'codex' },
-    'agent': { type: 'switch', provider: 'agent' },
-    'end': { type: 'interrupt' },
-    '停止': { type: 'interrupt' },
-    'stop': { type: 'interrupt' },
-    'status': { type: 'status' },
-    '状态': { type: 'status' },
-    'help': { type: 'help' },
-    '帮助': { type: 'help' },
-    'mode': { type: 'mode', hasArg: true },
-    '模式': { type: 'mode', hasArg: true },
-    'path': { type: 'path', hasArg: true },
-    '路径': { type: 'path', hasArg: true },
-
-    // 定时任务命令
-    'tasks': { type: 'tasks_list' },
-    'tasks status': { type: 'tasks_status' },
-    'tasks reload': { type: 'tasks_reload' },
-    'tasks run': { type: 'tasks_run', hasArg: true },
-    'tasks enable': { type: 'tasks_enable', hasArg: true },
-    'tasks disable': { type: 'tasks_disable', hasArg: true }
-  }
-
   constructor() {
+    this.config = config
     this.app = express()
     this.logger = new Logger(config.logging)
     this.dingtalk = new DingTalkIntegration(config.dingtalk, this.logger)
@@ -85,140 +62,7 @@ class UnifiedServer {
   }
 
   _setupRoutes() {
-    // GET /api/status - 获取状态
-    this.app.get('/api/status', (req, res) => {
-      const provider = config.provider
-      const connector = this.connectors.get(provider)
-
-      res.json({
-        success: true,
-        provider,
-        connected: !!connector,
-        connectors: Array.from(this.connectors.keys()).map(p => ({
-          provider: p,
-          connected: this.connectors.has(p)
-        })),
-        uptime: process.uptime(),
-        timestamp: new Date().toISOString()
-      })
-    })
-
-    // POST /api/message - 发送消息
-    this.app.post('/api/message', async (req, res) => {
-      try {
-        const { message, sessionId } = req.body
-
-        if (!message) {
-          return res.status(400).json({
-            success: false,
-            error: '消息不能为空'
-          })
-        }
-
-        const provider = config.provider
-        const connector = this.connectors.get(provider)
-
-        if (!connector) {
-          return res.status(503).json({
-            success: false,
-            error: `提供商 ${provider} 不可用`
-          })
-        }
-
-        // 收集事件
-        const events = []
-
-        const onEvent = (event) => {
-          events.push(event)
-        }
-
-        // 执行会话
-        const result = sessionId
-          ? await connector.continueSession(sessionId, message, { onEvent })
-          : await connector.startSession(message, { onEvent })
-
-        res.json({
-          success: true,
-          sessionId: result.sessionId,
-          provider,
-          events,
-          timestamp: new Date().toISOString()
-        })
-      } catch (error) {
-        res.status(500).json({
-          success: false,
-          error: error.message,
-          timestamp: new Date().toISOString()
-        })
-      }
-    })
-
-    // POST /api/interrupt - 中断会话
-    this.app.post('/api/interrupt', (req, res) => {
-      try {
-        const { sessionId } = req.body
-
-        if (!sessionId) {
-          return res.status(400).json({
-            success: false,
-            error: 'sessionId 不能为空'
-          })
-        }
-
-        const provider = config.provider
-        const connector = this.connectors.get(provider)
-
-        if (!connector) {
-          return res.status(503).json({
-            success: false,
-            error: `提供商 ${provider} 不可用`
-          })
-        }
-
-        const success = connector.interruptSession(sessionId)
-
-        res.json({
-          success,
-          timestamp: new Date().toISOString()
-        })
-      } catch (error) {
-        res.status(500).json({
-          success: false,
-          error: error.message
-        })
-      }
-    })
-
-    // POST /api/reset - 重置会话
-    this.app.post('/api/reset', async (req, res) => {
-      try {
-        const { sessionId } = req.body
-
-        const provider = config.provider
-        const connector = this.connectors.get(provider)
-
-        if (!connector) {
-          return res.status(503).json({
-            success: false,
-            error: `提供商 ${provider} 不可用`
-          })
-        }
-
-        if (sessionId && connector.interruptSession) {
-          connector.interruptSession(sessionId)
-        }
-
-        res.json({
-          success: true,
-          timestamp: new Date().toISOString()
-        })
-      } catch (error) {
-        res.status(500).json({
-          success: false,
-          error: error.message
-        })
-      }
-    })
+    setupHttpRoutes(this)
   }
 
   async _initializeAllConnectors() {
@@ -325,99 +169,11 @@ class UnifiedServer {
    * @returns {Object|null} 命令对象 { type, provider?, arg? }
    */
   _parseCommand(content) {
-    // 🔥 移除可能存在的斜杠前缀（如 /help、/status 等）
-    let trimmed = content.trim()
-
-    // 调试日志：显示原始输入和处理后的结果
-    this.logger.debug('COMMAND', `📥 原始输入: "${content}"`)
-    this.logger.debug('COMMAND', `✂️ Trim后: "${trimmed}"`)
-
-    if (trimmed.startsWith('/')) {
-      trimmed = trimmed.substring(1).trim()
-      this.logger.debug('COMMAND', `✂️ 移除斜杠后: "${trimmed}"`)
-    }
-
-    const parts = trimmed.split(/\s+/)
-    this.logger.debug('COMMAND', `🔢 分割结果: [${parts.map(p => `"${p}"`).join(', ')}]`)
-
-    // 🔥 从最长到最短尝试匹配（最长匹配原则）
-    // 例如：'tasks run 1' -> 先尝试 'tasks run'，再尝试 'tasks'
-    for (let i = Math.min(parts.length, 3); i >= 1; i--) {
-      const candidate = parts.slice(0, i).join(' ').toLowerCase()
-      const cmdConfig = UnifiedServer.COMMANDS[candidate]
-
-      if (cmdConfig) {
-        // 提取参数（剩余部分）
-        const arg = parts.length > i ? parts.slice(i).join(' ') : null
-
-        return {
-          ...cmdConfig,
-          original: candidate,
-          arg
-        }
-      }
-    }
-
-    // 🔥 检查是否为 agent-xxx 格式（动态模型切换）
-    // 例如: agent-iflow, agent-zhipu, agent-deepseek
-    const agentMatch = parts[0]?.match(/^agent-(.+)$/i)
-    if (agentMatch) {
-      const modelType = agentMatch[1].toLowerCase()
-      return {
-        type: 'switch',
-        provider: 'agent',
-        original: parts[0],
-        agentModel: modelType,  // 额外传递模型类型
-        arg: parts.length > 1 ? parts.slice(1).join(' ') : null
-      }
-    }
-
-    return null
+    return parseCommand(content, this.logger)
   }
 
   async _handleCommand(command, conversationId, replyTarget, platform, originalMessage, type) {
-    switch (command.type) {
-      case 'switch':
-        return await this._handleSwitch(command.provider, conversationId, replyTarget, platform, originalMessage, type)
-
-      case 'interrupt':
-        return await this._handleInterrupt(conversationId, replyTarget, platform, originalMessage, type)
-
-      case 'status':
-        return await this._handleStatus(conversationId, replyTarget, platform, originalMessage, type)
-
-      case 'help':
-        return await this._handleHelp(replyTarget, platform, originalMessage, type)
-
-      case 'mode':
-        return await this._handleMode(command.arg, conversationId, replyTarget, platform, originalMessage, type)
-
-      case 'path':
-        return await this._handlePath(command.arg, conversationId, replyTarget, platform, originalMessage, type)
-
-      // 定时任务命令
-      case 'tasks_list':
-        return await this._handleTasksList(conversationId, replyTarget, platform, originalMessage, type)
-
-      case 'tasks_status':
-        return await this._handleTasksStatus(conversationId, replyTarget, platform, originalMessage, type)
-
-      case 'tasks_reload':
-        return await this._handleTasksReload(conversationId, replyTarget, platform, originalMessage, type)
-
-      case 'tasks_run':
-        return await this._handleTasksRun(command.arg, conversationId, replyTarget, platform, originalMessage, type)
-
-      case 'tasks_enable':
-        return await this._handleTasksEnable(command.arg, conversationId, replyTarget, platform, originalMessage, type)
-
-      case 'tasks_disable':
-        return await this._handleTasksDisable(command.arg, conversationId, replyTarget, platform, originalMessage, type)
-
-      default:
-        this.logger.warning('COMMAND', `未知命令类型: ${command.type}`)
-        return { status: 'SUCCESS' }
-    }
+    return dispatchCommand(this, command, conversationId, replyTarget, platform, originalMessage, type)
   }
 
   async _handleSwitch(provider, conversationId, replyTarget, platform, originalMessage, type) {

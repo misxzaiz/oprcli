@@ -246,7 +246,14 @@ class CodexConnector extends BaseConnector {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
       shell: useShell,
-      env: { ...process.env } // 传递环境变量
+      env: {
+        ...process.env,
+        // 🔧 强制 UTF-8 编码（解决 Windows 中文乱码）
+        PYTHONUTF8: '1',
+        PYTHONIOENCODING: 'utf-8',
+        LANG: 'en_US.UTF-8',
+        PYTHONLEGACYWINDOWSSTDIO: '1'
+      }
     };
 
     this.logger.log(`[CodexConnector] 执行命令: ${command} ${finalArgs.join(' ')}`);
