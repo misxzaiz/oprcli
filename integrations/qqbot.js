@@ -156,12 +156,114 @@ class QQBotIntegration extends BasePlatformIntegration {
   }
 
   /**
-   * 提取消息内容
+   * 提取消息内容（支持图片附件，自动下载）
    * @param {object} rawMessage - 原始消息
-   * @returns {string}
+   * @returns {Promise<object>} { content: string, attachments: array }
    */
-  extractContent(rawMessage) {
-    return rawMessage.content?.trim() || ''
+  async extractContent(rawMessage) {
+    const content = rawMessage.content?.trim() || ''
+
+    // 提取图片附件并下载到本地
+    const attachments = []
+    if (rawMessage.attachments && Array.isArray(rawMessage.attachments)) {
+      for (let i = 0; i < rawMessage.attachments.length; i++) {
+        const att = rawMessage.attachments[i]
+        if (att.content_type === 'image' || att.content_type?.startsWith('image/')) {
+          const imageUrl = att.url || att.tencent_url
+
+          // 尝试下载图片到本地
+          let localPath = null
+          if (imageUrl) {
+            try {
+              localPath = await this._downloadImage(imageUrl, i)
+              this.logger.info('QQBOT', `✅ 图片已下载: ${localPath}`)
+            } catch (error) {
+              this.logger.warning('QQBOT', `⚠️ 图片下载失败: ${error.message}`)
+            }
+          }
+
+          attachments.push({
+            type: 'image',
+            url: imageUrl,
+            localPath: localPath, // 本地路径
+            content: att.content // base64 数据（如果有）
+          })
+        }
+      }
+    }
+
+    return { content, attachments }
+  }
+
+  /**
+   * 下载图片到本地 temp 目录
+   * @param {string} imageUrl - 图片 URL
+   * @param {number} index - 图片索引
+   * @returns {Promise<string>} 本地文件路径
+   * @private
+   */
+  async _downloadImage(imageUrl, index = 0) {
+    const https = require('https')
+    const fs = require('fs')
+    const path = require('path')
+    const url = require('url')
+
+    return new Promise((resolve, reject) => {
+      // 确保目录存在
+      const tempDir = 'D:/space/temp'
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true })
+      }
+
+      // 生成文件名
+      const timestamp = Date.now()
+      const filename = `qq-image-${timestamp}-${index}.jpg`
+      const filePath = path.join(tempDir, filename)
+
+      const parsedUrl = url.parse(imageUrl)
+
+      const options = {
+        hostname: parsedUrl.hostname,
+        port: 443,
+        path: parsedUrl.path,
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        timeout: 15000 // 15 秒超时
+      }
+
+      const req = https.request(options, (res) => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`HTTP ${res.statusCode}`))
+          return
+        }
+
+        const fileStream = fs.createWriteStream(filePath)
+        res.pipe(fileStream)
+
+        fileStream.on('finish', () => {
+          fileStream.close()
+          resolve(filePath)
+        })
+
+        fileStream.on('error', (err) => {
+          fs.unlink(filePath, () => {})
+          reject(err)
+        })
+      })
+
+      req.on('error', (err) => {
+        reject(new Error(`请求失败: ${err.message}`))
+      })
+
+      req.on('timeout', () => {
+        req.destroy()
+        reject(new Error('请求超时（15秒）'))
+      })
+
+      req.end()
+    })
   }
 
   /**

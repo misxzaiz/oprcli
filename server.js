@@ -462,7 +462,7 @@ class UnifiedServer {
     }
   }
 
-  async _buildContextualMessage(content, runtimeContext) {
+  async _buildContextualMessage(content, runtimeContext, attachments = []) {
     const modeInstructions = {
       universal: '优先按通用全能助手风格回答：先结论，后步骤，跨领域可执行。',
       dev: '优先按工程助手风格回答：给出可执行命令、代码和排障步骤。',
@@ -473,20 +473,45 @@ class UnifiedServer {
     const modePrompt = await config.getModePrompt(runtimeContext.provider, runtimeContext.mode, runtimeContext.sessionWorkDir)
     const modePromptBlock = modePrompt ? `[MODE_PROMPT]\n${modePrompt}\n[/MODE_PROMPT]` : ''
 
+    // 构建图片附件块（优先使用本地路径）
+    let attachmentBlock = ''
+    if (attachments && attachments.length > 0) {
+      const imageInfos = attachments
+        .filter(a => a.type === 'image')
+        .map((a, i) => {
+          if (a.localPath) {
+            // 优先使用已下载的本地文件
+            return `[图片${i + 1}] 本地文件: ${a.localPath}`
+          } else if (a.content) {
+            // 有 base64 数据
+            return `[图片${i + 1}] base64数据: ${a.content.substring(0, 100)}...`
+          } else if (a.url) {
+            // 只有 URL
+            return `[图片${i + 1}] URL: ${a.url}`
+          }
+          return null
+        })
+        .filter(Boolean)
+
+      if (imageInfos.length > 0) {
+        attachmentBlock = `\n\n[ATTACHMENTS]\n用户发送了 ${imageInfos.length} 张图片:\n${imageInfos.join('\n')}\n[/ATTACHMENTS]`
+      }
+    }
+
     if (config.systemPrompts?.channelAware === false && config.systemPrompts?.includeSourceContext === false) {
-      return content
+      return `${content}${attachmentBlock}`
     }
 
     if (config.systemPrompts?.includeSourceContext === false) {
-      return `${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${modeBlock}\n\n${content}`
+      return `${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${modeBlock}\n\n${content}${attachmentBlock}`
     }
 
     const contextBlock = `[RUNTIME_CONTEXT]\n${JSON.stringify(runtimeContext)}\n[/RUNTIME_CONTEXT]`
     if (config.systemPrompts?.channelAware === false) {
-      return `${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${modeBlock}\n\n${content}`
+      return `${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${modeBlock}\n\n${content}${attachmentBlock}`
     }
 
-    return `${contextBlock}\n\n${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${modeBlock}\n\n${content}`
+    return `${contextBlock}\n\n${modePromptBlock ? `${modePromptBlock}\n\n` : ''}${modeBlock}\n\n${content}${attachmentBlock}`
   }
 
   _mapProviderEventType(event) {
@@ -792,9 +817,12 @@ class UnifiedServer {
         raw_message: rawMessage
       })
 
-      // 1. 提取消息内容
-      const content = platform.extractContent(rawMessage)
-      if (!content) {
+      // 1. 提取消息内容（支持图片附件，自动下载）
+      const extracted = await platform.extractContent(rawMessage)
+      const content = extracted.content || (typeof extracted === 'string' ? extracted : '')
+      const attachments = extracted.attachments || []
+      
+      if (!content && attachments.length === 0) {
         this.logger.warning(platformName, '消息内容为空')
         this.auditLogger.logAgent('agent.incoming.empty', {
           trace_id: traceId,
@@ -804,12 +832,13 @@ class UnifiedServer {
         return { status: 'SUCCESS' }
       }
 
-      this.logger.success(platformName, `📨 原始消息: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"`)
+      this.logger.success(platformName, `📨 原始消息: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"${attachments.length > 0 ? ` [${attachments.length}个附件]` : ''}`)
       this.auditLogger.logAgent('agent.incoming.extracted', {
         trace_id: traceId,
         platform: platformName.toLowerCase(),
         conversation_id: conversationId,
-        content
+        content,
+        attachments: attachments.map(a => ({ type: a.type, hasUrl: !!a.url }))
       })
 
       // 2. 解析命令
@@ -849,7 +878,7 @@ class UnifiedServer {
         mode,
         sessionWorkDir: session?.workDir || null
       })
-      const contextualMessage = await this._buildContextualMessage(content, runtimeContext)
+      const contextualMessage = await this._buildContextualMessage(content, runtimeContext, attachments)
       this.auditLogger.logAgent('agent.request', {
         trace_id: traceId,
         platform: platformName.toLowerCase(),
