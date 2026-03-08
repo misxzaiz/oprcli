@@ -14,7 +14,7 @@ class Config {
   load() {
     // 核心配置
     this.provider = process.env.PROVIDER || 'claude'
-    this.port = process.env.PORT ? parseInt(process.env.PORT) : 12480
+    this.port = process.env.PORT ? parseInt(process.env.PORT) : 3000
 
     // 项目启动目录（文档路径）
     this.projectDir = process.cwd()

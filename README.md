@@ -102,7 +102,8 @@ pm2 save
 | 日志管理 | ❌ | ✅ |
 | 进程监控 | ❌ | ✅ |
 
-服务运行在 `http://localhost:12480`
+服务运行在 `http://localhost:3000`
+配置页面：`http://localhost:3000/config/config.html`
 
 ## 机器人命令
 
@@ -130,19 +131,19 @@ oprcli/
 
 ## 配置项
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `PROVIDER` | AI 提供商 | `iflow` |
-| `PORT` | 服务端口 | `12480` |
-| `IFLOW_WORK_DIR` | IFlow 工作目录 | - |
-| `CLAUDE_CMD_PATH` | Claude 命令路径 | - |
-| `CLAUDE_WORK_DIR` | Claude 工作目录 | - |
-| `AGENT_LLM_PROVIDER` | Agent LLM 提供商 | `iflow` |
+| 变量 | 说明 | 默认值           |
+|------|------|---------------|
+| `PROVIDER` | AI 提供商 | `iflow`       |
+| `PORT` | 服务端口 | `3000`        |
+| `IFLOW_WORK_DIR` | IFlow 工作目录 | -             |
+| `CLAUDE_CMD_PATH` | Claude 命令路径 | -             |
+| `CLAUDE_WORK_DIR` | Claude 工作目录 | -             |
+| `AGENT_LLM_PROVIDER` | Agent LLM 提供商 | `iflow`       |
 | `AGENT_MODEL` | Agent 模型 | `glm-4-flash` |
-| `DINGTALK_CLIENT_ID` | 钉钉 Client ID | - |
-| `DINGTALK_CLIENT_SECRET` | 钉钉 Secret | - |
-| `QQBOT_UIN` | QQ 机器人号 | - |
-| `QQBOT_TOKEN` | QQ 机器人 Token | - |
+| `DINGTALK_CLIENT_ID` | 钉钉 Client ID | -             |
+| `DINGTALK_CLIENT_SECRET` | 钉钉 Secret | -             |
+| `QQBOT_UIN` | QQ 机器人号 | -             |
+| `QQBOT_TOKEN` | QQ 机器人 Token | -             |
 
 更多配置见 `.env.example`。
 

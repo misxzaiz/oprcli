@@ -89,7 +89,7 @@ npm start
 ### 通过 API 使用
 
 ```bash
-curl -X POST http://localhost:12480/api/message \
+curl -X POST http://localhost:3000/api/message \
   -H "Content-Type: application/json" \
   -d '{
     "provider": "agent",
