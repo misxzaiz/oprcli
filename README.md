@@ -61,13 +61,13 @@ npm start
 
 ## 命令
 
-发送 `/help` 查看所有可用命令。
+发送 `help` 查看所有可用命令。
 
 常用命令：
-- `/claude` `/iflow` `/codex` `/agent` - 切换 AI 提供商
-- `/mode {mode}` - 切换提示词模式
-- `/path {path}` - 修改工作目录
-- `/tasks` - 定时任务管理
+- `claude` `iflow` `codex` `agent` - 切换 AI 提供商
+- `mode {mode}` - 切换提示词模式
+- `path {path}` - 修改工作目录
+- `tasks` - 定时任务管理
 
 ## 项目结构
 
