@@ -96,25 +96,59 @@ function setupHttpRoutes(server) {
   server.app.get('/api/detect', async (req, res) => {
     const results = {}
     
-    const commands = [
+    // npm 命令检测（需要添加 .cmd 后缀）
+    const npmCommands = [
       { key: 'CLAUDE_CMD_PATH', cmd: 'claude' },
       { key: 'IFLOW_PATH', cmd: 'iflow' },
-      { key: 'CODEX_PATH', cmd: 'codex' },
-      { key: 'CLAUDE_GIT_BIN_PATH', cmd: 'git' },
-      { key: 'BASH_PATH', cmd: 'bash' }
+      { key: 'CODEX_PATH', cmd: 'codex' }
     ]
 
-    for (const { key, cmd } of commands) {
+    for (const { key, cmd } of npmCommands) {
       try {
         const output = execSync(`where ${cmd}`, { encoding: 'utf-8', timeout: 5000 })
         const paths = output.trim().split('\n').map(p => p.trim()).filter(Boolean)
-        results[key] = paths.length > 0 ? paths[0] : null
-        if (paths.length > 1) {
-          results[key + '_ALL'] = paths
+        if (paths.length > 0) {
+          let detectedPath = paths[0]
+          // Windows npm 命令通常需要 .cmd 后缀
+          if (!detectedPath.toLowerCase().endsWith('.cmd') && !detectedPath.toLowerCase().endsWith('.exe')) {
+            const cmdPath = detectedPath + '.cmd'
+            try {
+              require('fs').accessSync(cmdPath)
+              detectedPath = cmdPath
+            } catch (e) {
+              // 保持原路径
+            }
+          }
+          results[key] = detectedPath
+          if (paths.length > 1) {
+            results[key + '_ALL'] = paths
+          }
         }
       } catch (e) {
         results[key] = null
       }
+    }
+
+    // Git bash 检测（需要 bash.exe 而不是 git.exe）
+    try {
+      const gitOutput = execSync('where git', { encoding: 'utf-8', timeout: 5000 })
+      const gitPaths = gitOutput.trim().split('\n').map(p => p.trim()).filter(Boolean)
+      if (gitPaths.length > 0) {
+        // 从 git 路径推导 bash 路径
+        const gitPath = gitPaths[0]
+        // C:\Program Files\Git\cmd\git.exe -> C:\Program Files\Git\usr\bin\bash.exe
+        const gitDir = gitPath.replace(/[\\\/]cmd[\\\/]git\.exe$/i, '')
+        const bashPath = gitDir + '\\usr\\bin\\bash.exe'
+        try {
+          require('fs').accessSync(bashPath)
+          results['CLAUDE_GIT_BIN_PATH'] = bashPath
+        } catch (e) {
+          // bash.exe 不存在，返回 git 路径作为备选
+          results['CLAUDE_GIT_BIN_PATH'] = gitPath
+        }
+      }
+    } catch (e) {
+      results['CLAUDE_GIT_BIN_PATH'] = null
     }
 
     res.json({ success: true, detected: results })
@@ -128,6 +162,41 @@ function setupHttpRoutes(server) {
     setTimeout(() => {
       process.exit(0) // PM2 或其他进程管理器会自动重启
     }, 500)
+  })
+
+  // 导出配置
+  server.app.get('/api/config/export', async (req, res) => {
+    try {
+      const envPath = path.join(__dirname, '../.env')
+      let content = ''
+      try {
+        content = await fs.readFile(envPath, 'utf-8')
+      } catch (e) {
+        // 文件不存在
+      }
+      
+      res.setHeader('Content-Type', 'application/octet-stream')
+      res.setHeader('Content-Disposition', 'attachment; filename="oprcli-config.env"')
+      res.send(content)
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message })
+    }
+  })
+
+  // 导入配置
+  server.app.post('/api/config/import', async (req, res) => {
+    try {
+      const content = req.body.content || req.body
+      if (typeof content !== 'string') {
+        return res.status(400).json({ success: false, error: '无效的配置内容' })
+      }
+      
+      const envPath = path.join(__dirname, '../.env')
+      await fs.writeFile(envPath, content, 'utf-8')
+      res.json({ success: true })
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message })
+    }
   })
 
   server.app.get('/api/status', (req, res) => {

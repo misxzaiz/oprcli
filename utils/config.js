@@ -94,8 +94,8 @@ class Config {
 
     // 系统提示词配置
     this.systemPrompts = {
-      global: process.env.SYSTEM_PROMPT,
-      promptsDir: process.env.SYSTEM_PROMPTS_DIR || path.join(__dirname, '../system-prompts'),
+      global: process.env.SYSTEM_PROMPT || '你是一个可靠、务实的助手。请先给结论，再给可执行步骤；不确定时明确说明。',
+      promptsDir: process.env.SYSTEM_PROMPTS_DIR || './system-prompts',
       mode: (process.env.PROMPT_MODE || 'universal').toLowerCase(),
       channelAware: process.env.PROMPT_CHANNEL_AWARE !== 'false',
       includeSourceContext: process.env.PROMPT_INCLUDE_SOURCE_CONTEXT !== 'false'

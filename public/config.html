@@ -764,6 +764,11 @@
   </div>
 
   <div class="actions">
+    <button type="button" class="btn-secondary" onclick="exportConfig()">导出</button>
+    <label class="btn-secondary" style="cursor:pointer;padding:8px 20px;border-radius:6px;font-size:13px;border:1px solid #d1d5db;">
+      导入
+      <input type="file" accept=".env,.txt" onchange="importConfig(event)" style="display:none">
+    </label>
     <button type="button" class="btn-secondary" onclick="loadConfig()">刷新</button>
     <button type="button" class="btn-secondary" onclick="saveConfig()">保存</button>
     <button type="button" class="btn-primary" onclick="saveAndRestart()">保存并重启</button>
@@ -929,6 +934,50 @@
       el.textContent = msg
       el.className = type
       setTimeout(() => el.className = '', 3000)
+    }
+
+    async function exportConfig() {
+      try {
+        const res = await fetch('/api/config/export')
+        const content = await res.text()
+        const blob = new Blob([content], { type: 'text/plain' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'oprcli-config.env'
+        a.click()
+        URL.revokeObjectURL(url)
+        showToast('配置已导出', 'success')
+      } catch (e) {
+        showToast('导出失败: ' + e.message, 'error')
+      }
+    }
+
+    async function importConfig(event) {
+      const file = event.target.files[0]
+      if (!file) return
+      
+      try {
+        const content = await file.text()
+        const res = await fetch('/api/config/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content })
+        })
+        const data = await res.json()
+        
+        if (data.success) {
+          showToast('配置已导入，正在重新加载...', 'success')
+          setTimeout(() => loadConfig(), 500)
+        } else {
+          showToast('导入失败: ' + data.error, 'error')
+        }
+      } catch (e) {
+        showToast('导入失败: ' + e.message, 'error')
+      }
+      
+      // 清空文件选择
+      event.target.value = ''
     }
 
     loadConfig()
