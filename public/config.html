@@ -8,262 +8,532 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      background: #0f0f1a;
       min-height: 100vh;
       color: #e0e0e0;
-      padding: 20px;
     }
-    .container { max-width: 900px; margin: 0 auto; }
-    h1 {
-      text-align: center;
-      margin-bottom: 30px;
-      color: #00d9ff;
-      font-weight: 300;
-      letter-spacing: 2px;
-    }
-    .section {
-      background: rgba(255,255,255,0.05);
-      border-radius: 12px;
-      padding: 20px;
+    .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-bottom: 20px;
-      border: 1px solid rgba(255,255,255,0.1);
+      padding-bottom: 15px;
+      border-bottom: 1px solid #2a2a3a;
+    }
+    h1 { font-size: 20px; color: #00d9ff; font-weight: 500; }
+    
+    /* Tabs */
+    .tabs { display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; }
+    .tab {
+      padding: 8px 16px;
+      background: #1a1a2e;
+      border: 1px solid #2a2a3a;
+      border-radius: 6px;
+      color: #888;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .tab:hover { color: #fff; border-color: #444; }
+    .tab.active { background: #00d9ff; color: #000; border-color: #00d9ff; }
+    
+    .panel { display: none; }
+    .panel.active { display: block; }
+    
+    /* Form */
+    .section {
+      background: #1a1a2e;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 15px;
+      border: 1px solid #2a2a3a;
     }
     .section-title {
-      font-size: 14px;
+      font-size: 13px;
       color: #00d9ff;
       margin-bottom: 15px;
       padding-bottom: 10px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      border-bottom: 1px solid #2a2a3a;
     }
-    .form-grid {
+    .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 15px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
     }
-    .form-group { margin-bottom: 5px; }
+    .form-group { margin-bottom: 3px; }
     .form-group.full { grid-column: 1 / -1; }
     label {
       display: block;
-      font-size: 12px;
-      color: #888;
-      margin-bottom: 5px;
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 4px;
     }
     input, select, textarea {
       width: 100%;
-      padding: 10px 12px;
-      background: rgba(0,0,0,0.3);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 6px;
+      padding: 8px 10px;
+      background: #0f0f1a;
+      border: 1px solid #2a2a3a;
+      border-radius: 5px;
       color: #fff;
-      font-size: 14px;
-      transition: border-color 0.2s;
+      font-size: 13px;
     }
-    input:focus, select:focus, textarea:focus {
-      outline: none;
-      border-color: #00d9ff;
-    }
-    textarea { min-height: 80px; resize: vertical; font-family: inherit; }
+    input:focus, select:focus { outline: none; border-color: #00d9ff; }
+    input[type="checkbox"] { width: 16px; height: 16px; accent-color: #00d9ff; }
+    .check-label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    
+    /* Actions */
     .actions {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #1a1a2e;
+      border-top: 1px solid #2a2a3a;
+      padding: 15px;
       display: flex;
-      gap: 15px;
       justify-content: center;
-      margin-top: 30px;
+      gap: 15px;
     }
     button {
-      padding: 12px 30px;
+      padding: 10px 25px;
       border: none;
       border-radius: 6px;
-      font-size: 14px;
+      font-size: 13px;
       cursor: pointer;
-      transition: all 0.2s;
     }
     .btn-primary {
-      background: linear-gradient(135deg, #00d9ff 0%, #00a8cc 100%);
+      background: #00d9ff;
       color: #000;
       font-weight: 500;
     }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,217,255,0.3); }
-    .btn-secondary {
-      background: rgba(255,255,255,0.1);
-      color: #fff;
-    }
-    .btn-secondary:hover { background: rgba(255,255,255,0.2); }
-    .status {
-      text-align: center;
-      padding: 15px;
+    .btn-secondary { background: #2a2a3a; color: #fff; }
+    
+    /* Status */
+    #status {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
       border-radius: 8px;
-      margin-top: 20px;
       display: none;
+      z-index: 100;
     }
-    .status.success { background: rgba(0,200,83,0.2); color: #00c853; display: block; }
-    .status.error { background: rgba(255,82,82,0.2); color: #ff5252; display: block; }
-    .checkbox-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      accent-color: #00d9ff;
-    }
-    .hint { font-size: 11px; color: #666; margin-top: 3px; }
+    #status.success { background: #1a4a1a; color: #4f4; display: block; }
+    #status.error { background: #4a1a1a; color: #f44; display: block; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>OPRCLI 配置管理</h1>
+    <header>
+      <h1>OPRCLI 配置管理</h1>
+    </header>
     
+    <div class="tabs">
+      <div class="tab active" data-panel="core">核心</div>
+      <div class="tab" data-panel="agent">Agent</div>
+      <div class="tab" data-panel="im">IM 集成</div>
+      <div class="tab" data-panel="output">消息输出</div>
+      <div class="tab" data-panel="log">日志审计</div>
+      <div class="tab" data-panel="other">其他</div>
+    </div>
+
     <form id="configForm">
       <!-- 核心配置 -->
-      <div class="section">
-        <div class="section-title">核心配置</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>默认模型</label>
-            <select id="PROVIDER">
-              <option value="claude">Claude</option>
-              <option value="iflow">IFlow</option>
-              <option value="codex">Codex</option>
-            </select>
+      <div class="panel active" id="panel-core">
+        <div class="section">
+          <div class="section-title">基本设置</div>
+          <div class="grid">
+            <div class="form-group">
+              <label>默认模型</label>
+              <select id="PROVIDER">
+                <option value="claude">Claude</option>
+                <option value="iflow">IFlow</option>
+                <option value="codex">Codex</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>服务端口</label>
+              <input type="number" id="PORT">
+            </div>
+            <div class="form-group full">
+              <label>默认工作目录</label>
+              <input type="text" id="DEFAULT_WORK_DIR">
+            </div>
           </div>
-          <div class="form-group">
-            <label>服务端口</label>
-            <input type="number" id="PORT" placeholder="13579">
-          </div>
-          <div class="form-group full">
-            <label>默认工作目录</label>
-            <input type="text" id="DEFAULT_WORK_DIR" placeholder="D:/space">
+        </div>
+        
+        <div class="section">
+          <div class="section-title">提示词系统</div>
+          <div class="grid">
+            <div class="form-group">
+              <label>会话模式</label>
+              <select id="PROMPT_MODE">
+                <option value="universal">通用</option>
+                <option value="dev">开发</option>
+                <option value="ops">运维</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="PROMPT_CHANNEL_AWARE"> 渠道感知</label>
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="PROMPT_INCLUDE_SOURCE_CONTEXT"> 包含来源上下文</label>
+            </div>
+            <div class="form-group full">
+              <label>全局提示词</label>
+              <textarea id="SYSTEM_PROMPT" rows="3"></textarea>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- 钉钉集成 -->
-      <div class="section">
-        <div class="section-title">钉钉集成</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Client ID</label>
-            <input type="text" id="DINGTALK_CLIENT_ID" placeholder="钉钉应用 Client ID">
+      <!-- Agent 配置 -->
+      <div class="panel" id="panel-agent">
+        <div class="section">
+          <div class="section-title">Claude</div>
+          <div class="grid">
+            <div class="form-group full">
+              <label>可执行文件路径</label>
+              <input type="text" id="CLAUDE_CMD_PATH">
+            </div>
+            <div class="form-group full">
+              <label>Git 路径</label>
+              <input type="text" id="CLAUDE_GIT_BIN_PATH">
+            </div>
+            <div class="form-group full">
+              <label>工作目录 (可选)</label>
+              <input type="text" id="CLAUDE_WORK_DIR">
+            </div>
           </div>
-          <div class="form-group">
-            <label>Client Secret</label>
-            <input type="password" id="DINGTALK_CLIENT_SECRET" placeholder="钉钉应用 Client Secret">
+        </div>
+        
+        <div class="section">
+          <div class="section-title">IFlow</div>
+          <div class="grid">
+            <div class="form-group">
+              <label>命令路径</label>
+              <input type="text" id="IFLOW_PATH">
+            </div>
+            <div class="form-group">
+              <label>包含目录</label>
+              <input type="text" id="IFLOW_INCLUDE_DIRS">
+            </div>
+            <div class="form-group full">
+              <label>工作目录 (可选)</label>
+              <input type="text" id="IFLOW_WORK_DIR">
+            </div>
+          </div>
+        </div>
+        
+        <div class="section">
+          <div class="section-title">Codex</div>
+          <div class="grid">
+            <div class="form-group">
+              <label>命令路径</label>
+              <input type="text" id="CODEX_PATH">
+            </div>
+            <div class="form-group">
+              <label>模型</label>
+              <input type="text" id="CODEX_MODEL">
+            </div>
+            <div class="form-group">
+              <label>Provider</label>
+              <input type="text" id="CODEX_MODEL_PROVIDER">
+            </div>
+            <div class="form-group">
+              <label>最大历史长度</label>
+              <input type="number" id="CODEX_MAX_HISTORY_LENGTH">
+            </div>
+            <div class="form-group full">
+              <label>工作目录 (可选)</label>
+              <input type="text" id="CODEX_WORK_DIR">
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- QQ Bot 集成 -->
-      <div class="section">
-        <div class="section-title">QQ Bot 集成</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>App ID</label>
-            <input type="text" id="QQBOT_APP_ID" placeholder="QQ Bot App ID">
+      <!-- IM 集成 -->
+      <div class="panel" id="panel-im">
+        <div class="section">
+          <div class="section-title">钉钉</div>
+          <div class="grid">
+            <div class="form-group">
+              <label>Client ID</label>
+              <input type="text" id="DINGTALK_CLIENT_ID">
+            </div>
+            <div class="form-group">
+              <label>Client Secret</label>
+              <input type="password" id="DINGTALK_CLIENT_SECRET">
+            </div>
           </div>
-          <div class="form-group">
-            <label>Client Secret</label>
-            <input type="password" id="QQBOT_CLIENT_SECRET" placeholder="QQ Bot Client Secret">
+        </div>
+        
+        <div class="section">
+          <div class="section-title">QQ Bot</div>
+          <div class="grid">
+            <div class="form-group">
+              <label>App ID</label>
+              <input type="text" id="QQBOT_APP_ID">
+            </div>
+            <div class="form-group">
+              <label>Client Secret</label>
+              <input type="password" id="QQBOT_CLIENT_SECRET">
+            </div>
+            <div class="form-group">
+              <label>命令前缀</label>
+              <input type="text" id="QQBOT_COMMAND_PREFIX">
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="QQBOT_SANDBOX"> 沙盒模式</label>
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="QQBOT_DEBUG"> 调试模式</label>
+            </div>
           </div>
-          <div class="form-group">
-            <label>命令前缀</label>
-            <input type="text" id="QQBOT_COMMAND_PREFIX" placeholder="/">
-          </div>
-          <div class="form-group">
-            <label class="checkbox-group">
-              <input type="checkbox" id="QQBOT_SANDBOX">
-              沙盒模式
-            </label>
+        </div>
+        
+        <div class="section">
+          <div class="section-title">百度语音</div>
+          <div class="grid">
+            <div class="form-group">
+              <label>API Key</label>
+              <input type="text" id="BAIDU_SPEECH_API_KEY">
+            </div>
+            <div class="form-group">
+              <label>Secret Key</label>
+              <input type="password" id="BAIDU_SPEECH_SECRET_KEY">
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- 通知配置 -->
-      <div class="section">
-        <div class="section-title">通知配置</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="checkbox-group">
-              <input type="checkbox" id="NOTIFICATION_ENABLED">
-              启用通知
-            </label>
+      <!-- 消息输出 -->
+      <div class="panel" id="panel-output">
+        <div class="section">
+          <div class="section-title">流式输出</div>
+          <div class="grid">
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="STREAM_ENABLED"> 启用流式</label>
+            </div>
+            <div class="form-group">
+              <label>间隔 (ms)</label>
+              <input type="number" id="STREAM_INTERVAL">
+            </div>
+            <div class="form-group">
+              <label>最大长度</label>
+              <input type="number" id="STREAM_MAX_LENGTH">
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="STREAM_SHOW_THINKING"> 显示思考</label>
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="STREAM_SHOW_TOOLS"> 显示工具</label>
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="STREAM_SHOW_TIME"> 显示时间</label>
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="STREAM_USE_MARKDOWN"> 使用 Markdown</label>
+            </div>
           </div>
-          <div class="form-group">
-            <label>通知类型</label>
-            <select id="NOTIFICATION_TYPE">
-              <option value="dingtalk">钉钉</option>
-            </select>
-          </div>
-          <div class="form-group full">
-            <label>钉钉 Webhook</label>
-            <input type="text" id="NOTIFICATION_DINGTALK_WEBHOOK" placeholder="https://oapi.dingtalk.com/robot/send?access_token=xxx">
-          </div>
-          <div class="form-group full">
-            <label>钉钉 Secret</label>
-            <input type="password" id="NOTIFICATION_DINGTALK_SECRET" placeholder="SECxxxxxxxx">
+        </div>
+        
+        <div class="section">
+          <div class="section-title">机器人输出</div>
+          <div class="grid">
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="ROBOT_OUTPUT_ENABLED"> 启用</label>
+            </div>
+            <div class="form-group">
+              <label>配置模式</label>
+              <select id="ROBOT_OUTPUT_PROFILE">
+                <option value="standard">标准</option>
+                <option value="verbose">详细</option>
+                <option value="minimal">精简</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>最大字符</label>
+              <input type="number" id="ROBOT_MAX_CHARS">
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="ROBOT_SHOW_THINKING"> 显示思考</label>
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="ROBOT_SHOW_NETWORK"> 显示网络</label>
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="ROBOT_END_SUMMARY"> 结束摘要</label>
+            </div>
+            <div class="form-group">
+              <label>去重窗口 (ms)</label>
+              <input type="number" id="ROBOT_DEDUP_WINDOW_MS">
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- 定时任务 -->
-      <div class="section">
-        <div class="section-title">定时任务</div>
-        <div class="form-grid">
-          <div class="form-group full">
-            <label>任务配置文件</label>
-            <input type="text" id="TASKS_FILE_PATH" placeholder="./scheduler/tasks.json">
+      <!-- 日志审计 -->
+      <div class="panel" id="panel-log">
+        <div class="section">
+          <div class="section-title">日志</div>
+          <div class="grid">
+            <div class="form-group">
+              <label>日志级别</label>
+              <select id="LOG_LEVEL">
+                <option value="DEBUG">DEBUG</option>
+                <option value="EVENT">EVENT</option>
+                <option value="INFO">INFO</option>
+                <option value="WARN">WARN</option>
+                <option value="ERROR">ERROR</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="LOG_COLORED"> 彩色输出</label>
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="STRUCTURED_LOGGING"> 结构化日志</label>
+            </div>
+          </div>
+        </div>
+        
+        <div class="section">
+          <div class="section-title">审计日志</div>
+          <div class="grid">
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="AUDIT_LOG_ENABLED"> 启用审计</label>
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="AUDIT_LOG_AGENT_IO"> Agent I/O</label>
+            </div>
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="AUDIT_LOG_BOT_TRANSFORM"> Bot 转换</label>
+            </div>
+            <div class="form-group">
+              <label>日志目录</label>
+              <input type="text" id="AUDIT_LOG_DIR">
+            </div>
+            <div class="form-group">
+              <label>最大字段长度</label>
+              <input type="number" id="AUDIT_LOG_MAX_FIELD_LENGTH">
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- 操作按钮 -->
-      <div class="actions">
-        <button type="button" class="btn-secondary" onclick="loadConfig()">刷新配置</button>
-        <button type="submit" class="btn-primary">保存并重启</button>
+      <!-- 其他 -->
+      <div class="panel" id="panel-other">
+        <div class="section">
+          <div class="section-title">通知</div>
+          <div class="grid">
+            <div class="form-group">
+              <label class="check-label"><input type="checkbox" id="NOTIFICATION_ENABLED"> 启用通知</label>
+            </div>
+            <div class="form-group">
+              <label>通知类型</label>
+              <select id="NOTIFICATION_TYPE">
+                <option value="dingtalk">钉钉</option>
+              </select>
+            </div>
+            <div class="form-group full">
+              <label>钉钉 Webhook</label>
+              <input type="text" id="NOTIFICATION_DINGTALK_WEBHOOK">
+            </div>
+            <div class="form-group full">
+              <label>钉钉 Secret</label>
+              <input type="password" id="NOTIFICATION_DINGTALK_SECRET">
+            </div>
+          </div>
+        </div>
+        
+        <div class="section">
+          <div class="section-title">定时任务</div>
+          <div class="grid">
+            <div class="form-group full">
+              <label>任务配置文件</label>
+              <input type="text" id="TASKS_FILE_PATH">
+            </div>
+          </div>
+        </div>
       </div>
     </form>
-
-    <div id="status" class="status"></div>
   </div>
 
+  <div class="actions">
+    <button type="button" class="btn-secondary" onclick="loadConfig()">刷新</button>
+    <button type="button" class="btn-primary" onclick="saveAndRestart()">保存并重启</button>
+  </div>
+  
+  <div id="status"></div>
+
   <script>
-    const configKeys = [
-      'PROVIDER', 'PORT', 'DEFAULT_WORK_DIR',
-      'DINGTALK_CLIENT_ID', 'DINGTALK_CLIENT_SECRET',
-      'QQBOT_APP_ID', 'QQBOT_CLIENT_SECRET', 'QQBOT_COMMAND_PREFIX', 'QQBOT_SANDBOX',
-      'NOTIFICATION_ENABLED', 'NOTIFICATION_TYPE', 'NOTIFICATION_DINGTALK_WEBHOOK', 'NOTIFICATION_DINGTALK_SECRET',
+    const ALL_KEYS = [
+      // 核心
+      'PROVIDER','PORT','DEFAULT_WORK_DIR','PROMPT_MODE','PROMPT_CHANNEL_AWARE','PROMPT_INCLUDE_SOURCE_CONTEXT','SYSTEM_PROMPT',
+      // Claude
+      'CLAUDE_CMD_PATH','CLAUDE_GIT_BIN_PATH','CLAUDE_WORK_DIR',
+      // IFlow
+      'IFLOW_PATH','IFLOW_INCLUDE_DIRS','IFLOW_WORK_DIR',
+      // Codex
+      'CODEX_PATH','CODEX_MODEL','CODEX_MODEL_PROVIDER','CODEX_MAX_HISTORY_LENGTH','CODEX_WORK_DIR',
+      // 钉钉
+      'DINGTALK_CLIENT_ID','DINGTALK_CLIENT_SECRET',
+      // QQ Bot
+      'QQBOT_APP_ID','QQBOT_CLIENT_SECRET','QQBOT_COMMAND_PREFIX','QQBOT_SANDBOX','QQBOT_DEBUG',
+      // 百度
+      'BAIDU_SPEECH_API_KEY','BAIDU_SPEECH_SECRET_KEY',
+      // 流式
+      'STREAM_ENABLED','STREAM_INTERVAL','STREAM_MAX_LENGTH','STREAM_SHOW_THINKING','STREAM_SHOW_TOOLS','STREAM_SHOW_TIME','STREAM_USE_MARKDOWN',
+      // 机器人输出
+      'ROBOT_OUTPUT_ENABLED','ROBOT_OUTPUT_PROFILE','ROBOT_MAX_CHARS','ROBOT_SHOW_THINKING','ROBOT_SHOW_NETWORK','ROBOT_END_SUMMARY','ROBOT_DEDUP_WINDOW_MS',
+      // 日志
+      'LOG_LEVEL','LOG_COLORED','STRUCTURED_LOGGING',
+      // 审计
+      'AUDIT_LOG_ENABLED','AUDIT_LOG_AGENT_IO','AUDIT_LOG_BOT_TRANSFORM','AUDIT_LOG_DIR','AUDIT_LOG_MAX_FIELD_LENGTH',
+      // 通知
+      'NOTIFICATION_ENABLED','NOTIFICATION_TYPE','NOTIFICATION_DINGTALK_WEBHOOK','NOTIFICATION_DINGTALK_SECRET',
+      // 任务
       'TASKS_FILE_PATH'
     ]
+
+    // Tab 切换
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'))
+        tab.classList.add('active')
+        document.getElementById('panel-' + tab.dataset.panel).classList.add('active')
+      }
+    })
 
     async function loadConfig() {
       try {
         const res = await fetch('/api/config')
         const data = await res.json()
         if (data.success) {
-          configKeys.forEach(key => {
+          ALL_KEYS.forEach(key => {
             const el = document.getElementById(key)
             if (el) {
+              const val = data.config[key]
               if (el.type === 'checkbox') {
-                el.checked = data.config[key] === 'true' || data.config[key] === true
+                el.checked = val === 'true' || val === true
               } else {
-                el.value = data.config[key] || ''
+                el.value = val || ''
               }
             }
           })
-          showStatus('配置已加载', 'success')
+          showStatus('已加载', 'success')
         }
       } catch (e) {
-        showStatus('加载配置失败: ' + e.message, 'error')
+        showStatus('加载失败: ' + e.message, 'error')
       }
     }
 
-    async function saveConfig(e) {
-      e.preventDefault()
+    async function saveAndRestart() {
       const config = {}
-      configKeys.forEach(key => {
+      ALL_KEYS.forEach(key => {
         const el = document.getElementById(key)
         if (el) {
           config[key] = el.type === 'checkbox' ? String(el.checked) : el.value
@@ -271,43 +541,38 @@
       })
 
       try {
-        // 保存配置
-        const saveRes = await fetch('/api/config', {
+        showStatus('保存中...', 'success')
+        
+        const res = await fetch('/api/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(config)
         })
-        const saveData = await saveRes.json()
+        const data = await res.json()
         
-        if (!saveData.success) {
-          showStatus('保存失败: ' + saveData.error, 'error')
+        if (!data.success) {
+          showStatus('保存失败: ' + data.error, 'error')
           return
         }
 
-        showStatus('配置已保存，正在重启...', 'success')
-
-        // 延迟重启
+        showStatus('已保存，重启中...', 'success')
+        
         setTimeout(async () => {
-          try {
-            await fetch('/api/restart', { method: 'POST' })
-            showStatus('服务已重启，页面即将刷新...', 'success')
-            setTimeout(() => location.reload(), 2000)
-          } catch (e) {
-            showStatus('重启请求已发送，请稍后刷新页面', 'success')
-          }
+          await fetch('/api/restart', { method: 'POST' })
+          setTimeout(() => location.reload(), 2000)
         }, 500)
       } catch (e) {
-        showStatus('保存失败: ' + e.message, 'error')
+        showStatus('失败: ' + e.message, 'error')
       }
     }
 
     function showStatus(msg, type) {
       const el = document.getElementById('status')
       el.textContent = msg
-      el.className = 'status ' + type
+      el.className = type
+      if (type === 'success') setTimeout(() => el.className = '', 3000)
     }
 
-    document.getElementById('configForm').addEventListener('submit', saveConfig)
     loadConfig()
   </script>
 </body>
