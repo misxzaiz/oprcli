@@ -111,6 +111,28 @@ class QQBotClient extends EventEmitter {
   }
 
   /**
+   * 检查 token 是否过期
+   */
+  isTokenExpired() {
+    if (!this.accessToken || !this.tokenExpireTime) {
+      return true;
+    }
+    // 提前 5 分钟判断为过期，避免临界点问题
+    return Date.now() >= (this.tokenExpireTime - 5 * 60 * 1000);
+  }
+
+  /**
+   * 确保 token 有效，如果过期则自动刷新
+   */
+  async ensureValidToken() {
+    if (this.isTokenExpired()) {
+      this.debugLog('🔄 Token 已过期或即将过期，正在刷新...');
+      await this.getAccessToken();
+      this.debugLog('✅ Token 刷新成功');
+    }
+  }
+
+  /**
    * 获取 Access Token
    */
   async getAccessToken() {
@@ -150,6 +172,8 @@ class QQBotClient extends EventEmitter {
             if (result.access_token) {
               this.accessToken = result.access_token;
               this.tokenExpireTime = Date.now() + (parseInt(result.expires_in) * 1000);
+              const expireMinutes = Math.round(parseInt(result.expires_in) / 60);
+              this.debugLog(`✅ Token 获取成功，有效期: ${expireMinutes} 分钟`);
               resolve();
             } else {
               reject(new Error(`响应中没有 access_token: ${JSON.stringify(result)}`));
@@ -173,6 +197,8 @@ class QQBotClient extends EventEmitter {
    * 获取 WebSocket 连接信息
    */
   async getWebSocketInfo() {
+    await this.ensureValidToken();
+
     return new Promise((resolve, reject) => {
       const url = new URL('/gateway/bot', this.apiBase);
 
@@ -698,8 +724,24 @@ class QQBotClient extends EventEmitter {
   async sendWithRetry(sendFn, retries = this.maxRetry) {
     for (let i = 0; i < retries; i++) {
       try {
+        // 发送前确保 token 有效
+        await this.ensureValidToken();
         return await sendFn();
       } catch (error) {
+        const errorMsg = error.message || '';
+
+        // 检测 token 过期错误，自动刷新后重试
+        if (errorMsg.includes('token not exist or expire') || errorMsg.includes('token')) {
+          this.debugLog('⚠️ 检测到 token 过期错误，强制刷新 token...');
+          try {
+            await this.getAccessToken();
+            this.debugLog('✅ Token 刷新成功，重试发送...');
+            continue; // 立即重试，不计数
+          } catch (refreshError) {
+            this.debugLog(`❌ Token 刷新失败: ${refreshError.message}`);
+          }
+        }
+
         if (i === retries - 1) {
           throw error;
         }
@@ -740,6 +782,8 @@ class QQBotClient extends EventEmitter {
    * @returns {Promise<{url: string, ttl: number}>}
    */
   async uploadFile(channelId, filePath, fileType = 'file') {
+    await this.ensureValidToken();
+
     const fs = require('fs');
     const path = require('path');
     const FormData = require('form-data');
@@ -844,6 +888,8 @@ class QQBotClient extends EventEmitter {
    * @returns {Promise<{upload_url: string, ttl: number, key: string}>}
    */
   async getC2CUploadUrl(openid, fileType = 1) {
+    await this.ensureValidToken();
+
     const https = require('https');
 
     return new Promise((resolve, reject) => {
