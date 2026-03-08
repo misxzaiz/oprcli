@@ -198,65 +198,82 @@ class SessionScanner {
    */
   _extractPreview(filePath) {
     try {
-      // 限制读取大小（前 10KB）
+      // 限制读取大小（前 30KB，增加匹配概率）
       const fd = fs.openSync(filePath, 'r');
-      const buffer = Buffer.alloc(Math.min(10240, fs.statSync(filePath).size));
+      const bufferSize = Math.min(30720, fs.statSync(filePath).size);
+      const buffer = Buffer.alloc(bufferSize);
       fs.readSync(fd, buffer, 0, buffer.length, 0);
       fs.closeSync(fd);
 
       const content = buffer.toString('utf8');
-      const lines = content.split('\n').filter(Boolean);
 
       // 根据文件路径判断 Provider
       const isCodex = filePath.includes('.codex');
+      const isClaude = filePath.includes('.claude');
+      const isIFlow = filePath.includes('.iflow');
 
-      for (const line of lines) {
-        try {
-          const data = JSON.parse(line);
+      // 使用智能 JSON 解析（处理嵌入换行符的情况）
+      const objects = this._parseJsonlObjects(content);
 
-          // 尝试多种消息格式
-          let msg = null;
+      for (const data of objects) {
+        // 尝试多种消息格式
+        let msg = null;
 
-          // Claude/IFlow 格式：{"type":"user","message":{"content":"..."}}
-          if (data.type === 'user' && data.message?.content) {
-            msg = data.message.content;
-          }
-          // 通用格式1：{"type":"user_message","content":"..."}
-          else if (data.type === 'user_message' && data.content) {
-            msg = data.content;
-          }
-          // 通用格式2：{"role":"user","content":"..."}
-          else if (data.role === 'user' && data.content) {
-            msg = data.content;
-          }
-          // 通用格式3：{"message":"..."}
-          else if (typeof data.message === 'string') {
-            msg = data.message;
-          }
-          // Codex 格式：{"type":"user_query","payload":{"query":"..."}}
-          else if (data.type === 'user_query' && data.payload?.query) {
-            msg = data.payload.query;
-          }
-
-          if (msg && typeof msg === 'string') {
-            const cleaned = msg.trim();
-
-            // 跳过系统注入的消息
-            if (this._isSystemMessage(cleaned)) {
-              continue;
+        // ===== Codex 格式 =====
+        if (isCodex && data.type === 'response_item' && data.payload?.role === 'user') {
+          const contentArr = data.payload.content;
+          if (Array.isArray(contentArr)) {
+            const texts = contentArr
+              .filter(c => c.type === 'input_text' && c.text)
+              .map(c => c.text);
+            if (texts.length > 0) {
+              msg = this._extractRealUserInput(texts.join('\n'));
             }
-
-            return cleaned.length > 50 ? cleaned.substring(0, 50) + '...' : cleaned;
           }
-        } catch (parseError) {
-          // 跳过解析失败的行
-          continue;
         }
-      }
+        else if (isCodex && data.type === 'user_query' && data.payload?.query) {
+          msg = data.payload.query;
+        }
 
-      // Codex 降级：显示会话标识
-      if (isCodex) {
-        return '(Codex 会话)';
+        // ===== Claude/IFlow 格式 =====
+        else if ((isClaude || isIFlow) && data.type === 'user' && data.message?.content) {
+          const rawContent = data.message.content;
+          // Claude 的 content 可能是字符串或数组
+          if (typeof rawContent === 'string') {
+            msg = rawContent;
+          } else if (Array.isArray(rawContent)) {
+            // 处理 content 数组
+            const textParts = rawContent
+              .filter(c => typeof c === 'string' || c.type === 'text')
+              .map(c => typeof c === 'string' ? c : c.text);
+            if (textParts.length > 0) {
+              msg = textParts.join(' ');
+            }
+          }
+        }
+
+        // ===== 通用格式 =====
+        else if (data.type === 'user_message' && data.content) {
+          msg = typeof data.content === 'string' ? data.content : null;
+        }
+        else if (data.role === 'user' && data.content) {
+          msg = typeof data.content === 'string' ? data.content : null;
+        }
+        else if (typeof data.message === 'string') {
+          msg = data.message;
+        }
+
+        if (msg && typeof msg === 'string') {
+          const cleaned = msg.trim().replace(/\n+/g, ' ');
+
+          // 跳过系统注入的消息
+          if (this._isSystemMessage(cleaned)) {
+            continue;
+          }
+
+          // 截取前 80 个字符作为预览
+          return cleaned.length > 80 ? cleaned.substring(0, 80) + '...' : cleaned;
+        }
       }
 
       return '(无预览)';
@@ -269,21 +286,132 @@ class SessionScanner {
   }
 
   /**
-   * 判断是否为系统消息
+   * 智能解析 JSONL 对象（处理 JSON 中嵌入换行符的情况）
+   */
+  _parseJsonlObjects(content) {
+    const results = [];
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let start = 0;
+
+    for (let i = 0; i < content.length; i++) {
+      const c = content[i];
+
+      if (escape) {
+        escape = false;
+        continue;
+      }
+
+      if (c === '\\') {
+        escape = true;
+        continue;
+      }
+
+      if (c === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (!inString) {
+        if (c === '{') depth++;
+        else if (c === '}') {
+          depth--;
+          if (depth === 0) {
+            const jsonStr = content.substring(start, i + 1);
+            try {
+              results.push(JSON.parse(jsonStr));
+            } catch (e) {
+              // 跳过解析失败的对象
+            }
+            start = i + 1;
+          }
+        }
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * 从 Codex 注入了对话历史的消息中提取真正的用户输入
+   * 格式可能是：
+   * **助手**: ...\n---\n**用户**: ...\n---\n[RUNTIME_CONTEXT]...真正的输入
+   */
+  _extractRealUserInput(text) {
+    // 如果消息很短，直接返回
+    if (text.length < 200) {
+      return text;
+    }
+
+    // 尝试从消息末尾提取用户输入
+    // 查找最后的分隔符后的内容
+    const separators = ['\n---\n\n请继续上面对话。', '\n---\n', '---\n\n'];
+
+    for (const sep of separators) {
+      const lastSepIndex = text.lastIndexOf(sep);
+      if (lastSepIndex > 0) {
+        const afterSep = text.substring(lastSepIndex + sep.length).trim();
+        // 检查是否是系统注入的消息
+        if (afterSep && !this._isSystemMessage(afterSep)) {
+          return afterSep;
+        }
+      }
+    }
+
+    // 尝试提取 [MODE_INSTRUCTION] 之后的内容
+    const modeInstrMatch = text.match(/\[\/MODE_INSTRUCTION\]\s*\n+(.+?)(?:\n---|\n\*\*|$)/s);
+    if (modeInstrMatch) {
+      const extracted = modeInstrMatch[1].trim();
+      if (extracted && !this._isSystemMessage(extracted)) {
+        return extracted;
+      }
+    }
+
+    // 降级：返回原始文本
+    return text;
+  }
+
+  /**
+   * 判断是否为系统消息（跳过系统注入的内容）
    */
   _isSystemMessage(content) {
-    // 跳过系统注入的内容
-    const systemPatterns = [
+    // 系统注入的模式（匹配开头）
+    const startPatterns = [
       '[RUNTIME_CONTEXT]',
       '[MODE_PROMPT]',
+      '[MODE_INSTRUCTION]',
       '<command-',
       '<local-command-',
-      '</command',
-      '</local-command',
+      '<permissions',
+      '<INSTRUCTIONS>',
+      '<environment_context>',
+      '<system-reminder>',
       '[system-reminder]'
     ];
 
-    return systemPatterns.some(pattern => content.startsWith(pattern));
+    // 系统注入的模式（匹配包含）
+    const containPatterns = [
+      '# AGENTS.md instructions',
+      '## Skills',
+      '### Available skills',
+      'You are Codex',
+      'You are Claude Code',
+      'You are iFlow CLI',
+      'You and the user share the same workspace'
+    ];
+
+    // 检查开头模式
+    if (startPatterns.some(pattern => content.startsWith(pattern))) {
+      return true;
+    }
+
+    // 检查包含模式（对于长消息）
+    if (content.length > 200 && containPatterns.some(pattern => content.includes(pattern))) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
