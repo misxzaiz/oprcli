@@ -6,21 +6,10 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "check-deps": "node scripts/check-deps.js",
-    "validate-env": "node scripts/validate-env.js",
-    "diagnose": "node scripts/diagnose.js",
-    "view-logs": "node scripts/view-logs.js",
+    "pm2": "pm2 start ecosystem.config.js",
     "audit": "npm audit",
     "audit:fix": "npm audit fix",
-    "outdated": "npm outdated",
-    "analyze": "node scripts/performance-analyzer.js",
-    "health": "node scripts/dependency-health-check.js",
-    "health:fix": "node scripts/dependency-health-check.js --fix",
-    "version:check": "node scripts/version-manager.js --check",
-    "version:bump": "node scripts/version-manager.js --bump",
-    "project:health": "node scripts/project-health.js",
-    "news:collect": "node scripts/news-collector.js",
-    "news:test": "node scripts/news-collector.js --test"
+    "outdated": "npm outdated"
   },
   "keywords": [
     "claude",

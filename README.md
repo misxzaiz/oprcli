@@ -74,6 +74,7 @@ npm install -g pm2-windows-startup
 
 # 启动项目
 pm2 start ecosystem.config.js
+[或 npm run pm2]
 
 # 设置开机自启
 pm2-startup install
