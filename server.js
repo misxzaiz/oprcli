@@ -276,10 +276,19 @@ class UnifiedServer {
       
       const { exec } = require('child_process')
       
-      this.logger.info('SERVER', 'PM2 restart triggered')
+      // 从 ecosystem.config.js 读取应用名称，支持多实例部署
+      let appName = 'oprcli'
+      try {
+        const ecosystemConfig = require('./ecosystem.config.js')
+        appName = ecosystemConfig.apps[0]?.name || 'oprcli'
+      } catch (e) {
+        this.logger.warn('SERVER', 'Failed to read ecosystem.config.js, using default name:', e.message)
+      }
+      
+      this.logger.info('SERVER', 'PM2 restart triggered', { appName })
       
       // PM2 重启命令
-      exec('pm2 restart oprcli', (error, stdout, stderr) => {
+      exec(`pm2 restart ${appName}`, (error, stdout, stderr) => {
         if (error) {
           this.logger.error('SERVER', 'PM2 restart error:', error.message)
         } else {
