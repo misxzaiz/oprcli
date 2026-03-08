@@ -877,7 +877,7 @@ class UnifiedServer {
       }
 
       // 5. 调用agent
-      await new Promise((resolve, reject) => {
+      await new Promise(async (resolve, reject) => {
         const options = {
           onEvent: async (event) => {
             try {
@@ -1057,7 +1057,7 @@ class UnifiedServer {
             session_id: sessionId,
             provider
           })
-          connector.continueSession(sessionId, contextualMessage, options)
+          await connector.continueSession(sessionId, contextualMessage, options)
         } else {
           console.log(`[DEBUG] 调用 startSession (无sessionId), conversationId: ${conversationId}`)
           this.logger.debug(platformName, '调用 startSession')
@@ -1067,7 +1067,21 @@ class UnifiedServer {
             conversation_id: conversationId,
             provider
           })
-          connector.startSession(contextualMessage, options)
+          const startResult = await connector.startSession(contextualMessage, options)
+          if (startResult?.sessionId) {
+            sessionId = startResult.sessionId
+            platform.setSession(conversationId, sessionId, provider, { mode })
+            this.logger.success('SESSION', `✅ 通过 startSession 返回值保存 SessionID: ${sessionId}`)
+            this.auditLogger.logAgent('agent.session.saved', {
+              trace_id: traceId,
+              platform: platformName.toLowerCase(),
+              conversation_id: conversationId,
+              session_id: sessionId,
+              provider,
+              mode,
+              source: 'start_session_result'
+            })
+          }
         }
       })
 

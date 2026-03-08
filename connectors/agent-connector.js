@@ -1,7 +1,8 @@
 /**
  * Agent Connector
- * 基于 LLM + Tools 的 AI Agent 连接器
- * 支持多种大模型（iFlow、DeepSeek、OpenAI 等）
+ *
+ * Adds conversation memory for agent provider and compresses long context
+ * with a rolling summary, to avoid token overflow.
  */
 
 const BaseConnector = require('./base-connector');
@@ -13,47 +14,44 @@ class AgentConnector extends BaseConnector {
   constructor(options = {}) {
     super(options);
 
-    // Agent 配置
     this.providerType = options.providerType || 'iflow';
     this.apiKey = options.apiKey;
     this.model = options.model;
-    this.server = options.server; // 用于访问定时任务等功能
+    this.server = options.server;
 
-    // 运行时实例（在 connect 中初始化）
+    this.maxHistoryMessages = options.maxHistoryMessages || parseInt(process.env.AGENT_MAX_HISTORY_MESSAGES || '24', 10);
+    this.maxContextChars = options.maxContextChars || parseInt(process.env.AGENT_MAX_CONTEXT_CHARS || '24000', 10);
+    this.summaryTriggerChars = options.summaryTriggerChars || parseInt(process.env.AGENT_SUMMARY_TRIGGER_CHARS || '18000', 10);
+    this.minRecentMessages = options.minRecentMessages || parseInt(process.env.AGENT_MIN_RECENT_MESSAGES || '8', 10);
+
     this.llmProvider = null;
     this.toolManager = null;
     this.agentEngine = null;
+
+    // sessionId -> { startTime, summary, messages: [{ role, content, timestamp }] }
+    this.conversationMemory = new Map();
   }
 
-  /**
-   * 连接到 Agent 服务
-   */
   async _connectInternal(options) {
     try {
-      // 1. 创建 LLM Provider
       this.llmProvider = createProvider({
         type: this.providerType,
         apiKey: this.apiKey,
         model: this.model
       });
 
-      // 2. 创建工具管理器
       this.toolManager = new ToolManager(this.workDir);
 
-      // 添加定时任务工具（如果可用）
       if (this.server && this.server.scheduler) {
         const schedulerTools = this.constructor.getSchedulerTools();
         Object.entries(schedulerTools).forEach(([name, toolDef]) => {
           this.toolManager.registerTool({
             ...toolDef,
-            handler: async (args) => {
-              return await this.handleSchedulerTool(name, args);
-            }
+            handler: async (args) => this.handleSchedulerTool(name, args)
           });
         });
       }
 
-      // 3. 创建 Agent 引擎
       this.agentEngine = new AgentEngine({
         llmProvider: this.llmProvider,
         toolManager: this.toolManager,
@@ -62,7 +60,7 @@ class AgentConnector extends BaseConnector {
 
       return {
         success: true,
-        version: '1.0.0',
+        version: '1.1.0',
         provider: this.providerType,
         model: this.llmProvider.model,
         tools: this.toolManager.getStats().total
@@ -70,130 +68,230 @@ class AgentConnector extends BaseConnector {
     } catch (error) {
       return {
         success: false,
-        error: `连接失败: ${error.message}`
+        error: `Agent connect failed: ${error.message}`
       };
     }
   }
 
-  /**
-   * 启动新的 Agent 会话
-   */
   async _startSessionInternal(message, options = {}) {
-    const tempId = this._generateTempId();
+    const sessionId = this._generateTempId();
 
-    // 包装事件回调，添加 sessionId（异步处理）
-    const wrappedOnEvent = options.onEvent ? async (event) => {
-      try {
-        await options.onEvent({
-          sessionId: tempId,
-          ...event
-        });
-      } catch (error) {
-        console.error('[AgentConnector] wrappedOnEvent 错误:', error.message);
-      }
-    } : null;
+    const wrappedOnEvent = options.onEvent
+      ? async (event) => {
+          try {
+            await options.onEvent({ sessionId, ...event });
+          } catch (error) {
+            console.error('[AgentConnector] wrappedOnEvent error:', error.message);
+          }
+        }
+      : null;
 
-    // 注册会话（Agent 会话是无状态的，但保留记录）
-    this._registerSession(tempId, {
-      startTime: Date.now(),
-      message
-    });
+    this._registerSession(sessionId, { startTime: Date.now() });
+    this._initMemoryIfMissing(sessionId);
+    this._appendMessage(sessionId, 'user', message);
 
-    // ⭐ 同步执行 Agent（等待完成）
+    const prompt = await this._buildContextPrompt(sessionId);
+
     try {
-      await this._executeAgentAsync(message, wrappedOnEvent);
+      const result = await this._executeAgentAsync(prompt, wrappedOnEvent);
+      if (result?.success && result.content) {
+        this._appendMessage(sessionId, 'assistant', result.content);
+      }
+      await this._trimHistory(sessionId);
     } catch (error) {
-      console.error('[AgentConnector] _startSessionInternal 执行失败:', error.message);
-
       if (wrappedOnEvent) {
-        await wrappedOnEvent({
-          type: 'error',
-          error: error.message
-        });
+        await wrappedOnEvent({ type: 'error', error: error.message });
       }
     }
 
-    return { sessionId: tempId };
+    return { sessionId };
   }
 
-  /**
-   * 继续已有会话（Agent 无状态，等同于新会话）
-   */
   async _continueSessionInternal(sessionId, message, options = {}) {
-    // Agent 是无状态的，每个任务独立执行
-    // 如果需要上下文，可以从会话历史中获取
-    const session = this._getSession(sessionId);
+    const wrappedOnEvent = options.onEvent
+      ? async (event) => {
+          try {
+            await options.onEvent({ sessionId, ...event });
+          } catch (error) {
+            console.error('[AgentConnector] wrappedOnEvent error:', error.message);
+          }
+        }
+      : null;
 
-    return this._startSessionInternal(message, options);
+    this._registerSession(sessionId, this._getSession(sessionId) || { startTime: Date.now() });
+    this._initMemoryIfMissing(sessionId);
+    this._appendMessage(sessionId, 'user', message);
+
+    const prompt = await this._buildContextPrompt(sessionId);
+
+    try {
+      const result = await this._executeAgentAsync(prompt, wrappedOnEvent);
+      if (result?.success && result.content) {
+        this._appendMessage(sessionId, 'assistant', result.content);
+      }
+      await this._trimHistory(sessionId);
+    } catch (error) {
+      if (wrappedOnEvent) {
+        await wrappedOnEvent({ type: 'error', error: error.message });
+      }
+    }
   }
 
-  /**
-   * 中断会话（Agent 不支持中断，只移除记录）
-   */
   _interruptSessionInternal(sessionId) {
-    // Agent 执行无法中断（异步执行中）
-    // 只移除会话记录
     this._unregisterSession(sessionId);
+    this.conversationMemory.delete(sessionId);
     return true;
   }
 
-  /**
-   * 异步执行 Agent
-   */
   async _executeAgentAsync(message, onEvent) {
-    const fs = require('fs');
-    const path = require('path');
+    const result = await this.agentEngine.execute(message, onEvent);
 
-    const logFile = path.join(__dirname, '../logs/agent-debug.log');
-    const log = (msg) => {
-      const timestamp = new Date().toISOString();
-      const logMsg = `[${timestamp}] ${msg}\n`;
-      fs.appendFileSync(logFile, logMsg);
-      console.log(msg); // 同时输出到控制台
-    };
+    if (onEvent) {
+      await onEvent({
+        type: 'done',
+        success: result.success,
+        content: result.content || result.error,
+        iterations: result.iterations,
+        duration: result.duration,
+        usage: result.usage
+      });
+    }
 
-    log('===== _executeAgentAsync 开始 =====');
-    log(`agentEngine 存在: ${!!this.agentEngine}`);
-    log(`llmProvider 存在: ${!!this.llmProvider}`);
-    log(`logger 存在: ${!!this.logger}`);
-    log(`message 长度: ${message.length}`);
+    return result;
+  }
 
-    try {
-      log('准备调用 agentEngine.execute...');
-      const result = await this.agentEngine.execute(message, onEvent);
-      log(`agentEngine.execute 完成: ${result.success}`);
-
-      // 发送完成事件
-      if (onEvent) {
-        onEvent({
-          type: 'done',
-          success: result.success,
-          content: result.content || result.error,
-          iterations: result.iterations,
-          duration: result.duration,
-          usage: result.usage
-        });
-      }
-
-      return result;
-    } catch (error) {
-      log(`_executeAgentAsync 错误: ${error.message}`);
-      log(`错误堆栈: ${error.stack}`);
-
-      if (onEvent) {
-        onEvent({
-          type: 'error',
-          error: error.message
-        });
-      }
-
-      throw error;
+  _initMemoryIfMissing(sessionId) {
+    if (!this.conversationMemory.has(sessionId)) {
+      this.conversationMemory.set(sessionId, {
+        startTime: Date.now(),
+        summary: '',
+        messages: []
+      });
     }
   }
 
-  /**
-   * 获取 Agent 统计信息
-   */
+  _appendMessage(sessionId, role, content) {
+    const memory = this.conversationMemory.get(sessionId);
+    if (!memory || !content) return;
+    memory.messages.push({ role, content, timestamp: Date.now() });
+  }
+
+  async _buildContextPrompt(sessionId) {
+    const memory = this.conversationMemory.get(sessionId);
+    if (!memory || memory.messages.length === 0) return '';
+
+    const totalChars = this._estimateMemoryChars(memory);
+    if (totalChars > this.summaryTriggerChars) {
+      await this._summarizeOldMessages(sessionId);
+    }
+
+    const latest = this.conversationMemory.get(sessionId);
+    const blocks = [];
+
+    if (latest.summary) {
+      blocks.push(`[Conversation Summary]\n${latest.summary}`);
+    }
+
+    for (const item of latest.messages) {
+      const speaker = item.role === 'assistant' ? 'Assistant' : 'User';
+      blocks.push(`[${speaker}] ${item.content}`);
+    }
+
+    blocks.push('Please continue the same conversation and keep consistency with previous context.');
+
+    const prompt = blocks.join('\n\n');
+    if (prompt.length <= this.maxContextChars) return prompt;
+
+    await this._summarizeOldMessages(sessionId, true);
+    const finalMemory = this.conversationMemory.get(sessionId);
+    const secondBlocks = [];
+
+    if (finalMemory.summary) {
+      secondBlocks.push(`[Conversation Summary]\n${finalMemory.summary}`);
+    }
+
+    for (const item of finalMemory.messages) {
+      const speaker = item.role === 'assistant' ? 'Assistant' : 'User';
+      secondBlocks.push(`[${speaker}] ${item.content}`);
+    }
+
+    secondBlocks.push('Please continue the same conversation and keep consistency with previous context.');
+    return secondBlocks.join('\n\n').slice(0, this.maxContextChars);
+  }
+
+  _estimateMemoryChars(memory) {
+    const messageChars = memory.messages.reduce((sum, m) => sum + (m.content ? m.content.length : 0), 0);
+    return messageChars + (memory.summary ? memory.summary.length : 0);
+  }
+
+  async _summarizeOldMessages(sessionId, force = false) {
+    const memory = this.conversationMemory.get(sessionId);
+    if (!memory || memory.messages.length <= this.minRecentMessages) return;
+
+    const keepCount = Math.max(this.minRecentMessages, Math.floor(this.maxHistoryMessages / 2));
+    const splitIndex = Math.max(0, memory.messages.length - keepCount);
+
+    if (!force && splitIndex <= 0) return;
+
+    const toSummarize = memory.messages.slice(0, splitIndex);
+    const toKeep = memory.messages.slice(splitIndex);
+
+    if (toSummarize.length === 0) return;
+
+    const transcript = toSummarize
+      .map((m) => `${m.role === 'assistant' ? 'Assistant' : 'User'}: ${m.content}`)
+      .join('\n');
+
+    try {
+      const summaryResponse = await this.llmProvider.chat(
+        [
+          {
+            role: 'system',
+            content: 'You are a summarizer. Preserve key facts, decisions, constraints, file paths, APIs, and pending tasks. Keep it concise and structured.'
+          },
+          {
+            role: 'user',
+            content: `Existing summary:\n${memory.summary || '(none)'}\n\nNew transcript:\n${transcript}\n\nReturn updated summary.`
+          }
+        ],
+        {
+          temperature: 0.2,
+          max_tokens: 600
+        }
+      );
+
+      const nextSummary = (summaryResponse?.content || '').trim();
+      if (nextSummary) {
+        memory.summary = nextSummary;
+        memory.messages = toKeep;
+      }
+    } catch (error) {
+      // Fallback: keep only recent messages if summarization fails.
+      memory.messages = toKeep;
+      if (!memory.summary) {
+        memory.summary = '[Fallback] Older messages were truncated due to context size.';
+      }
+    }
+  }
+
+  async _trimHistory(sessionId) {
+    const memory = this.conversationMemory.get(sessionId);
+    if (!memory) return;
+
+    if (memory.messages.length > this.maxHistoryMessages) {
+      await this._summarizeOldMessages(sessionId, true);
+    }
+
+    const totalChars = this._estimateMemoryChars(memory);
+    if (totalChars > this.maxContextChars) {
+      await this._summarizeOldMessages(sessionId, true);
+      const after = this.conversationMemory.get(sessionId);
+      if (this._estimateMemoryChars(after) > this.maxContextChars) {
+        after.messages = after.messages.slice(-this.minRecentMessages);
+      }
+    }
+  }
+
   getStats() {
     if (!this.agentEngine) {
       return {
@@ -206,6 +304,7 @@ class AgentConnector extends BaseConnector {
       connected: this.connected,
       provider: this.providerType,
       model: this.llmProvider.model,
+      sessionsWithMemory: this.conversationMemory.size,
       ...this.agentEngine.getStats()
     };
   }

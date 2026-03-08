@@ -51,7 +51,11 @@ class Config {
       providerType: process.env.AGENT_PROVIDER_TYPE || 'iflow',
       apiKey: process.env.AGENT_API_KEY,
       model: process.env.AGENT_MODEL,
-      workDir: process.env.AGENT_WORK_DIR || this.defaultWorkDir  // 支持Agent工作目录配置
+      workDir: process.env.AGENT_WORK_DIR || this.defaultWorkDir,  // 支持Agent工作目录配置
+      maxHistoryMessages: parseInt(process.env.AGENT_MAX_HISTORY_MESSAGES || '24', 10),
+      maxContextChars: parseInt(process.env.AGENT_MAX_CONTEXT_CHARS || '24000', 10),
+      summaryTriggerChars: parseInt(process.env.AGENT_SUMMARY_TRIGGER_CHARS || '18000', 10),
+      minRecentMessages: parseInt(process.env.AGENT_MIN_RECENT_MESSAGES || '8', 10)
     }
 
     // 钉钉配置
@@ -459,6 +463,10 @@ class Config {
         apiKey: this.agent.apiKey,
         model: this.agent.model,
         workDir: this.getWorkDir('agent'),
+        maxHistoryMessages: this.agent.maxHistoryMessages,
+        maxContextChars: this.agent.maxContextChars,
+        summaryTriggerChars: this.agent.summaryTriggerChars,
+        minRecentMessages: this.agent.minRecentMessages,
         systemPrompt
       }
     }
