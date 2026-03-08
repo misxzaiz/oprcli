@@ -7,7 +7,7 @@ class AgentEngine {
   constructor(options) {
     this.llmProvider = options.llmProvider;
     this.toolManager = options.toolManager;
-    this.maxIterations = options.maxIterations || 10;
+    this.maxIterations = options.maxIterations || 2000;
     this.logger = options.logger || console;
   }
 
