@@ -272,7 +272,7 @@ class UnifiedServer {
 
   async _handleRestart(conversationId, replyTarget, platform, originalMessage, type) {
     try {
-      await platform.send(replyTarget, '🔄 正在重启服务...', originalMessage, type)
+      await platform.send(replyTarget, '🔄 正在重启服务，5到10秒后再试', originalMessage, type)
       
       const { exec } = require('child_process')
       
