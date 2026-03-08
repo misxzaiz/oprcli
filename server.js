@@ -44,7 +44,6 @@ class UnifiedServer {
     // 多模型支持
     this.connectors = new Map()  // 'claude' | 'iflow' -> connector instance
     this.defaultProvider = config.provider
-    this.defaultPromptMode = this._normalizePromptMode(config.systemPrompts?.mode)
 
     // 定时任务模块
     this.scheduler = null
@@ -180,7 +179,7 @@ class UnifiedServer {
     return dispatchCommand(this, command, conversationId, replyTarget, platform, originalMessage, type)
   }
 
-  async _handleSwitch(provider, conversationId, replyTarget, platform, originalMessage, type) {
+  async _handleSwitch(provider, conversationId, replyTarget, platform, originalMessage, type, arg = null) {
     // 检查 connector 是否可用
     const connector = this.connectors.get(provider)
     if (!connector || !connector.connected) {
@@ -204,18 +203,48 @@ class UnifiedServer {
       }
     }
 
-    // 切换模型（清空旧 sessionId，保留 provider）
-    platform.setSession(conversationId, null, provider, { mode: currentSession?.mode || this.defaultPromptMode })
+    // 解析参数：[-r] [自定义提示词]
+    let promptMode = 'append'  // 默认拼接
+    let customPrompt = null
+
+    if (arg) {
+      const trimmedArg = arg.trim()
+      if (trimmedArg.startsWith('-r ') || trimmedArg === '-r') {
+        // -r 标志：替换模式
+        promptMode = 'replace'
+        customPrompt = trimmedArg.startsWith('-r ') ? trimmedArg.substring(3).trim() : null
+      } else {
+        // 无 -r 标志：拼接模式
+        promptMode = 'append'
+        customPrompt = trimmedArg
+      }
+    }
+
+    // 构建会话选项
+    const sessionOptions = {
+      ...currentSession,
+      promptMode,
+      customPrompt
+    }
+
+    // 切换模型（清空旧 sessionId，保留设置）
+    platform.setSession(conversationId, null, provider, sessionOptions)
+
+    // 构建响应消息
+    let responseMsg = `✅ 已切换到 ${provider.toUpperCase()} 模型`
+
+    if (customPrompt) {
+      const modeText = promptMode === 'replace' ? '替换' : '拼接'
+      const previewPrompt = customPrompt.length > 50 ? customPrompt.substring(0, 50) + '...' : customPrompt
+      responseMsg += `\n\n📝 自定义提示词（${modeText}）：\n${previewPrompt}`
+    }
 
     const availableProviders = Array.from(this.connectors.keys()).map(p => p.toUpperCase()).join(', ')
-    await platform.send(
-      replyTarget,
-      `✅ 已切换到 ${provider.toUpperCase()} 模型\n\n💡 可用模型：${availableProviders}`,
-      originalMessage,
-      type
-    )
+    responseMsg += `\n\n💡 可用模型：${availableProviders}`
 
-    this.logger.info('PROVIDER', `会话 ${conversationId} 切换到 ${provider}`)
+    await platform.send(replyTarget, responseMsg, originalMessage, type)
+
+    this.logger.info('PROVIDER', `会话 ${conversationId} 切换到 ${provider}${customPrompt ? `, promptMode=${promptMode}` : ''}`)
     return { status: 'SUCCESS' }
   }
 
@@ -244,8 +273,9 @@ class UnifiedServer {
   async _handleStatus(conversationId, replyTarget, platform, originalMessage, type) {
     const session = platform.getSession(conversationId)
     const provider = session?.provider || this.defaultProvider
-    const mode = this._normalizePromptMode(session?.mode || this.defaultPromptMode)
     const sessionId = session?.sessionId || null
+    const promptMode = session?.promptMode || 'append'
+    const customPrompt = session?.customPrompt
     const availableProviders = Array.from(this.connectors.entries())
       .filter(([_, conn]) => conn.connected)
       .map(([p, _]) => p.toUpperCase())
@@ -253,7 +283,8 @@ class UnifiedServer {
 
     const status = {
       当前模型: provider.toUpperCase(),
-      对话模式: mode,
+      提示词模式: promptMode === 'replace' ? '替换' : '拼接',
+      自定义提示词: customPrompt ? (customPrompt.length > 30 ? customPrompt.substring(0, 30) + '...' : customPrompt) : '无',
       会话状态: sessionId ? '运行中' : '空闲',
       可用模型: availableProviders || '无'
     }
@@ -275,9 +306,14 @@ class UnifiedServer {
     const help = `📖 命令帮助
 
 🤖 模型切换：
-  • claude  - 切换到 Claude 模型
-  • iflow  - 切换到 IFlow 模型
-  • codex  - 切换到 Codex 模型
+  • claude [-r] [提示词]  - 切换到 Claude 模型
+  • iflow [-r] [提示词]   - 切换到 IFlow 模型
+  • codex [-r] [提示词]   - 切换到 Codex 模型
+  
+  参数说明：
+  - 无参数：使用默认提示词
+  - [提示词]：拼接到默认提示词后
+  - -r [提示词]：替换默认提示词
 
 🛑 任务控制：
   • end / 停止 / stop  - 中断当前任务
@@ -292,7 +328,6 @@ class UnifiedServer {
 
 ℹ️ 信息查询：
   • status / 状态  - 查看当前状态
-  • mode [universal|dev|ops]  - 查看或切换对话模式
   • path [目录]  - 查看或设置工作目录
   • help / 帮助  - 显示此帮助
 
@@ -478,56 +513,6 @@ class UnifiedServer {
     return { status: 'SUCCESS' }
   }
 
-  _normalizePromptMode(mode) {
-    const value = (mode || '').toString().trim().toLowerCase()
-    const aliases = {
-      all: 'universal',
-      general: 'universal',
-      full: 'universal',
-      universal: 'universal',
-      dev: 'dev',
-      developer: 'dev',
-      coding: 'dev',
-      ops: 'ops',
-      operation: 'ops'
-    }
-    return aliases[value] || 'universal'
-  }
-
-  async _handleMode(modeArg, conversationId, replyTarget, platform, originalMessage, type) {
-    const session = platform.getSession(conversationId)
-    const currentProvider = session?.provider || this.defaultProvider
-    const currentMode = this._normalizePromptMode(session?.mode || this.defaultPromptMode)
-
-    if (!modeArg) {
-      await platform.send(
-        replyTarget,
-        `🧭 当前模式：${currentMode}\n\n可选模式：universal / dev / ops\n命令示例：mode universal`,
-        originalMessage,
-        type
-      )
-      return { status: 'SUCCESS' }
-    }
-
-    const rawMode = modeArg.trim().toLowerCase()
-    const normalized = this._normalizePromptMode(rawMode)
-    const isValidMode = ['universal', 'dev', 'ops', 'all', 'general', 'full', 'developer', 'coding', 'operation'].includes(rawMode)
-
-    if (!isValidMode) {
-      await platform.send(
-        replyTarget,
-        `❌ 不支持的模式：${modeArg}\n可选模式：universal / dev / ops`,
-        originalMessage,
-        type
-      )
-      return { status: 'SUCCESS' }
-    }
-
-    platform.setSession(conversationId, session?.sessionId || null, currentProvider, { mode: normalized })
-    await platform.send(replyTarget, `✅ 已切换对话模式：${normalized}`, originalMessage, type)
-    return { status: 'SUCCESS' }
-  }
-
   async _handlePath(pathArg, conversationId, replyTarget, platform, originalMessage, type) {
     const session = platform.getSession(conversationId)
     const currentProvider = session?.provider || this.defaultProvider
@@ -558,7 +543,7 @@ class UnifiedServer {
     // 切换到默认工作目录
     if (trimmedPath === '~' || trimmedPath === 'reset') {
       platform.setSession(conversationId, session?.sessionId || null, currentProvider, {
-        mode: session?.mode || this.defaultPromptMode,
+        ...session,
         workDir: null  // 清除会话级别的工作目录设置，使用默认配置
       })
 
@@ -613,7 +598,7 @@ class UnifiedServer {
 
     // 设置新的工作目录
     platform.setSession(conversationId, session?.sessionId || null, currentProvider, {
-      mode: session?.mode || this.defaultPromptMode,
+      ...session,
       workDir: newPath
     })
 
@@ -628,13 +613,14 @@ class UnifiedServer {
     return { status: 'SUCCESS' }
   }
 
-  _buildRuntimeContext({ platformName, type, conversationId, provider, mode, sessionWorkDir }) {
+  _buildRuntimeContext({ platformName, type, conversationId, provider, sessionWorkDir, promptMode, customPrompt }) {
     return {
       platform: (platformName || 'UNKNOWN').toLowerCase(),
       message_type: type || 'default',
       conversation_id: conversationId,
       provider,
-      mode,
+      promptMode: promptMode || 'append',
+      customPrompt: customPrompt || null,
       work_dir: config.getWorkDir(provider, sessionWorkDir),
       project_dir: config.getProjectDir(),
       default_work_dir: config.getDefaultWorkDir(),
@@ -643,15 +629,30 @@ class UnifiedServer {
   }
 
   async _buildContextualMessage(content, runtimeContext, attachments = []) {
-    const modeInstructions = {
-      universal: '优先按通用全能助手风格回答：先结论，后步骤，跨领域可执行。',
-      dev: '优先按工程助手风格回答：给出可执行命令、代码和排障步骤。',
-      ops: '优先按运维助手风格回答：强调稳定性、风险、回滚与监控建议。'
+    // 加载默认系统提示词
+    const defaultPrompt = await config.getSystemPrompt(runtimeContext.provider)
+
+    // 构建最终提示词
+    let finalPrompt = ''
+
+    if (runtimeContext.customPrompt) {
+      if (runtimeContext.promptMode === 'replace') {
+        // 替换模式：使用用户提示词
+        finalPrompt = runtimeContext.customPrompt
+      } else {
+        // 拼接模式：默认提示词 + 用户提示词
+        if (defaultPrompt) {
+          finalPrompt = defaultPrompt + '\n\n' + runtimeContext.customPrompt
+        } else {
+          finalPrompt = runtimeContext.customPrompt
+        }
+      }
+    } else {
+      // 无自定义提示词，使用默认提示词
+      finalPrompt = defaultPrompt || ''
     }
 
-    const modeBlock = `[MODE_INSTRUCTION]\n${modeInstructions[runtimeContext.mode] || modeInstructions.universal}\n[/MODE_INSTRUCTION]`
-    const modePrompt = await config.getModePrompt(runtimeContext.provider, runtimeContext.mode, runtimeContext.sessionWorkDir)
-    const modePromptBlock = modePrompt ? `[MODE_PROMPT]\n${modePrompt}\n[/MODE_PROMPT]` : ''
+    const modePromptBlock = finalPrompt ? `[MODE_PROMPT]\n${finalPrompt}\n[/MODE_PROMPT]` : ''
 
     // 构建附件块（支持图片、文件、音频、视频）
     let attachmentBlock = ''
@@ -1104,14 +1105,14 @@ class UnifiedServer {
         session_id: sessionId,
         provider
       })
-      const mode = this._normalizePromptMode(session?.mode || this.defaultPromptMode)
       const runtimeContext = this._buildRuntimeContext({
         platformName,
         type,
         conversationId,
         provider,
-        mode,
-        sessionWorkDir: session?.workDir || null
+        sessionWorkDir: session?.workDir || null,
+        promptMode: session?.promptMode || 'append',
+        customPrompt: session?.customPrompt || null
       })
       const contextualMessage = await this._buildContextualMessage(content, runtimeContext, attachments)
       this.auditLogger.logAgent('agent.request', {
@@ -1119,7 +1120,8 @@ class UnifiedServer {
         platform: platformName.toLowerCase(),
         conversation_id: conversationId,
         provider,
-        mode,
+        promptMode: runtimeContext.promptMode,
+        hasCustomPrompt: !!runtimeContext.customPrompt,
         runtime_context: runtimeContext,
         request_message: contextualMessage
       })

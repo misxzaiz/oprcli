@@ -240,24 +240,36 @@ class Config {
   }
 
   /**
-   * 获取按模式拆分的提示词（oprcli.<mode>.md），找不到时回退到 oprcli.md
-   * 不读取环境变量覆盖，专用于运行时 mode 注入
+   * 获取系统提示词
+   * 支持自定义提示词注入：
+   * - customPrompt + promptMode='replace': 直接返回自定义提示词
+   * - customPrompt + promptMode='append': 默认提示词 + 自定义提示词
+   * - 无 customPrompt: 返回默认提示词
    */
-  async getModePrompt(provider, mode = 'universal', sessionWorkDir = null) {
-    const normalizedMode = (mode || 'universal').toString().trim().toLowerCase()
-    const modeFile = `oprcli.${normalizedMode}.md`
-    const fallbackFile = 'oprcli.md'
-
-    let content = await this._loadSystemPromptFromFile(modeFile)
-    if (!content && normalizedMode !== 'universal') {
-      content = await this._loadSystemPromptFromFile(fallbackFile)
-    }
-    if (!content && normalizedMode === 'universal') {
-      content = await this._loadSystemPromptFromFile(fallbackFile)
+  async getModePrompt(provider, mode = null, sessionWorkDir = null, customPrompt = null, promptMode = 'append') {
+    // 如果有自定义提示词且是替换模式，直接返回
+    if (customPrompt && promptMode === 'replace') {
+      return customPrompt
     }
 
-    if (!content) return null
-    return this._replaceTemplateVars(content, provider, sessionWorkDir)
+    // 加载默认提示词文件（oprcli.md）
+    const content = await this._loadSystemPromptFromFile('oprcli.md')
+
+    let defaultPrompt = null
+    if (content) {
+      defaultPrompt = this._replaceTemplateVars(content, provider, sessionWorkDir)
+    }
+
+    // 如果有自定义提示词且是拼接模式，拼接默认 + 自定义
+    if (customPrompt && promptMode === 'append') {
+      if (defaultPrompt) {
+        return `${defaultPrompt}\n\n---\n\n${customPrompt}`
+      }
+      return customPrompt
+    }
+
+    // 无自定义提示词，返回默认
+    return defaultPrompt
   }
 
   validate() {

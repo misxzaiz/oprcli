@@ -1,15 +1,13 @@
 async function dispatchCommand(server, command, conversationId, replyTarget, platform, originalMessage, type) {
   switch (command.type) {
     case 'switch':
-      return server._handleSwitch(command.provider, conversationId, replyTarget, platform, originalMessage, type)
+      return server._handleSwitch(command.provider, conversationId, replyTarget, platform, originalMessage, type, command.arg)
     case 'interrupt':
       return server._handleInterrupt(conversationId, replyTarget, platform, originalMessage, type)
     case 'status':
       return server._handleStatus(conversationId, replyTarget, platform, originalMessage, type)
     case 'help':
       return server._handleHelp(replyTarget, platform, originalMessage, type)
-    case 'mode':
-      return server._handleMode(command.arg, conversationId, replyTarget, platform, originalMessage, type)
     case 'path':
       return server._handlePath(command.arg, conversationId, replyTarget, platform, originalMessage, type)
     case 'tasks_list':
