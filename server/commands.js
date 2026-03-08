@@ -39,8 +39,8 @@ const COMMANDS = {
   'tasks off': { type: 'tasks_off' },
 
   // 任务添加/删除
-  'task add': { type: 'task_add', hasArg: true },
-  'task rm': { type: 'task_rm', hasArg: true },
+  'tasks add': { type: 'tasks_add', hasArg: true },
+  'tasks rm': { type: 'tasks_rm', hasArg: true },
 
   // 会话管理
   sessions: { type: 'sessions_list' },

@@ -28,9 +28,9 @@ async function dispatchCommand(server, command, conversationId, replyTarget, pla
       return server._handleTasksOn(conversationId, replyTarget, platform, originalMessage, type)
     case 'tasks_off':
       return server._handleTasksOff(conversationId, replyTarget, platform, originalMessage, type)
-    case 'task_add':
+    case 'tasks_add':
       return server._handleTaskAdd(command.arg, conversationId, replyTarget, platform, originalMessage, type)
-    case 'task_rm':
+    case 'tasks_rm':
       return server._handleTaskRm(command.arg, conversationId, replyTarget, platform, originalMessage, type)
     case 'sessions_list':
       return server._handleSessionsList(conversationId, replyTarget, platform, originalMessage, type)

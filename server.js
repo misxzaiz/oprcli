@@ -356,17 +356,17 @@ class UnifiedServer {
   • tasks  - 查看任务列表
   • tasks status  - 查看任务状态
   • tasks reload  - 重载任务配置
+  • tasks on  - 启用定时任务功能
+  • tasks off  - 禁用定时任务功能
   • tasks run <id>  - 手动执行任务
   • tasks enable <id>  - 启用任务
   • tasks disable <id>  - 禁用任务
-  • tasks on  - 启用定时任务功能
-  • tasks off  - 禁用定时任务功能
-  • task add <id> <间隔> <消息>  - 创建任务
-  • task rm <id>  - 删除任务
+  • tasks add <id> <间隔> <消息>  - 创建任务
+  • tasks rm <id>  - 删除任务
   
   间隔格式：30s/10m/1h 或 cron 表达式
   选项：--name=名称 --provider=模型 --enabled=true/false
-  示例：task add drink 30m 该喝水了 --provider=iflow
+  示例：tasks add drink 30m 该喝水了 --provider=iflow
 
 🔄 服务管理：
   • rs / restart / 重启  - 远程重启服务 (PM2模式)
@@ -1023,18 +1023,18 @@ class UnifiedServer {
 
     if (!arg) {
       await platform.send(replyTarget,
-        '❌ 用法: task add <id> <interval> <message> [--name=名称] [--provider=模型] [--enabled=true/false]\n' +
-        '示例: task add weather 30m 每半小时提醒我喝水', originalMessage, type
+        '❌ 用法: tasks add <id> <interval> <message> [--name=名称] [--provider=模型] [--enabled=true/false]\n' +
+        '示例: tasks add weather 30m 每半小时提醒我喝水', originalMessage, type
       )
       return { status: 'SUCCESS' }
     }
 
     // 解析参数
-    // 格式: task add <id> <interval> <message> [--name=名称] [--provider=模型]
+    // 格式: tasks add <id> <interval> <message> [--name=名称] [--provider=模型]
     const parts = arg.split(/\s+/)
     if (parts.length < 3) {
       await platform.send(replyTarget,
-        '❌ 参数不足\n用法: task add <id> <interval> <message> [--name=名称] [--provider=模型] [--enabled=true/false]', originalMessage, type
+        '❌ 参数不足\n用法: tasks add <id> <interval> <message> [--name=名称] [--provider=模型] [--enabled=true/false]', originalMessage, type
       )
       return { status: 'SUCCESS' }
     }
