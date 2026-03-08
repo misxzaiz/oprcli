@@ -248,13 +248,18 @@ class CodexConnector extends BaseConnector {
       shell: useShell,
       env: {
         ...process.env,
-        // 🔧 强制 UTF-8 编码（解决 Windows 中文乱码）
-        PYTHONUTF8: '1',
-        PYTHONIOENCODING: 'utf-8',
-        LANG: 'en_US.UTF-8',
-        PYTHONLEGACYWINDOWSSTDIO: '1'
+        // 🔧 强制 UTF-8 编码（解决 Windows/Linux 中文乱码）
+        LANG: this._isWindows() ? 'zh_CN.UTF-8' : 'zh_CN.UTF-8',
+        LC_ALL: 'zh_CN.UTF-8',
+        // Node.js 编码设置
+        NODE_OPTIONS: '--max-old-space-size=4096'
       }
     };
+
+    // Windows 下额外设置编码页
+    if (this._isWindows()) {
+      spawnOptions.env.CHCP = '65001'; // UTF-8 代码页
+    }
 
     this.logger.log(`[CodexConnector] 执行命令: ${command} ${finalArgs.join(' ')}`);
     this.logger.log(`[CodexConnector] useShell: ${useShell}`);
@@ -306,7 +311,7 @@ class CodexConnector extends BaseConnector {
 
     // 处理标准输出
     child.stdout.on('data', (data) => {
-      const text = data.toString();
+      const text = data.toString('utf-8'); // 🔧 显式指定 UTF-8 编码
       this.logger.log('[CodexConnector] stdout:', text.substring(0, 200));
       stdoutBuffer += text;
 
@@ -319,7 +324,7 @@ class CodexConnector extends BaseConnector {
 
     // 处理标准错误
     child.stderr.on('data', (data) => {
-      const text = data.toString();
+      const text = data.toString('utf-8'); // 🔧 显式指定 UTF-8 编码
       this.logger.log('[CodexConnector] stderr:', text);
       stderrBuffer += text;
 

@@ -3,9 +3,10 @@
   <component name="ChangeListManager">
     <list default="true" id="dc7fecaf-1f35-44e1-8b68-37882546a989" name="Changes" comment="修改工具调用序列化">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/connectors/agent-connector.js" beforeDir="false" afterPath="$PROJECT_DIR$/connectors/agent-connector.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/server.js" beforeDir="false" afterPath="$PROJECT_DIR$/server.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/config.js" beforeDir="false" afterPath="$PROJECT_DIR$/utils/config.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/connectors/codex-connector.js" beforeDir="false" afterPath="$PROJECT_DIR$/connectors/codex-connector.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scheduler/task-manager.js" beforeDir="false" afterPath="$PROJECT_DIR$/scheduler/task-manager.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scheduler/tasks.json" beforeDir="false" afterPath="$PROJECT_DIR$/scheduler/tasks.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/system-prompts/oprcli.md" beforeDir="false" afterPath="$PROJECT_DIR$/system-prompts/oprcli.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
