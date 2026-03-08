@@ -1131,7 +1131,7 @@ class UnifiedServer {
     const validation = config.validate()
     if (!validation.valid) {
       console.error('❌ 配置错误:')
-      validation.errors.forEach(err => console.error(`  - ${err}`))
+      validation.errors.forEach(err => console.error(`  - ${err.message || JSON.stringify(err)}`))
       process.exit(1)
     }
 
@@ -1167,6 +1167,15 @@ class UnifiedServer {
     this.scheduler = new SchedulerModule(this, this.logger)
     await this.scheduler.start()
 
+    // 显示配置警告（如有）
+    const validation = config.validate()
+    if (validation.warnings.length > 0) {
+      this.logger.log('\n⚠️  配置警告:')
+      validation.warnings.forEach(w => {
+        this.logger.log(`   - ${w.message}`)
+      })
+    }
+
     // 启动 HTTP 服务器（仅在端口配置时）
     if (config.port) {
       const server = this.app.listen(config.port, () => {
@@ -1174,6 +1183,7 @@ class UnifiedServer {
         this.logger.log('  Unified AI CLI Connector Server')
         this.logger.log('========================================')
         this.logger.log(`\n🌐 服务器运行在: http://localhost:${config.port}`)
+        this.logger.log(`📄 配置页面: http://localhost:${config.port}/config/config.html`)
         this.logger.log(`🤖 提供商: ${config.provider.toUpperCase()}`)
         this.logger.log(`📱 钉钉: ${dingtalkEnabled ? '✅ 已启用' : '❌ 未启用'}`)
         this.logger.log('\n按 Ctrl+C 停止服务器\n')

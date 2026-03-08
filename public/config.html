@@ -13,13 +13,8 @@
       min-height: 100vh;
     }
     
-    /* Layout */
-    .layout {
-      display: flex;
-      min-height: 100vh;
-    }
+    .layout { display: flex; min-height: 100vh; }
     
-    /* Sidebar */
     .sidebar {
       width: 200px;
       background: #fff;
@@ -62,7 +57,6 @@
     }
     .nav-status.configured { background: #10b981; }
     
-    /* Main */
     .main {
       flex: 1;
       margin-left: 200px;
@@ -70,7 +64,6 @@
       padding-bottom: 80px;
     }
     
-    /* Section */
     .section {
       background: #fff;
       border-radius: 8px;
@@ -86,11 +79,7 @@
       padding-bottom: 15px;
       border-bottom: 1px solid #e5e7eb;
     }
-    .section-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: #111;
-    }
+    .section-title { font-size: 15px; font-weight: 600; color: #111; }
     .section-link {
       font-size: 12px;
       color: #2563eb;
@@ -98,7 +87,6 @@
     }
     .section-link:hover { text-decoration: underline; }
     
-    /* Form */
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -135,13 +123,12 @@
     input::placeholder { color: #9ca3af; }
     textarea { resize: vertical; min-height: 60px; font-family: inherit; }
     
-    /* Password */
     .input-with-action {
       display: flex;
       gap: 4px;
     }
     .input-with-action input { flex: 1; }
-    .toggle-pwd {
+    .btn-small {
       padding: 0 10px;
       background: #f3f4f6;
       border: 1px solid #d1d5db;
@@ -149,10 +136,10 @@
       cursor: pointer;
       color: #6b7280;
       font-size: 12px;
+      white-space: nowrap;
     }
-    .toggle-pwd:hover { background: #e5e7eb; }
+    .btn-small:hover { background: #e5e7eb; }
     
-    /* Checkbox */
     .check-group {
       display: flex;
       align-items: center;
@@ -165,7 +152,6 @@
     }
     .check-label { font-size: 13px; }
     
-    /* Actions */
     .actions {
       position: fixed;
       bottom: 0;
@@ -197,7 +183,6 @@
     }
     .btn-secondary:hover { background: #f9fafb; }
     
-    /* Status */
     #toast {
       position: fixed;
       top: 20px;
@@ -212,11 +197,9 @@
     #toast.success { background: #10b981; color: #fff; display: block; }
     #toast.error { background: #ef4444; color: #fff; display: block; }
     
-    /* Panel */
     .panel { display: none; }
     .panel.active { display: block; }
     
-    /* Guide */
     .guide {
       background: #f0f9ff;
       border: 1px solid #bae6fd;
@@ -228,6 +211,12 @@
       line-height: 1.6;
     }
     .guide a { color: #0284c7; }
+    code {
+      background: #e0f2fe;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: Consolas, monospace;
+    }
   </style>
 </head>
 <body>
@@ -263,8 +252,8 @@
               </div>
               <div class="form-group">
                 <label>服务端口</label>
-                <input type="number" id="PORT">
-                <div class="hint">HTTP 服务监听端口</div>
+                <input type="number" id="PORT" value="3000">
+                <div class="hint">HTTP 服务监听端口，默认 3000</div>
               </div>
               <div class="form-group full">
                 <label>默认工作目录</label>
@@ -306,7 +295,6 @@
               <div class="form-group full">
                 <label>Claude 提示词覆盖</label>
                 <textarea id="CLAUDE_SYSTEM_PROMPT" rows="2"></textarea>
-                <div class="hint">留空则使用全局提示词</div>
               </div>
               <div class="form-group full">
                 <label>IFlow 提示词覆盖</label>
@@ -333,12 +321,18 @@
             <div class="grid">
               <div class="form-group full">
                 <label>可执行文件路径</label>
-                <input type="text" id="CLAUDE_CMD_PATH" placeholder="claude 或 D:/path/to/claude.exe">
+                <div class="input-with-action">
+                  <input type="text" id="CLAUDE_CMD_PATH" placeholder="claude 或完整路径">
+                  <button type="button" class="btn-small" onclick="detectPath('CLAUDE_CMD_PATH', 'claude')">检测</button>
+                </div>
                 <div class="hint">Claude CLI 的完整路径</div>
               </div>
               <div class="form-group full">
                 <label>Git 路径</label>
-                <input type="text" id="CLAUDE_GIT_BIN_PATH" placeholder="C:/Program Files/Git/bin/git.exe">
+                <div class="input-with-action">
+                  <input type="text" id="CLAUDE_GIT_BIN_PATH" placeholder="git 或完整路径">
+                  <button type="button" class="btn-small" onclick="detectPath('CLAUDE_GIT_BIN_PATH', 'git')">检测</button>
+                </div>
                 <div class="hint">Git 可执行文件路径 (Claude 需要)</div>
               </div>
               <div class="form-group full">
@@ -358,7 +352,10 @@
             <div class="grid">
               <div class="form-group full">
                 <label>命令路径</label>
-                <input type="text" id="IFLOW_PATH">
+                <div class="input-with-action">
+                  <input type="text" id="IFLOW_PATH" placeholder="iflow 或完整路径">
+                  <button type="button" class="btn-small" onclick="detectPath('IFLOW_PATH', 'iflow')">检测</button>
+                </div>
                 <div class="hint">IFlow CLI 命令或路径</div>
               </div>
               <div class="form-group full">
@@ -384,7 +381,10 @@
             <div class="grid">
               <div class="form-group full">
                 <label>命令路径</label>
-                <input type="text" id="CODEX_PATH">
+                <div class="input-with-action">
+                  <input type="text" id="CODEX_PATH" placeholder="codex 或完整路径">
+                  <button type="button" class="btn-small" onclick="detectPath('CODEX_PATH', 'codex')">检测</button>
+                </div>
               </div>
               <div class="form-group">
                 <label>模型</label>
@@ -429,7 +429,7 @@
                 <label>Client Secret</label>
                 <div class="input-with-action">
                   <input type="password" id="DINGTALK_CLIENT_SECRET">
-                  <button type="button" class="toggle-pwd" data-target="DINGTALK_CLIENT_SECRET">显示</button>
+                  <button type="button" class="btn-small toggle-pwd" data-target="DINGTALK_CLIENT_SECRET">显示</button>
                 </div>
               </div>
             </div>
@@ -452,7 +452,7 @@
                 <label>Client Secret</label>
                 <div class="input-with-action">
                   <input type="password" id="QQBOT_CLIENT_SECRET">
-                  <button type="button" class="toggle-pwd" data-target="QQBOT_CLIENT_SECRET">显示</button>
+                  <button type="button" class="btn-small toggle-pwd" data-target="QQBOT_CLIENT_SECRET">显示</button>
                 </div>
               </div>
               <div class="form-group">
@@ -489,7 +489,7 @@
                 <label>Secret Key</label>
                 <div class="input-with-action">
                   <input type="password" id="BAIDU_SPEECH_SECRET_KEY">
-                  <button type="button" class="toggle-pwd" data-target="BAIDU_SPEECH_SECRET_KEY">显示</button>
+                  <button type="button" class="btn-small toggle-pwd" data-target="BAIDU_SPEECH_SECRET_KEY">显示</button>
                 </div>
               </div>
             </div>
@@ -716,7 +716,7 @@
                 <label>加签 Secret</label>
                 <div class="input-with-action">
                   <input type="password" id="NOTIFICATION_DINGTALK_SECRET">
-                  <button type="button" class="toggle-pwd" data-target="NOTIFICATION_DINGTALK_SECRET">显示</button>
+                  <button type="button" class="btn-small toggle-pwd" data-target="NOTIFICATION_DINGTALK_SECRET">显示</button>
                 </div>
                 <div class="hint">安全设置中的加签密钥</div>
               </div>
@@ -731,11 +731,31 @@
               <span class="section-title">任务配置</span>
             </div>
             <div class="grid">
+              <div class="form-group">
+                <div class="check-group">
+                  <input type="checkbox" id="SCHEDULER_ENABLED">
+                  <span class="check-label">启用定时任务</span>
+                </div>
+                <div class="hint">开启后系统将按计划执行任务</div>
+              </div>
               <div class="form-group full">
                 <label>任务配置文件</label>
-                <input type="text" id="TASKS_FILE_PATH">
+                <input type="text" id="TASKS_FILE_PATH" placeholder="./scheduler/tasks.json">
                 <div class="hint">JSON 格式的任务定义文件路径</div>
               </div>
+            </div>
+          </div>
+          
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">任务管理命令</span>
+            </div>
+            <div class="guide">
+              通过机器人对话管理定时任务：<br>
+              <code>task add &lt;id&gt; &lt;间隔&gt; &lt;消息&gt;</code> - 创建任务<br>
+              <code>task rm &lt;id&gt;</code> - 删除任务<br>
+              <code>tasks</code> - 查看任务列表<br>
+              间隔格式：<code>30s</code> / <code>10m</code> / <code>1h</code> 或 cron 表达式
             </div>
           </div>
         </div>
@@ -753,38 +773,22 @@
 
   <script>
     const ALL_KEYS = [
-      // 核心
       'PROVIDER','PORT','DEFAULT_WORK_DIR','SYSTEM_PROMPTS_DIR','PROMPT_CHANNEL_AWARE','PROMPT_INCLUDE_SOURCE_CONTEXT',
       'SYSTEM_PROMPT','CLAUDE_SYSTEM_PROMPT','IFLOW_SYSTEM_PROMPT','CODEX_SYSTEM_PROMPT',
-      // Claude
       'CLAUDE_CMD_PATH','CLAUDE_GIT_BIN_PATH','CLAUDE_WORK_DIR',
-      // IFlow
       'IFLOW_PATH','IFLOW_INCLUDE_DIRS','IFLOW_WORK_DIR',
-      // Codex
       'CODEX_PATH','CODEX_MODEL','CODEX_MODEL_PROVIDER','CODEX_MAX_HISTORY_LENGTH','CODEX_SYSTEM_PROMPT_FILE','CODEX_WORK_DIR',
-      // 钉钉
       'DINGTALK_CLIENT_ID','DINGTALK_CLIENT_SECRET',
-      // QQ Bot
       'QQBOT_APP_ID','QQBOT_CLIENT_SECRET','QQBOT_COMMAND_PREFIX','QQBOT_SANDBOX','QQBOT_DEBUG',
-      // 百度
       'BAIDU_SPEECH_API_KEY','BAIDU_SPEECH_SECRET_KEY',
-      // 流式
       'STREAM_ENABLED','STREAM_INTERVAL','STREAM_MAX_LENGTH','STREAM_SHOW_THINKING','STREAM_SHOW_TOOLS','STREAM_SHOW_TIME','STREAM_USE_MARKDOWN',
-      // 机器人输出
       'ROBOT_OUTPUT_ENABLED','ROBOT_OUTPUT_PROFILE','ROBOT_MAX_CHARS','ROBOT_SHOW_THINKING','ROBOT_SHOW_NETWORK',
       'ROBOT_END_SUMMARY','ROBOT_DEDUP_WINDOW_MS','ROBOT_CHUNK_STRATEGY','ROBOT_SHOW_TYPES',
-      // 日志
       'LOG_LEVEL','LOG_COLORED','STRUCTURED_LOGGING',
-      // 审计
       'AUDIT_LOG_ENABLED','AUDIT_LOG_DIR','AUDIT_LOG_AGENT_IO','AUDIT_LOG_BOT_TRANSFORM','AUDIT_LOG_MAX_FIELD_LENGTH','AUDIT_LOG_REDACT_KEYS',
-      // 通知
       'NOTIFICATION_ENABLED','NOTIFICATION_TYPE','NOTIFICATION_DINGTALK_WEBHOOK','NOTIFICATION_DINGTALK_SECRET',
-      // 任务
-      'TASKS_FILE_PATH'
+      'SCHEDULER_ENABLED','TASKS_FILE_PATH'
     ]
-
-    // 密码字段列表
-    const SECRET_KEYS = ['DINGTALK_CLIENT_SECRET', 'QQBOT_CLIENT_SECRET', 'BAIDU_SPEECH_SECRET_KEY', 'NOTIFICATION_DINGTALK_SECRET']
 
     // 导航切换
     document.querySelectorAll('.nav-item').forEach(item => {
@@ -806,6 +810,31 @@
       }
     })
 
+    // 自动检测路径
+    async function detectPath(fieldId, command) {
+      try {
+        const res = await fetch('/api/detect')
+        const data = await res.json()
+        if (data.success && data.detected) {
+          const mapping = {
+            'CLAUDE_CMD_PATH': 'CLAUDE_CMD_PATH',
+            'CLAUDE_GIT_BIN_PATH': 'CLAUDE_GIT_BIN_PATH',
+            'IFLOW_PATH': 'IFLOW_PATH',
+            'CODEX_PATH': 'CODEX_PATH'
+          }
+          const detectedPath = data.detected[mapping[fieldId]]
+          if (detectedPath) {
+            document.getElementById(fieldId).value = detectedPath
+            showToast(`已检测到: ${detectedPath}`, 'success')
+          } else {
+            showToast(`未找到 ${command} 命令`, 'error')
+          }
+        }
+      } catch (e) {
+        showToast('检测失败: ' + e.message, 'error')
+      }
+    }
+
     async function loadConfig() {
       try {
         const res = await fetch('/api/config')
@@ -822,6 +851,13 @@
               }
             }
           })
+          
+          // 特殊处理：PORT 默认值
+          const portEl = document.getElementById('PORT')
+          if (portEl && !portEl.value) {
+            portEl.value = '3000'
+          }
+          
           updateNavStatus(data.config)
           showToast('已加载配置', 'success')
         }
@@ -838,7 +874,7 @@
         output: ['STREAM_ENABLED', 'ROBOT_OUTPUT_ENABLED'],
         log: ['LOG_LEVEL', 'AUDIT_LOG_ENABLED'],
         notify: ['NOTIFICATION_ENABLED'],
-        task: ['TASKS_FILE_PATH']
+        task: ['SCHEDULER_ENABLED']
       }
       
       Object.entries(panels).forEach(([panel, keys]) => {

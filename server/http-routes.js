@@ -1,5 +1,6 @@
 const fs = require('fs').promises
 const path = require('path')
+const { execSync } = require('child_process')
 
 function setupHttpRoutes(server) {
   // 静态文件服务
@@ -9,25 +10,29 @@ function setupHttpRoutes(server) {
   server.app.get('/api/config', async (req, res) => {
     try {
       const envPath = path.join(__dirname, '../.env')
-      const content = await fs.readFile(envPath, 'utf-8')
       const config = {}
       
-      content.split('\n').forEach(line => {
-        const trimmed = line.trim()
-        if (trimmed && !trimmed.startsWith('#')) {
-          const eqIndex = trimmed.indexOf('=')
-          if (eqIndex > 0) {
-            const key = trimmed.substring(0, eqIndex).trim()
-            let value = trimmed.substring(eqIndex + 1).trim()
-            // 移除引号
-            if ((value.startsWith('"') && value.endsWith('"')) ||
-                (value.startsWith("'") && value.endsWith("'"))) {
-              value = value.slice(1, -1)
+      try {
+        const content = await fs.readFile(envPath, 'utf-8')
+        content.split('\n').forEach(line => {
+          const trimmed = line.trim()
+          if (trimmed && !trimmed.startsWith('#')) {
+            const eqIndex = trimmed.indexOf('=')
+            if (eqIndex > 0) {
+              const key = trimmed.substring(0, eqIndex).trim()
+              let value = trimmed.substring(eqIndex + 1).trim()
+              // 移除引号
+              if ((value.startsWith('"') && value.endsWith('"')) ||
+                  (value.startsWith("'") && value.endsWith("'"))) {
+                value = value.slice(1, -1)
+              }
+              config[key] = value
             }
-            config[key] = value
           }
-        }
-      })
+        })
+      } catch (e) {
+        // .env 文件不存在，返回空配置
+      }
 
       res.json({ success: true, config })
     } catch (error) {
@@ -35,7 +40,7 @@ function setupHttpRoutes(server) {
     }
   })
 
-  // 保存配置
+  // 保存配置（自动创建 .env 文件）
   server.app.post('/api/config', async (req, res) => {
     try {
       const newConfig = req.body
@@ -46,7 +51,11 @@ function setupHttpRoutes(server) {
       try {
         content = await fs.readFile(envPath, 'utf-8')
       } catch (e) {
-        // 文件不存在，使用空内容
+        // 文件不存在，创建默认内容
+        content = `# OPRCLI 配置文件
+# 生成时间: ${new Date().toISOString()}
+
+`
       }
 
       const lines = content.split('\n')
@@ -81,6 +90,34 @@ function setupHttpRoutes(server) {
     } catch (error) {
       res.status(500).json({ success: false, error: error.message })
     }
+  })
+
+  // 自动检测命令路径
+  server.app.get('/api/detect', async (req, res) => {
+    const results = {}
+    
+    const commands = [
+      { key: 'CLAUDE_CMD_PATH', cmd: 'claude' },
+      { key: 'IFLOW_PATH', cmd: 'iflow' },
+      { key: 'CODEX_PATH', cmd: 'codex' },
+      { key: 'CLAUDE_GIT_BIN_PATH', cmd: 'git' },
+      { key: 'BASH_PATH', cmd: 'bash' }
+    ]
+
+    for (const { key, cmd } of commands) {
+      try {
+        const output = execSync(`where ${cmd}`, { encoding: 'utf-8', timeout: 5000 })
+        const paths = output.trim().split('\n').map(p => p.trim()).filter(Boolean)
+        results[key] = paths.length > 0 ? paths[0] : null
+        if (paths.length > 1) {
+          results[key + '_ALL'] = paths
+        }
+      } catch (e) {
+        results[key] = null
+      }
+    }
+
+    res.json({ success: true, detected: results })
   })
 
   // 重启服务
