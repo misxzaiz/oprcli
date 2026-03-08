@@ -165,19 +165,23 @@ class SessionScanner {
 
       for (const entry of entries) {
         if (entry.isFile() && entry.name.startsWith('rollout-') && entry.name.endsWith('.jsonl')) {
-          const sessionId = entry.name.replace('.jsonl', '');
+          const fullFileName = entry.name.replace('.jsonl', '');
 
-          // 提取 ULID 部分作为短 ID（格式：rollout-{timestamp}-{ulid}.jsonl）
-          const ulidMatch = sessionId.match(/rollout-.*-([0-9a-f]{8})[0-9a-f-]*$/);
-          const shortId = ulidMatch ? ulidMatch[1] : sessionId.substring(0, 12);
+          // 提取 ULID 作为 sessionId（格式：rollout-{timestamp}-{ulid}.jsonl）
+          // ULID 格式：8-4-4-4-12 (例如：019cbd93-66a8-7c70-a39e-929f1fed8bdb)
+          // codex resume 命令需要 ULID 而非完整文件名
+          const ulidMatch = fullFileName.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+          const sessionId = ulidMatch ? ulidMatch[1] : fullFileName;
+          const shortId = sessionId.substring(0, 8);  // 用于显示的短 ID
 
           const filePath = path.join(datePath, entry.name);
           const stat = fs.statSync(filePath);
           const preview = this._extractPreview(filePath);
 
           sessions.push({
-            id: sessionId,
-            shortId: shortId,  // 添加短 ID 用于显示
+            id: sessionId,        // ULID，供 codex resume 使用
+            shortId: shortId,     // 短 ID，用于显示
+            fullFileName,         // 完整文件名（调试用）
             mtime: stat.mtime.getTime(),
             size: stat.size,
             preview

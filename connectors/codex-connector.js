@@ -134,19 +134,13 @@ class CodexConnector extends BaseConnector {
 
   /**
    * 构建命令行参数
-   * 使用 `codex exec` 非交互模式
+   * 使用 `codex exec` 非交互模式（codex resume 是交互式 TUI，无法用于非交互环境）
    */
   _buildCommandArgs(message, isResume, sessionId = null) {
-    // 使用 exec 非交互模式，输出 JSONL 格式
+    // 始终使用 exec 非交互模式
     let args = ['exec', '--json', '--skip-git-repo-check'];
 
-    // 如果是恢复会话
-    if (isResume && sessionId) {
-      // Codex exec 暂不支持会话恢复，需要重新创建
-      // 可以考虑使用会话文件或其他机制
-    }
-
-    // 消息作为参数传递（而不是 stdin）
+    // 消息作为参数传递
     if (message) {
       args.push(message);
     }
@@ -156,6 +150,7 @@ class CodexConnector extends BaseConnector {
 
   /**
    * 构建完整的消息内容（包含系统提示词和历史上下文）
+   * 恢复会话时，从 JSONL 文件读取历史并注入到消息中
    */
   _buildFullMessage(message, isResume, sessionId = null) {
     let finalMessage = message;
@@ -175,16 +170,156 @@ class CodexConnector extends BaseConnector {
         this.logger.log('[CodexConnector] 已添加系统提示词到 prompt（首次会话）');
       }
     } else if (isResume && sessionId) {
-      // 🆕 继续会话时，添加历史上下文
-      const history = this.conversationHistory.get(sessionId);
+      // 🆕 恢复会话时，从 JSONL 文件读取历史上下文
+      const history = this._loadHistoryFromFile(sessionId);
       if (history && history.length > 0) {
         const context = this._buildConversationContext(history, message);
         finalMessage = context;
-        this.logger.log(`[CodexConnector] 已添加历史上下文 (${history.length} 条消息)`);
+        this.logger.log(`[CodexConnector] 已从文件加载历史上下文 (${history.length} 条消息)`);
+      } else {
+        // 降级：尝试从内存中获取历史
+        const memHistory = this.conversationHistory.get(sessionId);
+        if (memHistory && memHistory.length > 0) {
+          const context = this._buildConversationContext(memHistory, message);
+          finalMessage = context;
+          this.logger.log(`[CodexConnector] 已从内存加载历史上下文 (${memHistory.length} 条消息)`);
+        }
       }
     }
 
     return finalMessage;
+  }
+
+  /**
+   * 从 Codex JSONL 文件读取历史对话
+   * @param {string} sessionId - 会话 ID (ULID 格式)
+   * @returns {Array} 历史消息列表 [{role, content, timestamp}]
+   */
+  _loadHistoryFromFile(sessionId) {
+    const os = require('os');
+    const path = require('path');
+
+    // Codex 会话文件路径：~/.codex/sessions/{yyyy}/{MM}/{dd}/rollout-{ts}-{ulid}.jsonl
+    // 需要查找匹配 sessionId (ULID) 的文件
+    const codexDir = path.join(os.homedir(), '.codex', 'sessions');
+
+    if (!fs.existsSync(codexDir)) {
+      this.logger.log('[CodexConnector] Codex sessions 目录不存在');
+      return null;
+    }
+
+    // 遍历最近 7 天的目录查找匹配的会话文件
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+
+      const datePath = path.join(
+        codexDir,
+        String(date.getFullYear()).padStart(4, '0'),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0')
+      );
+
+      if (!fs.existsSync(datePath)) continue;
+
+      const files = fs.readdirSync(datePath);
+      const targetFile = files.find(f => f.includes(sessionId) && f.endsWith('.jsonl'));
+
+      if (targetFile) {
+        const filePath = path.join(datePath, targetFile);
+        this.logger.log(`[CodexConnector] 找到会话文件: ${filePath}`);
+        return this._parseHistoryJsonl(filePath);
+      }
+    }
+
+    this.logger.log(`[CodexConnector] 未找到会话文件: ${sessionId}`);
+    return null;
+  }
+
+  /**
+   * 解析 Codex JSONL 文件提取历史对话
+   * @param {string} filePath - JSONL 文件路径
+   * @returns {Array} 历史消息列表
+   */
+  _parseHistoryJsonl(filePath) {
+    const history = [];
+
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lines = content.split('\n').filter(Boolean);
+
+      for (const line of lines) {
+        try {
+          const data = JSON.parse(line);
+
+          // 解析用户消息
+          if (data.type === 'response_item' && data.payload?.role === 'user') {
+            const content = data.payload.content;
+            if (Array.isArray(content)) {
+              const text = content
+                .filter(c => c.type === 'input_text')
+                .map(c => c.text)
+                .join('');
+
+              // 跳过系统注入的消息
+              if (text && !this._isSystemMessage(text)) {
+                history.push({
+                  role: 'user',
+                  content: text,
+                  timestamp: data.timestamp
+                });
+              }
+            }
+          }
+
+          // 解析助手消息
+          if (data.type === 'response_item' && data.payload?.role === 'assistant') {
+            const content = data.payload.content;
+            if (Array.isArray(content)) {
+              const text = content
+                .filter(c => c.type === 'output_text')
+                .map(c => c.text)
+                .join('');
+
+              if (text) {
+                history.push({
+                  role: 'assistant',
+                  content: text,
+                  timestamp: data.timestamp
+                });
+              }
+            }
+          }
+        } catch (parseError) {
+          // 跳过解析失败的行
+          continue;
+        }
+      }
+
+      return history;
+    } catch (err) {
+      this.logger.error(`[CodexConnector] 解析历史文件失败: ${err.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * 判断是否为系统消息（跳过系统注入的内容）
+   */
+  _isSystemMessage(content) {
+    const systemPatterns = [
+      '[RUNTIME_CONTEXT]',
+      '[MODE_PROMPT]',
+      '<permissions instructions>',
+      '<INSTRUCTIONS>',
+      '<environment_context>',
+      '<command-',
+      '</command',
+      '[system-reminder]'
+    ];
+
+    return systemPatterns.some(pattern => content.includes(pattern));
   }
 
   /**
