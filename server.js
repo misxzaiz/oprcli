@@ -1126,7 +1126,7 @@ class UnifiedServer {
         request_message: contextualMessage
       })
 
-      this.logger.debug(platformName, '使用模型', { provider, mode, hasSessionId: !!sessionId })
+      this.logger.debug(platformName, '使用模型', { provider, promptMode: runtimeContext.promptMode, hasCustomPrompt: !!runtimeContext.customPrompt, hasSessionId: !!sessionId })
 
       // 4. 获取connector
       const connector = this.connectors.get(provider)
@@ -1300,7 +1300,7 @@ class UnifiedServer {
         connector.onSessionIdUpdate((realSessionId) => {
           console.log(`[DEBUG] 收到 sessionIdUpdateCallback: ${realSessionId}, conversationId: ${conversationId}`)
           sessionId = realSessionId
-          platform.setSession(conversationId, realSessionId, provider, { mode })
+          platform.setSession(conversationId, realSessionId, provider, { ...session })
           this.logger.success('SESSION', `✅ 通过回调保存SessionID: ${realSessionId}`)
           this.auditLogger.logAgent('agent.session.saved', {
             trace_id: traceId,
@@ -1308,7 +1308,8 @@ class UnifiedServer {
             conversation_id: conversationId,
             session_id: realSessionId,
             provider,
-            mode,
+            promptMode: session?.promptMode,
+            hasCustomPrompt: !!session?.customPrompt,
             source: 'connector_callback'
           })
         })
@@ -1336,7 +1337,7 @@ class UnifiedServer {
           const startResult = await connector.startSession(contextualMessage, options)
           if (startResult?.sessionId) {
             sessionId = startResult.sessionId
-            platform.setSession(conversationId, sessionId, provider, { mode })
+            platform.setSession(conversationId, sessionId, provider, { ...session })
             this.logger.success('SESSION', `✅ 通过 startSession 返回值保存 SessionID: ${sessionId}`)
             this.auditLogger.logAgent('agent.session.saved', {
               trace_id: traceId,
@@ -1344,7 +1345,8 @@ class UnifiedServer {
               conversation_id: conversationId,
               session_id: sessionId,
               provider,
-              mode,
+              promptMode: session?.promptMode,
+              hasCustomPrompt: !!session?.customPrompt,
               source: 'start_session_result'
             })
           }
