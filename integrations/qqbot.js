@@ -156,36 +156,85 @@ class QQBotIntegration extends BasePlatformIntegration {
   }
 
   /**
-   * 提取消息内容（支持图片附件，自动下载）
+   * 提取消息内容（支持图片、文件、语音、视频附件，自动下载）
    * @param {object} rawMessage - 原始消息
    * @returns {Promise<object>} { content: string, attachments: array }
    */
   async extractContent(rawMessage) {
     const content = rawMessage.content?.trim() || ''
 
-    // 提取图片附件并下载到本地
+    // 提取附件并下载到本地
     const attachments = []
     if (rawMessage.attachments && Array.isArray(rawMessage.attachments)) {
       for (let i = 0; i < rawMessage.attachments.length; i++) {
         const att = rawMessage.attachments[i]
-        if (att.content_type === 'image' || att.content_type?.startsWith('image/')) {
-          const imageUrl = att.url || att.tencent_url
+        const contentType = att.content_type || ''
+        const fileUrl = att.url || att.tencent_url
 
-          // 尝试下载图片到本地
-          let localPath = null
-          if (imageUrl) {
+        if (!fileUrl) continue
+
+        let attachmentType = null
+        let localPath = null
+        let skipDownload = false
+
+        // 1. 图片
+        if (contentType === 'image' || contentType.startsWith('image/')) {
+          attachmentType = 'image'
+          try {
+            localPath = await this._downloadFile(fileUrl, i, 'image', contentType)
+            this.logger.info('QQBOT', `✅ 图片已下载: ${localPath}`)
+          } catch (error) {
+            this.logger.warning('QQBOT', `⚠️ 图片下载失败: ${error.message}`)
+          }
+        }
+        // 2. 文件（文档类）
+        else if (contentType.startsWith('application/') || contentType.startsWith('text/')) {
+          attachmentType = 'file'
+          try {
+            localPath = await this._downloadFile(fileUrl, i, 'file', contentType, att.file_name)
+            this.logger.info('QQBOT', `✅ 文件已下载: ${localPath}`)
+          } catch (error) {
+            this.logger.warning('QQBOT', `⚠️ 文件下载失败: ${error.message}`)
+          }
+        }
+        // 3. 音频
+        else if (contentType.startsWith('audio/')) {
+          attachmentType = 'audio'
+          try {
+            localPath = await this._downloadFile(fileUrl, i, 'audio', contentType)
+            this.logger.info('QQBOT', `✅ 音频已下载: ${localPath}`)
+          } catch (error) {
+            this.logger.warning('QQBOT', `⚠️ 音频下载失败: ${error.message}`)
+          }
+        }
+        // 4. 视频（限制大小）
+        else if (contentType.startsWith('video/')) {
+          const fileSize = att.file_size || 0
+          const maxSize = 50 * 1024 * 1024 // 50MB
+
+          if (fileSize > maxSize) {
+            this.logger.warning('QQBOT', `⚠️ 视频文件过大 (${(fileSize / 1024 / 1024).toFixed(2)}MB)，超过限制 50MB`)
+            skipDownload = true
+          } else {
+            attachmentType = 'video'
             try {
-              localPath = await this._downloadImage(imageUrl, i)
-              this.logger.info('QQBOT', `✅ 图片已下载: ${localPath}`)
+              localPath = await this._downloadFile(fileUrl, i, 'video', contentType)
+              this.logger.info('QQBOT', `✅ 视频已下载: ${localPath}`)
             } catch (error) {
-              this.logger.warning('QQBOT', `⚠️ 图片下载失败: ${error.message}`)
+              this.logger.warning('QQBOT', `⚠️ 视频下载失败: ${error.message}`)
             }
           }
+        }
 
+        // 添加到附件列表
+        if (attachmentType) {
           attachments.push({
-            type: 'image',
-            url: imageUrl,
-            localPath: localPath, // 本地路径
+            type: attachmentType,
+            url: fileUrl,
+            localPath: localPath,
+            contentType: contentType,
+            fileName: att.file_name || null,
+            fileSize: att.file_size || null,
             content: att.content // base64 数据（如果有）
           })
         }
@@ -196,14 +245,18 @@ class QQBotIntegration extends BasePlatformIntegration {
   }
 
   /**
-   * 下载图片到本地 temp 目录
-   * @param {string} imageUrl - 图片 URL
-   * @param {number} index - 图片索引
+   * 下载文件到本地 temp 目录（通用方法）
+   * @param {string} fileUrl - 文件 URL
+   * @param {number} index - 文件索引
+   * @param {string} fileType - 文件类型 (image/file/audio/video)
+   * @param {string} contentType - Content-Type header
+   * @param {string} originalFileName - 原始文件名（可选）
    * @returns {Promise<string>} 本地文件路径
    * @private
    */
-  async _downloadImage(imageUrl, index = 0) {
+  async _downloadFile(fileUrl, index = 0, fileType = 'file', contentType = '', originalFileName = null) {
     const https = require('https')
+    const http = require('http')
     const fs = require('fs')
     const path = require('path')
     const url = require('url')
@@ -217,23 +270,36 @@ class QQBotIntegration extends BasePlatformIntegration {
 
       // 生成文件名
       const timestamp = Date.now()
-      const filename = `qq-image-${timestamp}-${index}.jpg`
+      let fileExt = this._getFileExtension(contentType, originalFileName)
+      let filename
+
+      if (originalFileName) {
+        // 使用原始文件名
+        const nameWithoutExt = path.parse(originalFileName).name
+        filename = `qq-${fileType}-${timestamp}-${index}-${nameWithoutExt}${fileExt}`
+      } else {
+        // 使用默认文件名
+        filename = `qq-${fileType}-${timestamp}-${index}${fileExt}`
+      }
+
       const filePath = path.join(tempDir, filename)
 
-      const parsedUrl = url.parse(imageUrl)
+      const parsedUrl = url.parse(fileUrl)
+      const isHttps = parsedUrl.protocol === 'https:'
+      const requestLib = isHttps ? https : http
 
       const options = {
         hostname: parsedUrl.hostname,
-        port: 443,
+        port: parsedUrl.port || (isHttps ? 443 : 80),
         path: parsedUrl.path,
         method: 'GET',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         },
-        timeout: 15000 // 15 秒超时
+        timeout: 30000 // 30 秒超时（文件可能较大）
       }
 
-      const req = https.request(options, (res) => {
+      const req = requestLib.request(options, (res) => {
         if (res.statusCode !== 200) {
           reject(new Error(`HTTP ${res.statusCode}`))
           return
@@ -259,11 +325,51 @@ class QQBotIntegration extends BasePlatformIntegration {
 
       req.on('timeout', () => {
         req.destroy()
-        reject(new Error('请求超时（15秒）'))
+        reject(new Error('请求超时（30秒）'))
       })
 
       req.end()
     })
+  }
+
+  /**
+   * 根据 Content-Type 或原始文件名获取文件扩展名
+   * @param {string} contentType - Content-Type header
+   * @param {string} originalFileName - 原始文件名
+   * @returns {string} 文件扩展名（包含点号）
+   * @private
+   */
+  _getFileExtension(contentType = '', originalFileName = null) {
+    // 优先使用原始文件名的扩展名
+    if (originalFileName) {
+      const ext = path.parse(originalFileName).ext
+      if (ext) return ext
+    }
+
+    // 根据 Content-Type 推断扩展名
+    const mimeMap = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/gif': '.gif',
+      'image/webp': '.webp',
+      'text/plain': '.txt',
+      'text/markdown': '.md',
+      'text/csv': '.csv',
+      'application/json': '.json',
+      'application/xml': '.xml',
+      'application/pdf': '.pdf',
+      'application/zip': '.zip',
+      'application/x-tar': '.tar',
+      'application/x-gzip': '.gz',
+      'audio/mpeg': '.mp3',
+      'audio/wav': '.wav',
+      'audio/ogg': '.ogg',
+      'video/mp4': '.mp4',
+      'video/webm': '.webm',
+      'video/quicktime': '.mov'
+    }
+
+    return mimeMap[contentType] || '.' + contentType.split('/')[1] || '.bin'
   }
 
   /**

@@ -473,28 +473,69 @@ class UnifiedServer {
     const modePrompt = await config.getModePrompt(runtimeContext.provider, runtimeContext.mode, runtimeContext.sessionWorkDir)
     const modePromptBlock = modePrompt ? `[MODE_PROMPT]\n${modePrompt}\n[/MODE_PROMPT]` : ''
 
-    // 构建图片附件块（优先使用本地路径）
+    // 构建附件块（支持图片、文件、音频、视频）
     let attachmentBlock = ''
     if (attachments && attachments.length > 0) {
-      const imageInfos = attachments
-        .filter(a => a.type === 'image')
-        .map((a, i) => {
-          if (a.localPath) {
-            // 优先使用已下载的本地文件
-            return `[图片${i + 1}] 本地文件: ${a.localPath}`
-          } else if (a.content) {
-            // 有 base64 数据
-            return `[图片${i + 1}] base64数据: ${a.content.substring(0, 100)}...`
-          } else if (a.url) {
-            // 只有 URL
-            return `[图片${i + 1}] URL: ${a.url}`
-          }
-          return null
-        })
-        .filter(Boolean)
+      const attachmentInfos = []
 
-      if (imageInfos.length > 0) {
-        attachmentBlock = `\n\n[ATTACHMENTS]\n用户发送了 ${imageInfos.length} 张图片:\n${imageInfos.join('\n')}\n[/ATTACHMENTS]`
+      // 按类型分组
+      const images = attachments.filter(a => a.type === 'image')
+      const files = attachments.filter(a => a.type === 'file')
+      const audios = attachments.filter(a => a.type === 'audio')
+      const videos = attachments.filter(a => a.type === 'video')
+
+      // 处理图片
+      if (images.length > 0) {
+        images.forEach((a, i) => {
+          if (a.localPath) {
+            attachmentInfos.push(`[图片${i + 1}] 本地文件: ${a.localPath}`)
+          } else if (a.url) {
+            attachmentInfos.push(`[图片${i + 1}] URL: ${a.url}`)
+          }
+        })
+      }
+
+      // 处理文件
+      if (files.length > 0) {
+        files.forEach((a, i) => {
+          const fileName = a.fileName || `文件${i + 1}`
+          const sizeStr = a.fileSize ? ` (${(a.fileSize / 1024).toFixed(2)} KB)` : ''
+          if (a.localPath) {
+            attachmentInfos.push(`[文件${i + 1}] ${fileName}${sizeStr}\n    本地路径: ${a.localPath}`)
+          } else if (a.url) {
+            attachmentInfos.push(`[文件${i + 1}] ${fileName}${sizeStr}\n    URL: ${a.url}`)
+          }
+        })
+      }
+
+      // 处理音频
+      if (audios.length > 0) {
+        audios.forEach((a, i) => {
+          const fileName = a.fileName || `音频${i + 1}`
+          const sizeStr = a.fileSize ? ` (${(a.fileSize / 1024).toFixed(2)} KB)` : ''
+          if (a.localPath) {
+            attachmentInfos.push(`[音频${i + 1}] ${fileName}${sizeStr}\n    本地路径: ${a.localPath} (已保存，暂不支持语音识别)`)
+          } else if (a.url) {
+            attachmentInfos.push(`[音频${i + 1}] ${fileName}${sizeStr}\n    URL: ${a.url} (暂不支持语音识别)`)
+          }
+        })
+      }
+
+      // 处理视频
+      if (videos.length > 0) {
+        videos.forEach((a, i) => {
+          const fileName = a.fileName || `视频${i + 1}`
+          const sizeStr = a.fileSize ? ` (${(a.fileSize / 1024 / 1024).toFixed(2)} MB)` : ''
+          if (a.localPath) {
+            attachmentInfos.push(`[视频${i + 1}] ${fileName}${sizeStr}\n    本地路径: ${a.localPath} (已保存，AI 无法分析视频内容)`)
+          } else if (a.url) {
+            attachmentInfos.push(`[视频${i + 1}] ${fileName}${sizeStr}\n    URL: ${a.url} (AI 无法分析视频内容)`)
+          }
+        })
+      }
+
+      if (attachmentInfos.length > 0) {
+        attachmentBlock = `\n\n[ATTACHMENTS]\n用户发送了 ${attachments.length} 个附件:\n${attachmentInfos.join('\n')}\n[/ATTACHMENTS]`
       }
     }
 
