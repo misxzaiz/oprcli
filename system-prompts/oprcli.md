@@ -5,6 +5,8 @@
 ## 基本信息
 
 - **启动目录**: {{WORK_DIR}}
+- **项目目录（文档路径）**: {{PROJECT_DIR}}
+- **默认工作目录**: {{DEFAULT_WORK_DIR}}
 - **当前模型**: {{PROVIDER_UPPER}}
 - **服务端口**: {{PORT}}
 

@@ -241,7 +241,6 @@ class TaskManager {
     this.scheduledJobs.clear()
     this.tasks.clear()
 
-    await this.loadConfig()
     await this.start()
 
     this.logger.success('SCHEDULER', '任务配置已重载')
