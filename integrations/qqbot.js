@@ -7,6 +7,11 @@
 
 const BasePlatformIntegration = require('./base-platform-integration')
 const AuditLogger = require('./audit-logger')
+const path = require('path')
+const fs = require('fs')
+const https = require('https')
+const http = require('http')
+const url = require('url')
 
 class QQBotIntegration extends BasePlatformIntegration {
   constructor(config, logger) {
@@ -287,12 +292,6 @@ class QQBotIntegration extends BasePlatformIntegration {
    * @private
    */
   async _downloadFile(fileUrl, index = 0, fileType = 'file', contentType = '', originalFileName = null) {
-    const https = require('https')
-    const http = require('http')
-    const fs = require('fs')
-    const path = require('path')
-    const url = require('url')
-
     return new Promise((resolve, reject) => {
       // 确保目录存在
       const tempDir = 'D:/space/temp'
