@@ -48,7 +48,7 @@ class RobotEventFormatter {
 
     if (eventType === 'tool_result') {
       const ok = event?.ok === false || event?.success === false ? '失败' : '完成'
-      const output = this._trim(event?.output || extractedText || event?.result || event?.text || '')
+      const output = this._safeJson(event?.output || extractedText || event?.result || event?.text || '')
       const outputLine = output ? `\n📤 结果：${output}` : ''
       return `🧩 工具结果：${ok}${outputLine}`
     }
