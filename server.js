@@ -1168,7 +1168,6 @@ class UnifiedServer {
     await this.scheduler.start()
 
     // 显示配置警告（如有）
-    const validation = config.validate()
     if (validation.warnings.length > 0) {
       this.logger.log('\n⚠️  配置警告:')
       validation.warnings.forEach(w => {
