@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "tasks": [
+    {
+      "id": "example-task",
+      "name": "示例任务",
+      "schedule": "0 9 * * *",
+      "message": "这是一个示例定时任务消息",
+      "provider": "iflow",
+      "enabled": false
+    }
+  ]
+}

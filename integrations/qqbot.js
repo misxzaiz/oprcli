@@ -323,7 +323,7 @@ class QQBotIntegration extends BasePlatformIntegration {
   async _downloadFile(fileUrl, index = 0, fileType = 'file', contentType = '', originalFileName = null) {
     return new Promise((resolve, reject) => {
       // 确保目录存在
-      const tempDir = 'D:/space/temp'
+      const tempDir = path.join(__dirname, '../temp')
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true })
       }
