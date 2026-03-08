@@ -49,6 +49,7 @@ class AgentEngine {
         });
 
         console.log('[DEBUG] LLM 响应成功');
+        console.log('[DEBUG] 响应内容:', response);
         console.log('[DEBUG] 响应内容长度:', response.content?.length || 0);
         console.log('[DEBUG] 工具调用数:', response.toolCalls?.length || 0);
 
