@@ -4,6 +4,8 @@ async function dispatchCommand(server, command, conversationId, replyTarget, pla
       return server._handleSwitch(command.provider, conversationId, replyTarget, platform, originalMessage, type, command.arg)
     case 'interrupt':
       return server._handleInterrupt(conversationId, replyTarget, platform, originalMessage, type)
+    case 'restart':
+      return server._handleRestart(conversationId, replyTarget, platform, originalMessage, type)
     case 'status':
       return server._handleStatus(conversationId, replyTarget, platform, originalMessage, type)
     case 'help':

@@ -51,23 +51,67 @@ QQBOT_UIN=机器人QQ号
 QQBOT_TOKEN=机器人Token
 ```
 
-### 启动
+## 运行模式
+
+支持两种运行模式：
+
+### 模式一：npm（简单模式）
+
+适合开发测试，手动启动。
 
 ```bash
 npm start
 ```
 
+### 模式二：PM2（生产模式）
+
+适合生产环境，支持自动重启、日志管理、开机自启。
+
+```bash
+# 安装 PM2
+npm install -g pm2
+npm install -g pm2-windows-startup
+
+# 启动项目
+pm2 start ecosystem.config.js
+
+# 设置开机自启
+pm2-startup install
+pm2 save
+```
+
+**PM2 常用命令：**
+
+| 命令 | 说明 |
+|------|------|
+| `pm2 list` | 查看所有进程 |
+| `pm2 restart oprcli` | 重启应用 |
+| `pm2 stop oprcli` | 停止应用 |
+| `pm2 logs oprcli` | 查看日志 |
+| `pm2 monit` | 监控面板 |
+| `pm2 save` | 保存进程列表 |
+
+**模式对比：**
+
+| 特性 | npm | PM2 |
+|------|-----|-----|
+| 重启命令 | ❌ 需手动重启 | ✅ 支持 |
+| 开机自启 | ❌ | ✅ |
+| 崩溃自动恢复 | ❌ | ✅ |
+| 日志管理 | ❌ | ✅ |
+| 进程监控 | ❌ | ✅ |
+
 服务运行在 `http://localhost:12480`
 
-## 命令
+## 机器人命令
 
 发送 `help` 查看所有可用命令。
 
 常用命令：
 - `claude` `iflow` `codex` `agent` - 切换 AI 提供商
-- `mode {mode}` - 切换提示词模式
 - `path {path}` - 修改工作目录
 - `tasks` - 定时任务管理
+- `restart` `rs` `重启` - 重启服务（仅 PM2 模式支持）
 
 ## 项目结构
 

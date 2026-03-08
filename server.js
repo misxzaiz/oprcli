@@ -270,6 +270,31 @@ class UnifiedServer {
     return { status: 'SUCCESS' }
   }
 
+  async _handleRestart(conversationId, replyTarget, platform, originalMessage, type) {
+    try {
+      await platform.send(replyTarget, '🔄 正在重启服务...', originalMessage, type)
+      
+      const { exec } = require('child_process')
+      
+      this.logger.info('SERVER', 'PM2 restart triggered')
+      
+      // PM2 重启命令
+      exec('pm2 restart oprcli', (error, stdout, stderr) => {
+        if (error) {
+          this.logger.error('SERVER', 'PM2 restart error:', error.message)
+        } else {
+          this.logger.info('SERVER', 'PM2 restart success:', stdout)
+        }
+      })
+      
+    } catch (error) {
+      this.logger.error('SERVER', 'Restart failed:', error)
+      await platform.send(replyTarget, `❌ 重启失败: ${error.message}`, originalMessage, type)
+    }
+    
+    return { status: 'SUCCESS' }
+  }
+
   async _handleStatus(conversationId, replyTarget, platform, originalMessage, type) {
     const session = platform.getSession(conversationId)
     const provider = session?.provider || this.defaultProvider

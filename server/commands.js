@@ -13,6 +13,11 @@ const COMMANDS = {
   '停止': { type: 'interrupt' },
   stop: { type: 'interrupt' },
 
+  // 重启命令
+  restart: { type: 'restart' },
+  rs: { type: 'restart' },
+  '重启': { type: 'restart' },
+
   // 状态和帮助
   status: { type: 'status' },
   '状态': { type: 'status' },
