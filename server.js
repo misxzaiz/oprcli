@@ -513,10 +513,13 @@ class UnifiedServer {
         audios.forEach((a, i) => {
           const fileName = a.fileName || `音频${i + 1}`
           const sizeStr = a.fileSize ? ` (${(a.fileSize / 1024).toFixed(2)} KB)` : ''
-          if (a.localPath) {
-            attachmentInfos.push(`[音频${i + 1}] ${fileName}${sizeStr}\n    本地路径: ${a.localPath} (已保存，暂不支持语音识别)`)
+          if (a.transcript) {
+            // 语音识别成功，直接使用识别结果
+            attachmentInfos.push(`[语音消息] ${a.transcript}`)
+          } else if (a.localPath) {
+            attachmentInfos.push(`[音频${i + 1}] ${fileName}${sizeStr}\n    本地路径: ${a.localPath} (语音识别未启用或失败)`)
           } else if (a.url) {
-            attachmentInfos.push(`[音频${i + 1}] ${fileName}${sizeStr}\n    URL: ${a.url} (暂不支持语音识别)`)
+            attachmentInfos.push(`[音频${i + 1}] ${fileName}${sizeStr}\n    URL: ${a.url} (语音识别未启用或失败)`)
           }
         })
       }

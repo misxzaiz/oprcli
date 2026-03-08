@@ -12,6 +12,7 @@ const fs = require('fs')
 const https = require('https')
 const http = require('http')
 const url = require('url')
+const { speechToText } = require('../utils/baidu-speech')
 
 class QQBotIntegration extends BasePlatformIntegration {
   constructor(config, logger) {
@@ -181,6 +182,7 @@ class QQBotIntegration extends BasePlatformIntegration {
         let attachmentType = null
         let localPath = null
         let skipDownload = false
+        let transcript = null // 语音识别结果
 
         // 1. 图片
         if (contentType === 'image' || contentType.startsWith('image/')) {
@@ -200,6 +202,19 @@ class QQBotIntegration extends BasePlatformIntegration {
             const voiceUrl = att.voice_wav_url || fileUrl
             localPath = await this._downloadFile(voiceUrl, i, 'audio', 'audio/wav', att.filename)
             this.logger.info('QQBOT', `✅ 语音已下载: ${localPath}`)
+            
+            // 尝试语音识别
+            try {
+              const sttResult = await speechToText(localPath)
+              if (sttResult.success) {
+                transcript = sttResult.text
+                this.logger.info('QQBOT', `🎤 语音识别成功: ${transcript}`)
+              } else {
+                this.logger.warning('QQBOT', `⚠️ 语音识别失败: ${sttResult.error}`)
+              }
+            } catch (sttError) {
+              this.logger.warning('QQBOT', `⚠️ 语音识别异常: ${sttError.message}`)
+            }
           } catch (error) {
             this.logger.warning('QQBOT', `⚠️ 语音下载失败: ${error.message}`)
           }
@@ -230,6 +245,19 @@ class QQBotIntegration extends BasePlatformIntegration {
           try {
             localPath = await this._downloadFile(fileUrl, i, 'audio', contentType)
             this.logger.info('QQBOT', `✅ 音频已下载: ${localPath}`)
+            
+            // 尝试语音识别
+            try {
+              const sttResult = await speechToText(localPath)
+              if (sttResult.success) {
+                transcript = sttResult.text
+                this.logger.info('QQBOT', `🎤 语音识别成功: ${transcript}`)
+              } else {
+                this.logger.warning('QQBOT', `⚠️ 语音识别失败: ${sttResult.error}`)
+              }
+            } catch (sttError) {
+              this.logger.warning('QQBOT', `⚠️ 语音识别异常: ${sttError.message}`)
+            }
           } catch (error) {
             this.logger.warning('QQBOT', `⚠️ 音频下载失败: ${error.message}`)
           }
@@ -272,7 +300,8 @@ class QQBotIntegration extends BasePlatformIntegration {
             contentType: contentType,
             fileName: att.file_name || null,
             fileSize: att.file_size || null,
-            content: att.content // base64 数据（如果有）
+            content: att.content, // base64 数据（如果有）
+            transcript: transcript // 语音识别结果
           })
         }
       }
