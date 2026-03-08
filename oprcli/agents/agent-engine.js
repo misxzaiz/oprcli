@@ -15,6 +15,9 @@ class AgentEngine {
    * 执行 Agent 任务
    */
   async execute(userMessage, onEvent) {
+    console.log('[DEBUG] ===== AgentEngine.execute 开始 =====');
+    console.log('[DEBUG] 用户消息长度:', userMessage.length);
+
     const messages = [
       {
         role: 'system',
@@ -26,6 +29,11 @@ class AgentEngine {
       }
     ];
 
+    console.log('[DEBUG] 系统提示词长度:', messages[0].content.length);
+    console.log('[DEBUG] 可用工具数:', this.toolManager.getTools().length);
+    console.log('[DEBUG] LLM Provider:', this.llmProvider.serviceName || 'unknown');
+    console.log('[DEBUG] 模型:', this.llmProvider.model || 'unknown');
+
     let iteration = 0;
     const startTime = Date.now();
 
@@ -33,12 +41,16 @@ class AgentEngine {
       while (iteration < this.maxIterations) {
         iteration++;
 
-        this.logger.debug(`[Agent] Iteration ${iteration}/${this.maxIterations}`);
+        console.log(`[DEBUG] ========== 迭代 ${iteration}/${this.maxIterations} ==========`);
+        console.log('[DEBUG] 正在调用 LLM...');
 
-        // 1. 调用 LLM
         const response = await this.llmProvider.chat(messages, {
           tools: this.toolManager.getTools()
         });
+
+        console.log('[DEBUG] LLM 响应成功');
+        console.log('[DEBUG] 响应内容长度:', response.content?.length || 0);
+        console.log('[DEBUG] 工具调用数:', response.toolCalls?.length || 0);
 
         // 2. 添加助手响应到消息历史
         const assistantMessage = {

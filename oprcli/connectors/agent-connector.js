@@ -81,32 +81,37 @@ class AgentConnector extends BaseConnector {
   async _startSessionInternal(message, options = {}) {
     const tempId = this._generateTempId();
 
-    // 包装事件回调，添加 sessionId
-    const wrappedOnEvent = options.onEvent ? (event) => {
-      options.onEvent({
-        sessionId: tempId,
-        ...event
-      });
+    // 包装事件回调，添加 sessionId（异步处理）
+    const wrappedOnEvent = options.onEvent ? async (event) => {
+      try {
+        await options.onEvent({
+          sessionId: tempId,
+          ...event
+        });
+      } catch (error) {
+        console.error('[AgentConnector] wrappedOnEvent 错误:', error.message);
+      }
     } : null;
-
-    // 异步执行 Agent（不阻塞）
-    this._executeAgentAsync(message, wrappedOnEvent)
-      .catch(error => {
-        this.logger?.error(`[AgentConnector] 执行错误: ${error.message}`);
-
-        if (wrappedOnEvent) {
-          wrappedOnEvent({
-            type: 'error',
-            error: error.message
-          });
-        }
-      });
 
     // 注册会话（Agent 会话是无状态的，但保留记录）
     this._registerSession(tempId, {
       startTime: Date.now(),
       message
     });
+
+    // ⭐ 同步执行 Agent（等待完成）
+    try {
+      await this._executeAgentAsync(message, wrappedOnEvent);
+    } catch (error) {
+      console.error('[AgentConnector] _startSessionInternal 执行失败:', error.message);
+
+      if (wrappedOnEvent) {
+        await wrappedOnEvent({
+          type: 'error',
+          error: error.message
+        });
+      }
+    }
 
     return { sessionId: tempId };
   }
@@ -136,8 +141,27 @@ class AgentConnector extends BaseConnector {
    * 异步执行 Agent
    */
   async _executeAgentAsync(message, onEvent) {
+    const fs = require('fs');
+    const path = require('path');
+
+    const logFile = path.join(__dirname, '../logs/agent-debug.log');
+    const log = (msg) => {
+      const timestamp = new Date().toISOString();
+      const logMsg = `[${timestamp}] ${msg}\n`;
+      fs.appendFileSync(logFile, logMsg);
+      console.log(msg); // 同时输出到控制台
+    };
+
+    log('===== _executeAgentAsync 开始 =====');
+    log(`agentEngine 存在: ${!!this.agentEngine}`);
+    log(`llmProvider 存在: ${!!this.llmProvider}`);
+    log(`logger 存在: ${!!this.logger}`);
+    log(`message 长度: ${message.length}`);
+
     try {
+      log('准备调用 agentEngine.execute...');
       const result = await this.agentEngine.execute(message, onEvent);
+      log(`agentEngine.execute 完成: ${result.success}`);
 
       // 发送完成事件
       if (onEvent) {
@@ -153,7 +177,8 @@ class AgentConnector extends BaseConnector {
 
       return result;
     } catch (error) {
-      this.logger?.error(`[AgentConnector] 执行失败: ${error.message}`);
+      log(`_executeAgentAsync 错误: ${error.message}`);
+      log(`错误堆栈: ${error.stack}`);
 
       if (onEvent) {
         onEvent({

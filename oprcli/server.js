@@ -73,12 +73,150 @@ class UnifiedServer {
     this.robotDedup = new RobotDedup(config.robotStream?.dedupWindowMs || 5000)
 
     this._setupMiddleware()
+    this._setupRoutes()
   }
 
   _setupMiddleware() {
     // 基础中间件配置
     this.app.use(express.json({ limit: '10mb' }))
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+  }
+
+  _setupRoutes() {
+    // GET /api/status - 获取状态
+    this.app.get('/api/status', (req, res) => {
+      const provider = config.provider
+      const connector = this.connectors.get(provider)
+
+      res.json({
+        success: true,
+        provider,
+        connected: !!connector,
+        connectors: Array.from(this.connectors.keys()).map(p => ({
+          provider: p,
+          connected: this.connectors.has(p)
+        })),
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+      })
+    })
+
+    // POST /api/message - 发送消息
+    this.app.post('/api/message', async (req, res) => {
+      try {
+        const { message, sessionId } = req.body
+
+        if (!message) {
+          return res.status(400).json({
+            success: false,
+            error: '消息不能为空'
+          })
+        }
+
+        const provider = config.provider
+        const connector = this.connectors.get(provider)
+
+        if (!connector) {
+          return res.status(503).json({
+            success: false,
+            error: `提供商 ${provider} 不可用`
+          })
+        }
+
+        // 收集事件
+        const events = []
+
+        const onEvent = (event) => {
+          events.push(event)
+        }
+
+        // 执行会话
+        const result = sessionId
+          ? await connector.continueSession(sessionId, message, { onEvent })
+          : await connector.startSession(message, { onEvent })
+
+        res.json({
+          success: true,
+          sessionId: result.sessionId,
+          provider,
+          events,
+          timestamp: new Date().toISOString()
+        })
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        })
+      }
+    })
+
+    // POST /api/interrupt - 中断会话
+    this.app.post('/api/interrupt', (req, res) => {
+      try {
+        const { sessionId } = req.body
+
+        if (!sessionId) {
+          return res.status(400).json({
+            success: false,
+            error: 'sessionId 不能为空'
+          })
+        }
+
+        const provider = config.provider
+        const connector = this.connectors.get(provider)
+
+        if (!connector) {
+          return res.status(503).json({
+            success: false,
+            error: `提供商 ${provider} 不可用`
+          })
+        }
+
+        const success = connector.interruptSession(sessionId)
+
+        res.json({
+          success,
+          timestamp: new Date().toISOString()
+        })
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error: error.message
+        })
+      }
+    })
+
+    // POST /api/reset - 重置会话
+    this.app.post('/api/reset', async (req, res) => {
+      try {
+        const { sessionId } = req.body
+
+        const provider = config.provider
+        const connector = this.connectors.get(provider)
+
+        if (!connector) {
+          return res.status(503).json({
+            success: false,
+            error: `提供商 ${provider} 不可用`
+          })
+        }
+
+        if (sessionId && connector.interruptSession) {
+          connector.interruptSession(sessionId)
+        }
+
+        res.json({
+          success: true,
+          timestamp: new Date().toISOString()
+        })
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error: error.message
+        })
+      }
+    })
   }
 
   async _initializeAllConnectors() {
@@ -116,9 +254,10 @@ class UnifiedServer {
       // 收集结果
       results.forEach(result => {
         if (result.success) {
+          const providerName = typeof result.provider === 'string' ? result.provider : String(result.provider)
           this.connectors.set(result.provider, result.connector)
           availableProviders.push(result.provider)
-          this.logger.success('CONNECTOR', `${result.provider.toUpperCase()} 初始化成功 (版本: ${result.version || 'unknown'})`)
+          this.logger.success('CONNECTOR', `${providerName.toUpperCase()} 初始化成功 (版本: ${result.version || 'unknown'})`)
         } else {
           errors.push(result.error)
         }
@@ -489,7 +628,7 @@ class UnifiedServer {
   _mapProviderEventType(event) {
     if (!event || !event.type) return 'unknown'
     if (event.type === 'assistant') return 'assistant_chunk'
-    if (event.type === 'result') return 'result'
+    if (event.type === 'result' || event.type === 'done') return 'result'
     if (event.type === 'tool_use') return 'tool_use'
     if (event.type === 'tool_end' || event.type === 'tool_result') return 'tool_result'
     if (event.type === 'session_end') return 'end'
@@ -1098,6 +1237,11 @@ class UnifiedServer {
     // 方式2: event.result 字符串格式
     if (event.result) {
       return event.result
+    }
+
+    // 方式3: event.content 字符串格式 ⭐ 支持 Agent
+    if (event.content) {
+      return event.content
     }
 
     return ''
