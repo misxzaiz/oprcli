@@ -795,6 +795,52 @@
       'SCHEDULER_ENABLED','TASKS_FILE_PATH'
     ]
 
+    // 默认值（排除密钥和路径）
+    const DEFAULTS = {
+      PROVIDER: 'claude',
+      PORT: '12480',
+      SYSTEM_PROMPT: '你是一个可靠、务实的助手。请先给结论，再给可执行步骤；不确定时明确说明。',
+      SYSTEM_PROMPTS_DIR: './system-prompts',
+      PROMPT_CHANNEL_AWARE: 'true',
+      PROMPT_INCLUDE_SOURCE_CONTEXT: 'true',
+      STREAM_ENABLED: 'true',
+      STREAM_INTERVAL: '2000',
+      STREAM_MAX_LENGTH: '5000',
+      STREAM_SHOW_THINKING: 'true',
+      STREAM_SHOW_TOOLS: 'true',
+      STREAM_SHOW_TIME: 'true',
+      STREAM_USE_MARKDOWN: 'true',
+      LOG_LEVEL: 'DEBUG',
+      LOG_COLORED: 'true',
+      STRUCTURED_LOGGING: 'false',
+      AUDIT_LOG_ENABLED: 'false',
+      AUDIT_LOG_DIR: './logs',
+      AUDIT_LOG_AGENT_IO: 'true',
+      AUDIT_LOG_BOT_TRANSFORM: 'true',
+      AUDIT_LOG_MAX_FIELD_LENGTH: '8000',
+      AUDIT_LOG_REDACT_KEYS: 'clientSecret,token,authorization,webhook,secret',
+      ROBOT_OUTPUT_ENABLED: 'true',
+      ROBOT_OUTPUT_PROFILE: 'standard',
+      ROBOT_SHOW_TYPES: 'assistant_chunk,result,thinking_exposed,tool_use,tool_result,http_request,http_response,error,end',
+      ROBOT_SHOW_THINKING: 'true',
+      ROBOT_SHOW_NETWORK: 'true',
+      ROBOT_END_SUMMARY: 'true',
+      ROBOT_MAX_CHARS: '12000',
+      ROBOT_DEDUP_WINDOW_MS: '5000',
+      ROBOT_CHUNK_STRATEGY: 'throttle',
+      QQBOT_SANDBOX: 'false',
+      QQBOT_DEBUG: 'true',
+      QQBOT_COMMAND_PREFIX: '/',
+      CODEX_MODEL: 'gpt-5.3-codex',
+      CODEX_MODEL_PROVIDER: 'custom',
+      CODEX_MAX_HISTORY_LENGTH: '20',
+      CODEX_SYSTEM_PROMPT_FILE: './system-prompts/codex.txt',
+      NOTIFICATION_ENABLED: 'true',
+      NOTIFICATION_TYPE: 'dingtalk',
+      SCHEDULER_ENABLED: 'true',
+      TASKS_FILE_PATH: './scheduler/tasks.json'
+    }
+
     // 导航切换
     document.querySelectorAll('.nav-item').forEach(item => {
       item.onclick = () => {
@@ -849,19 +895,17 @@
             const el = document.getElementById(key)
             if (el) {
               const val = data.config[key]
+              const defaultVal = DEFAULTS[key]
+              
               if (el.type === 'checkbox') {
-                el.checked = val === 'true' || val === true
+                // 有配置值用配置值，否则用默认值
+                el.checked = val !== undefined ? (val === 'true' || val === true) : (defaultVal === 'true')
               } else {
-                el.value = val || ''
+                // 有配置值用配置值，否则用默认值
+                el.value = val !== undefined && val !== '' ? val : (defaultVal || '')
               }
             }
           })
-          
-          // 特殊处理：PORT 默认值
-          const portEl = document.getElementById('PORT')
-          if (portEl && !portEl.value) {
-            portEl.value = '3000'
-          }
           
           updateNavStatus(data.config)
           showToast('已加载配置', 'success')
