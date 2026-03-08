@@ -24,6 +24,11 @@ class RobotEventFormatter {
     const elapsedMs = Number(ctx.elapsedMs || 0)
     const elapsedSec = (elapsedMs / 1000).toFixed(1)
 
+    console.log('[eventType] eventType:', eventType);
+    console.log('[event] event:', event);
+    console.log('[extractedText] extractedText:', extractedText);
+    console.log('[ctx] ctx:', ctx);
+
     if (eventType === 'assistant_chunk' || eventType === 'result') {
       // 优先使用 extractedText，然后尝试其他字段（包括 Agent 的 content 字段）
       const text = this._trim(extractedText || event?.result || event?.text || event?.content || '')
