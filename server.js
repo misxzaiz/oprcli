@@ -533,6 +533,7 @@ class UnifiedServer {
 ℹ️ 信息查询：
   • status / 状态  - 查看当前状态
   • mode [universal|dev|ops]  - 查看或切换对话模式
+  • path [目录]  - 查看或设置工作目录
   • help / 帮助  - 显示此帮助
 
 💡 可用模型：${availableProviders || '无'}`
