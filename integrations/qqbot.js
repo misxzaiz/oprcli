@@ -247,6 +247,16 @@ class QQBotIntegration extends BasePlatformIntegration {
             }
           }
         }
+        // 7. 默认：有 URL 但没有 content_type，当作文件处理
+        else if (fileUrl) {
+          attachmentType = 'file'
+          try {
+            localPath = await this._downloadFile(fileUrl, i, 'file', 'application/octet-stream', att.filename)
+            this.logger.info('QQBOT', `✅ 文件已下载: ${localPath}`)
+          } catch (error) {
+            this.logger.warning('QQBOT', `⚠️ 文件下载失败: ${error.message}`)
+          }
+        }
 
         // 添加到附件列表
         if (attachmentType) {
@@ -322,6 +332,14 @@ class QQBotIntegration extends BasePlatformIntegration {
       }
 
       const req = requestLib.request(options, (res) => {
+        // 处理重定向 (301, 302, 303, 307, 308)
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          this._downloadFile(res.headers.location, index, fileType, contentType, originalFileName)
+            .then(resolve)
+            .catch(reject)
+          return
+        }
+
         if (res.statusCode !== 200) {
           reject(new Error(`HTTP ${res.statusCode}`))
           return
