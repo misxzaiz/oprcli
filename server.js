@@ -28,6 +28,7 @@ const IFlowConnector = require('./connectors/iflow-connector')
 const CodexConnector = require('./connectors/codex-connector')
 const AgentConnector = require('./connectors/agent-connector')
 const SchedulerModule = require('./scheduler')
+const SessionScanner = require('./utils/session-scanner')
 const { parseCommand } = require('./server/commands')
 const { dispatchCommand } = require('./server/command-dispatcher')
 const { setupHttpRoutes } = require('./server/http-routes')
@@ -50,6 +51,9 @@ class UnifiedServer {
     this.auditLogger = AuditLogger
     this.robotFormatter = new RobotEventFormatter({ maxChars: config.robotStream?.maxChars || 1200 })
     this.robotDedup = new RobotDedup(config.robotStream?.dedupWindowMs || 5000)
+
+    // 会话管理
+    this.sessionScanner = new SessionScanner(this.logger)
 
     this._setupMiddleware()
     this._setupRoutes()
@@ -292,9 +296,185 @@ class UnifiedServer {
   • path [目录]  - 查看或设置工作目录
   • help / 帮助  - 显示此帮助
 
+📋 会话管理：
+  • sessions / 会话  - 查看历史会话列表
+  • resume / 继续  - 继续上次会话或指定会话
+
 💡 可用模型：${availableProviders || '无'}`
 
     await platform.send(replyTarget, help.trim(), originalMessage, type)
+    return { status: 'SUCCESS' }
+  }
+
+  /**
+   * 处理会话列表命令
+   */
+  async _handleSessionsList(conversationId, replyTarget, platform, originalMessage, type) {
+    const workDir = this._getWorkDir(conversationId, platform)
+    const sessions = await this.sessionScanner.scanSessions(workDir)
+    return this._listSessions(sessions, replyTarget, platform, originalMessage, type)
+  }
+
+  /**
+   * 处理会话恢复命令
+   */
+  async _handleSessionsResume(arg, conversationId, replyTarget, platform, originalMessage, type) {
+    const workDir = this._getWorkDir(conversationId, platform)
+    const session = platform.getSession(conversationId)
+    const currentProvider = session?.provider || this.defaultProvider
+
+    const sessions = await this.sessionScanner.scanSessions(workDir)
+
+    // 过滤当前 Provider 的会话
+    const providerSessions = sessions.filter(s => s.provider === currentProvider)
+
+    // 无参数：继续最新会话（优先当前 Provider）
+    if (!arg?.trim()) {
+      // 优先使用当前 Provider 的会话
+      const targetSessions = providerSessions.length > 0 ? providerSessions : sessions
+
+      if (targetSessions.length === 0) {
+        await platform.send(replyTarget, '❌ 没有找到历史会话', originalMessage, type)
+        return { status: 'SUCCESS' }
+      }
+
+      return this._resumeSession(targetSessions[0], conversationId, replyTarget, platform, originalMessage, type)
+    }
+
+    // 有参数：优先在当前 Provider 中搜索，再全局搜索
+    const targetSession = providerSessions.find(s =>
+      s.id.startsWith(arg) ||
+      s.shortId?.startsWith(arg) ||
+      s.id.includes(arg) ||
+      arg === s.id
+    ) || sessions.find(s =>
+      s.id.startsWith(arg) ||
+      s.shortId?.startsWith(arg) ||
+      s.id.includes(arg) ||
+      arg === s.id
+    )
+
+    if (!targetSession) {
+      await platform.send(
+        replyTarget,
+        `❌ 未找到会话: ${arg}\n\n💡 提示：使用 /sessions 查看所有会话`,
+        originalMessage,
+        type
+      )
+      return { status: 'SUCCESS' }
+    }
+
+    return this._resumeSession(targetSession, conversationId, replyTarget, platform, originalMessage, type)
+  }
+
+  /**
+   * 获取工作目录
+   */
+  _getWorkDir(conversationId, platform) {
+    const session = platform.getSession(conversationId)
+    return session?.workDir || this.config.claude.workDir || this.config.iflow.workDir || process.cwd()
+  }
+
+  /**
+   * 列出会话
+   */
+  async _listSessions(sessions, replyTarget, platform, originalMessage, type) {
+    if (sessions.length === 0) {
+      const message = '📭 暂无历史会话'
+      await platform.send(replyTarget, message, originalMessage, type)
+      return { status: 'SUCCESS' }
+    }
+
+    // 按 Provider 分组
+    const grouped = sessions.reduce((acc, s) => {
+      if (!acc[s.provider]) acc[s.provider] = []
+      acc[s.provider].push(s)
+      return acc
+    }, {})
+
+    // 构建消息
+    const lines = ['📋 历史会话列表：\n']
+
+    for (const [provider, providerSessions] of Object.entries(grouped)) {
+      const providerName = provider.toUpperCase()
+      lines.push(`📂 ${providerName} (${providerSessions.length})`)
+
+      for (const session of providerSessions.slice(0, 5)) {
+        const icon = session === sessions[0] ? '🔸' : '•'
+        const time = new Date(session.mtime).toLocaleString('zh-CN', {
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+        const size = (session.size / 1024).toFixed(1) + 'KB'
+        // 优先使用 shortId（Codex），否则截取 ID 前12位
+        const displayId = session.shortId || session.id.substring(0, 12)
+
+        lines.push(`  ${icon} [${displayId}] ${time} (${size})`)
+        lines.push(`     └─ ${session.preview}`)
+      }
+
+      if (providerSessions.length > 5) {
+        lines.push(`     ... 还有 ${providerSessions.length - 5} 个会话`)
+      }
+
+      lines.push('')
+    }
+
+    lines.push('💡 提示：')
+    lines.push('- 发送 /resume 继续上次会话')
+    lines.push('- 发送 /resume {id前几位} 继续指定会话')
+
+    const message = lines.join('\n')
+    await platform.send(replyTarget, message, originalMessage, type)
+
+    return { status: 'SUCCESS' }
+  }
+
+  /**
+   * 恢复指定会话
+   */
+  async _resumeSession(session, conversationId, replyTarget, platform, originalMessage, type) {
+    const connector = this.connectors.get(session.provider)
+
+    if (!connector) {
+      await platform.send(
+        replyTarget,
+        `❌ ${session.provider} 连接器未启用`,
+        originalMessage,
+        type
+      )
+      return { status: 'SUCCESS' }
+    }
+
+    // 更新当前会话状态（不发送消息，避免触发新轮次）
+    const currentSession = platform.getSession(conversationId) || {}
+    const newSession = {
+      ...currentSession,
+      sessionId: session.id,
+      provider: session.provider,
+      startTime: currentSession.startTime || Date.now()
+    }
+    platform.conversations.set(conversationId, newSession)
+
+    console.log(`[DEBUG] 会话已恢复:`, {
+      conversationId,
+      sessionId: session.id,
+      provider: session.provider,
+      shortId: session.shortId || session.id.substring(0, 12)
+    })
+    this.logger.success('SESSION', `✅ 会话已恢复: ${session.provider.toUpperCase()} / ${session.shortId || session.id.substring(0, 12)}`)
+
+    // 发送恢复通知
+    const displayId = session.shortId || session.id.substring(0, 12)
+    await platform.send(
+      replyTarget,
+      `✅ 已恢复 ${session.provider.toUpperCase()} 会话: ${displayId}...\n\n💡 下一条消息将发送到此会话`,
+      originalMessage,
+      type
+    )
+
     return { status: 'SUCCESS' }
   }
 
@@ -798,7 +978,7 @@ class UnifiedServer {
 
     // 启动 HTTP 服务器（仅在端口配置时）
     if (config.port) {
-      this.app.listen(config.port, () => {
+      const server = this.app.listen(config.port, () => {
         this.logger.log('\n========================================')
         this.logger.log('  Unified AI CLI Connector Server')
         this.logger.log('========================================')
@@ -806,6 +986,17 @@ class UnifiedServer {
         this.logger.log(`🤖 提供商: ${config.provider.toUpperCase()}`)
         this.logger.log(`📱 钉钉: ${dingtalkEnabled ? '✅ 已启用' : '❌ 未启用'}`)
         this.logger.log('\n按 Ctrl+C 停止服务器\n')
+      })
+
+      // 添加错误处理
+      server.on('error', (error) => {
+        if (error.code === 'EADDRINUSE') {
+          this.logger.error('SERVER', `端口 ${config.port} 已被占用，请检查是否有其他服务正在运行`)
+          process.exit(1)
+        } else {
+          this.logger.error('SERVER', `服务器错误: ${error.message}`)
+          process.exit(1)
+        }
       })
     } else {
       this.logger.log('\n========================================')

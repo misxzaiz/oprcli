@@ -19,7 +19,12 @@ const COMMANDS = {
   'tasks reload': { type: 'tasks_reload' },
   'tasks run': { type: 'tasks_run', hasArg: true },
   'tasks enable': { type: 'tasks_enable', hasArg: true },
-  'tasks disable': { type: 'tasks_disable', hasArg: true }
+  'tasks disable': { type: 'tasks_disable', hasArg: true },
+  sessions: { type: 'sessions_list' },
+  '会话': { type: 'sessions_list' },
+  resume: { type: 'sessions_resume', hasArg: true },
+  '继续': { type: 'sessions_resume', hasArg: true },
+  '恢复': { type: 'sessions_resume', hasArg: true }
 }
 
 function parseCommand(content, logger) {

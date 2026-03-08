@@ -24,6 +24,10 @@ async function dispatchCommand(server, command, conversationId, replyTarget, pla
       return server._handleTasksEnable(command.arg, conversationId, replyTarget, platform, originalMessage, type)
     case 'tasks_disable':
       return server._handleTasksDisable(command.arg, conversationId, replyTarget, platform, originalMessage, type)
+    case 'sessions_list':
+      return server._handleSessionsList(conversationId, replyTarget, platform, originalMessage, type)
+    case 'sessions_resume':
+      return server._handleSessionsResume(command.arg, conversationId, replyTarget, platform, originalMessage, type)
     default:
       server.logger.warning('COMMAND', `Unknown command type: ${command.type}`)
       return { status: 'SUCCESS' }
