@@ -45,6 +45,8 @@ class UnifiedServer {
     '帮助': { type: 'help' },
     'mode': { type: 'mode', hasArg: true },
     '模式': { type: 'mode', hasArg: true },
+    'path': { type: 'path', hasArg: true },
+    '路径': { type: 'path', hasArg: true },
 
     // 定时任务命令
     'tasks': { type: 'tasks_list' },
@@ -390,6 +392,9 @@ class UnifiedServer {
       case 'mode':
         return await this._handleMode(command.arg, conversationId, replyTarget, platform, originalMessage, type)
 
+      case 'path':
+        return await this._handlePath(command.arg, conversationId, replyTarget, platform, originalMessage, type)
+
       // 定时任务命令
       case 'tasks_list':
         return await this._handleTasksList(conversationId, replyTarget, platform, originalMessage, type)
@@ -586,14 +591,116 @@ class UnifiedServer {
     return { status: 'SUCCESS' }
   }
 
-  _buildRuntimeContext({ platformName, type, conversationId, provider, mode }) {
+  async _handlePath(pathArg, conversationId, replyTarget, platform, originalMessage, type) {
+    const session = platform.getSession(conversationId)
+    const currentProvider = session?.provider || this.defaultProvider
+    const currentWorkDir = session?.workDir || null
+
+    // 如果没有参数，显示当前工作目录信息
+    if (!pathArg) {
+      const actualWorkDir = config.getWorkDir(currentProvider, currentWorkDir)
+      const defaultWorkDir = config.getDefaultWorkDir()
+      const projectDir = config.getProjectDir()
+
+      const pathInfo = {
+        '当前工作目录': actualWorkDir,
+        '默认工作目录': defaultWorkDir,
+        '项目目录（文档路径）': projectDir,
+        '当前模型': currentProvider.toUpperCase()
+      }
+
+      const infoText = `📁 工作目录信息\n\n${Object.entries(pathInfo).map(([k, v]) => `• ${k}：\n  ${v}`).join('\n')}\n\n💡 使用命令：\n/path <目录> - 设置工作目录\n/path ~ - 切换到默认工作目录\n/path reset - 重置为默认工作目录`
+
+      await platform.send(replyTarget, infoText, originalMessage, type)
+      return { status: 'SUCCESS' }
+    }
+
+    // 处理特殊参数
+    const trimmedPath = pathArg.trim().toLowerCase()
+
+    // 切换到默认工作目录
+    if (trimmedPath === '~' || trimmedPath === 'reset') {
+      platform.setSession(conversationId, session?.sessionId || null, currentProvider, {
+        mode: session?.mode || this.defaultPromptMode,
+        workDir: null  // 清除会话级别的工作目录设置，使用默认配置
+      })
+
+      const defaultDir = config.getDefaultWorkDir()
+      await platform.send(
+        replyTarget,
+        `✅ 已切换到默认工作目录\n\n📍 ${defaultDir}`,
+        originalMessage,
+        type
+      )
+
+      this.logger.info('WORK_DIR', `会话 ${conversationId} 工作目录重置为默认: ${defaultDir}`)
+      return { status: 'SUCCESS' }
+    }
+
+    // 设置新的工作目录
+    const newPath = pathArg.trim()
+    const fs = require('fs')
+
+    // 检查目录是否存在
+    if (!fs.existsSync(newPath)) {
+      await platform.send(
+        replyTarget,
+        `❌ 目录不存在：${newPath}\n\n💡 请检查路径是否正确`,
+        originalMessage,
+        type
+      )
+      return { status: 'SUCCESS' }
+    }
+
+    // 检查是否为目录
+    try {
+      const stats = fs.statSync(newPath)
+      if (!stats.isDirectory()) {
+        await platform.send(
+          replyTarget,
+          `❌ 路径不是目录：${newPath}\n\n💡 请提供一个有效的目录路径`,
+          originalMessage,
+          type
+        )
+        return { status: 'SUCCESS' }
+      }
+    } catch (err) {
+      await platform.send(
+        replyTarget,
+        `❌ 无法访问目录：${newPath}\n\n错误：${err.message}`,
+        originalMessage,
+        type
+      )
+      return { status: 'SUCCESS' }
+    }
+
+    // 设置新的工作目录
+    platform.setSession(conversationId, session?.sessionId || null, currentProvider, {
+      mode: session?.mode || this.defaultPromptMode,
+      workDir: newPath
+    })
+
+    await platform.send(
+      replyTarget,
+      `✅ 工作目录已更新\n\n📍 ${newPath}\n\n💡 使用 /path 查看详细信息`,
+      originalMessage,
+      type
+    )
+
+    this.logger.info('WORK_DIR', `会话 ${conversationId} 工作目录更新为: ${newPath}`)
+    return { status: 'SUCCESS' }
+  }
+
+  _buildRuntimeContext({ platformName, type, conversationId, provider, mode, sessionWorkDir }) {
     return {
       platform: (platformName || 'UNKNOWN').toLowerCase(),
       message_type: type || 'default',
       conversation_id: conversationId,
       provider,
       mode,
-      work_dir: config.getWorkDir(provider),
+      work_dir: config.getWorkDir(provider, sessionWorkDir),
+      project_dir: config.getProjectDir(),
+      default_work_dir: config.getDefaultWorkDir(),
       timestamp: new Date().toISOString()
     }
   }
@@ -606,7 +713,7 @@ class UnifiedServer {
     }
 
     const modeBlock = `[MODE_INSTRUCTION]\n${modeInstructions[runtimeContext.mode] || modeInstructions.universal}\n[/MODE_INSTRUCTION]`
-    const modePrompt = await config.getModePrompt(runtimeContext.provider, runtimeContext.mode)
+    const modePrompt = await config.getModePrompt(runtimeContext.provider, runtimeContext.mode, runtimeContext.sessionWorkDir)
     const modePromptBlock = modePrompt ? `[MODE_PROMPT]\n${modePrompt}\n[/MODE_PROMPT]` : ''
 
     if (config.systemPrompts?.channelAware === false && config.systemPrompts?.includeSourceContext === false) {
@@ -982,7 +1089,8 @@ class UnifiedServer {
         type,
         conversationId,
         provider,
-        mode
+        mode,
+        sessionWorkDir: session?.workDir || null
       })
       const contextualMessage = await this._buildContextualMessage(content, runtimeContext)
       this.auditLogger.logAgent('agent.request', {

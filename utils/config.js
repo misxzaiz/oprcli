@@ -16,24 +16,30 @@ class Config {
     this.provider = process.env.PROVIDER || 'claude'
     this.port = process.env.PORT ? parseInt(process.env.PORT) : null
 
+    // 项目启动目录（文档路径）
+    this.projectDir = process.cwd()
+
+    // 默认工作目录配置
+    this.defaultWorkDir = process.env.DEFAULT_WORK_DIR || this.projectDir
+
     // Claude 配置
     this.claude = {
       cmdPath: process.env.CLAUDE_CMD_PATH,
-      workDir: process.env.CLAUDE_WORK_DIR,
+      workDir: process.env.CLAUDE_WORK_DIR || this.defaultWorkDir,  // 如果未设置则使用默认工作目录
       gitBinPath: process.env.CLAUDE_GIT_BIN_PATH
     }
 
     // IFlow 配置
     this.iflow = {
       path: process.env.IFLOW_PATH || 'iflow',
-      workDir: process.env.IFLOW_WORK_DIR,
+      workDir: process.env.IFLOW_WORK_DIR || this.defaultWorkDir,  // 如果未设置则使用默认工作目录
       includeDirs: this._parseList(process.env.IFLOW_INCLUDE_DIRS)
     }
 
     // Codex 配置
     this.codex = {
       path: process.env.CODEX_PATH || 'codex',
-      workDir: process.env.CODEX_WORK_DIR,
+      workDir: process.env.CODEX_WORK_DIR || this.defaultWorkDir,  // 如果未设置则使用默认工作目录
       systemPromptFile: process.env.CODEX_SYSTEM_PROMPT_FILE,
       model: process.env.CODEX_MODEL,
       provider: process.env.CODEX_MODEL_PROVIDER
@@ -44,7 +50,8 @@ class Config {
       enabled: process.env.AGENT_ENABLED === 'true',
       providerType: process.env.AGENT_PROVIDER_TYPE || 'iflow',
       apiKey: process.env.AGENT_API_KEY,
-      model: process.env.AGENT_MODEL
+      model: process.env.AGENT_MODEL,
+      workDir: process.env.AGENT_WORK_DIR || this.defaultWorkDir  // 支持Agent工作目录配置
     }
 
     // 钉钉配置
@@ -135,14 +142,39 @@ class Config {
 
   /**
    * 获取当前 provider 的工作目录
+   * 支持会话级别的工作目录覆盖（通过path命令设置）
    */
-  getWorkDir(provider = null) {
-    const p = provider || this.provider
-    // agent 使用当前工作目录
-    if (p === 'agent') {
-      return process.cwd()
+  getWorkDir(provider = null, sessionWorkDir = null) {
+    // 优先使用会话级别的工作目录设置
+    if (sessionWorkDir) {
+      return sessionWorkDir
     }
-    return this[p]?.workDir || process.cwd()
+
+    const p = provider || this.provider
+    // 优先使用provider特定配置
+    if (this[p]?.workDir) {
+      return this[p].workDir
+    }
+    // 其次使用默认工作目录
+    if (this.defaultWorkDir) {
+      return this.defaultWorkDir
+    }
+    // 最后使用项目启动目录
+    return this.projectDir
+  }
+
+  /**
+   * 获取项目启动目录（文档路径）
+   */
+  getProjectDir() {
+    return this.projectDir
+  }
+
+  /**
+   * 获取默认工作目录
+   */
+  getDefaultWorkDir() {
+    return this.defaultWorkDir
   }
 
   /**
@@ -160,12 +192,14 @@ class Config {
 
   /**
    * 替换模板变量
-   * 支持 {{WORK_DIR}}, {{PORT}}, {{PROVIDER}} 等
+   * 支持 {{WORK_DIR}}, {{PROJECT_DIR}}, {{DEFAULT_WORK_DIR}}, {{PORT}}, {{PROVIDER}} 等
    */
-  _replaceTemplateVars(content, provider) {
-    const workDir = this.getWorkDir(provider)
+  _replaceTemplateVars(content, provider, sessionWorkDir = null) {
+    const workDir = this.getWorkDir(provider, sessionWorkDir)
     const vars = {
       WORK_DIR: workDir,
+      PROJECT_DIR: this.projectDir,
+      DEFAULT_WORK_DIR: this.defaultWorkDir,
       PORT: this.port || 'N/A',
       PROVIDER: provider || this.provider,
       PROVIDER_UPPER: (provider || this.provider).toUpperCase()
@@ -205,7 +239,7 @@ class Config {
    * 获取按模式拆分的提示词（oprcli.<mode>.md），找不到时回退到 oprcli.md
    * 不读取环境变量覆盖，专用于运行时 mode 注入
    */
-  async getModePrompt(provider, mode = 'universal') {
+  async getModePrompt(provider, mode = 'universal', sessionWorkDir = null) {
     const normalizedMode = (mode || 'universal').toString().trim().toLowerCase()
     const modeFile = `oprcli.${normalizedMode}.md`
     const fallbackFile = 'oprcli.md'
@@ -219,7 +253,7 @@ class Config {
     }
 
     if (!content) return null
-    return this._replaceTemplateVars(content, provider)
+    return this._replaceTemplateVars(content, provider, sessionWorkDir)
   }
 
   validate() {
