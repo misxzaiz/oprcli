@@ -187,7 +187,29 @@ class QQBotIntegration extends BasePlatformIntegration {
             this.logger.warning('QQBOT', `⚠️ 图片下载失败: ${error.message}`)
           }
         }
-        // 2. 文件（文档类）
+        // 2. QQ 语音（voice 类型，不是标准 audio/*）
+        else if (contentType === 'voice') {
+          attachmentType = 'audio'
+          try {
+            // 优先使用 wav 格式 URL（如果有的话）
+            const voiceUrl = att.voice_wav_url || fileUrl
+            localPath = await this._downloadFile(voiceUrl, i, 'audio', 'audio/wav', att.filename)
+            this.logger.info('QQBOT', `✅ 语音已下载: ${localPath}`)
+          } catch (error) {
+            this.logger.warning('QQBOT', `⚠️ 语音下载失败: ${error.message}`)
+          }
+        }
+        // 3. QQ 文件（file 类型，不是标准 application/*）
+        else if (contentType === 'file') {
+          attachmentType = 'file'
+          try {
+            localPath = await this._downloadFile(fileUrl, i, 'file', 'application/octet-stream', att.filename)
+            this.logger.info('QQBOT', `✅ 文件已下载: ${localPath}`)
+          } catch (error) {
+            this.logger.warning('QQBOT', `⚠️ 文件下载失败: ${error.message}`)
+          }
+        }
+        // 4. 文件（文档类，标准 MIME 类型）
         else if (contentType.startsWith('application/') || contentType.startsWith('text/')) {
           attachmentType = 'file'
           try {
@@ -197,7 +219,7 @@ class QQBotIntegration extends BasePlatformIntegration {
             this.logger.warning('QQBOT', `⚠️ 文件下载失败: ${error.message}`)
           }
         }
-        // 3. 音频
+        // 5. 音频（标准 MIME 类型）
         else if (contentType.startsWith('audio/')) {
           attachmentType = 'audio'
           try {
@@ -207,7 +229,7 @@ class QQBotIntegration extends BasePlatformIntegration {
             this.logger.warning('QQBOT', `⚠️ 音频下载失败: ${error.message}`)
           }
         }
-        // 4. 视频（限制大小）
+        // 6. 视频（限制大小）
         else if (contentType.startsWith('video/')) {
           const fileSize = att.file_size || 0
           const maxSize = 50 * 1024 * 1024 // 50MB
