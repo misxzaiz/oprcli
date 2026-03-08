@@ -139,9 +139,9 @@ pm2 save
 | 日志管理 | ❌ | ✅ |
 | 进程监控 | ❌ | ✅ |
 
-服务运行在 `http://localhost:12480`
+服务运行在 `http://localhost:3000`
 
-配置页面：`http://localhost:12480/config/config.html`
+配置页面：`http://localhost:3000/config/config.html`
 
 ## 机器人命令
 
