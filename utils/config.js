@@ -39,6 +39,14 @@ class Config {
       provider: process.env.CODEX_MODEL_PROVIDER
     }
 
+    // Agent 配置
+    this.agent = {
+      enabled: process.env.AGENT_ENABLED === 'true',
+      providerType: process.env.AGENT_PROVIDER_TYPE || 'iflow',
+      apiKey: process.env.AGENT_API_KEY,
+      model: process.env.AGENT_MODEL
+    }
+
     // 钉钉配置
     this.dingtalk = {
       clientId: process.env.DINGTALK_CLIENT_ID,
@@ -130,6 +138,10 @@ class Config {
    */
   getWorkDir(provider = null) {
     const p = provider || this.provider
+    // agent 使用当前工作目录
+    if (p === 'agent') {
+      return process.cwd()
+    }
     return this[p]?.workDir || process.cwd()
   }
 
@@ -215,10 +227,10 @@ class Config {
     const warnings = []
 
     // Provider 验证
-    if (!['claude', 'iflow', 'codex'].includes(this.provider)) {
+    if (!['claude', 'iflow', 'codex', 'agent'].includes(this.provider)) {
       errors.push({
         field: 'PROVIDER',
-        message: `无效的 PROVIDER 值: "${this.provider}"，有效值为: claude, iflow, codex`,
+        message: `无效的 PROVIDER 值: "${this.provider}"，有效值为: claude, iflow, codex, agent`,
         value: this.provider
       })
     }
@@ -405,6 +417,14 @@ class Config {
           model: this.codex.model,
           provider: this.codex.provider
         },
+        systemPrompt
+      }
+    } else if (targetProvider === 'agent') {
+      return {
+        providerType: this.agent.providerType,
+        apiKey: this.agent.apiKey,
+        model: this.agent.model,
+        workDir: this.getWorkDir('agent'),
         systemPrompt
       }
     }

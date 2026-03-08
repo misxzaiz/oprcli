@@ -25,7 +25,8 @@ class RobotEventFormatter {
     const elapsedSec = (elapsedMs / 1000).toFixed(1)
 
     if (eventType === 'assistant_chunk' || eventType === 'result') {
-      const text = this._trim(extractedText || event?.result || event?.text || '')
+      // 优先使用 extractedText，然后尝试其他字段（包括 Agent 的 content 字段）
+      const text = this._trim(extractedText || event?.result || event?.text || event?.content || '')
       if (!text) return ''
       return `💬 ${text}`
     }
