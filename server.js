@@ -172,7 +172,7 @@ class UnifiedServer {
    * @returns {Object|null} 命令对象 { type, provider?, arg? }
    */
   _parseCommand(content) {
-    return parseCommand(content, this.logger)
+    return parseCommand(content, this.logger, this.config.commands)
   }
 
   async _handleCommand(command, conversationId, replyTarget, platform, originalMessage, type) {

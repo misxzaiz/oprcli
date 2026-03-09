@@ -137,6 +137,16 @@ class Config {
       dedupWindowMs: parseInt(process.env.ROBOT_DEDUP_WINDOW_MS || '5000', 10),
       chunkStrategy: (process.env.ROBOT_CHUNK_STRATEGY || 'throttle').toLowerCase()
     }
+
+    // 命令配置
+    this.commands = {
+      // 全局要求使用 / 前缀（默认 false，即允许某些命令无前缀）
+      requireSlash: process.env.COMMAND_REQUIRE_SLASH === 'true',
+      // 需要前缀的命令列表（逗号分隔），默认为空表示使用命令定义中的设置
+      requireSlashList: this._parseList(process.env.COMMAND_REQUIRE_SLASH_LIST),
+      // 不需要前缀的命令列表（逗号分隔），优先级高于 requireSlash
+      noSlashList: this._parseList(process.env.COMMAND_NO_SLASH_LIST)
+    }
   }
 
   _parseList(str) {
