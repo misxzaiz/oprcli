@@ -59,8 +59,8 @@ class ClaudeConnector extends BaseConnector {
       }
       this.nodeExe = resolved.nodeExe;
       this.cliJs = resolved.cliJs;
-      this.logger.log(`[ClaudeConnector] node.exe: ${this.nodeExe}`);
-      this.logger.log(`[ClaudeConnector] cli.js: ${this.cliJs}`);
+      this.logger.success('ClaudeConnector', `node.exe: ${this.nodeExe}`);
+      this.logger.success('ClaudeConnector', `cli.js: ${this.cliJs}`);
     }
 
     // 3. 测试命令
@@ -154,60 +154,17 @@ class ClaudeConnector extends BaseConnector {
   // ==================== 辅助方法 ====================
 
   _resolveNodeAndCli(claudeCmdPath) {
+    this.logger.success('ClaudeConnector', `claudeCmdPath: ${claudeCmdPath}`);
+
     const normalizedPath = claudeCmdPath.replace(/\\/g, '/');
     const npmDir = path.dirname(normalizedPath);
 
-    // 查找 node.exe
-    let nodeExe = null;
+    this.logger.success('ClaudeConnector', `npmDir: ${npmDir}`);
 
-    // 方法 1: 使用 'where node' 查找系统 node（增强验证）
-    try {
-      const { spawnSync } = require('child_process');
-      const result = spawnSync('where', ['node'], { encoding: 'utf8', timeout: 5000 });
-      if (result.status === 0 && result.stdout) {
-        const candidate = result.stdout.trim().split('\n')[0];
-        // 验证文件是否真的存在
-        if (candidate && fs.existsSync(candidate)) {
-          nodeExe = candidate;
-          this.logger.log(`[ClaudeConnector] 找到 node.exe: ${nodeExe}`);
-        }
-      }
-    } catch (e) {
-      this.logger.log('[ClaudeConnector] where node 失败:', e.message);
-    }
-
-    // 方法 2: npm 目录下的 node.exe
-    if (!nodeExe) {
-      const npmNodeExe = path.join(npmDir, 'node.exe');
-      if (fs.existsSync(npmNodeExe)) {
-        nodeExe = npmNodeExe;
-        this.logger.log(`[ClaudeConnector] 找到 node.exe: ${nodeExe}`);
-      }
-    }
-
-    // 方法 3: 常见安装路径（带验证）
-    if (!nodeExe) {
-      const commonPaths = [
-        'C:\\Program Files\\nodejs\\node.exe',
-        'C:\\Program Files (x86)\\nodejs\\node.exe',
-        process.env.ProgramFiles + '\\nodejs\\node.exe',
-        process.env['ProgramFiles(x86)'] + '\\nodejs\\node.exe'
-      ].filter(Boolean);
-
-      for (const p of commonPaths) {
-        if (fs.existsSync(p)) {
-          nodeExe = p;
-          this.logger.log(`[ClaudeConnector] 找到 node.exe: ${p}`);
-          break;
-        }
-      }
-    }
-
-    // 🔥 方法 4: 使用当前运行的 Node.js（最后降级方案）
-    if (!nodeExe) {
-      nodeExe = process.execPath;
-      this.logger.log(`[ClaudeConnector] 使用当前 Node.js: ${nodeExe}`);
-    }
+    // 直接使用当前运行的 Node.js（100% 可靠，避免路径查找问题）
+    // 原因：环境变量 ProgramFiles 可能指向错误的盘符（如 C:\ 但实际在 D:\）
+    const nodeExe = process.execPath;
+    this.logger.success('ClaudeConnector', `使用当前 Node.js: ${nodeExe}`);
 
     // 查找 cli.js
     const cliJs = path.normalize(path.join(
@@ -217,6 +174,8 @@ class ClaudeConnector extends BaseConnector {
       'claude-code',
       'cli.js'
     ));
+
+    this.logger.success('ClaudeConnector', `cliJs: ${cliJs}`);
 
     if (!fs.existsSync(cliJs)) {
       this.logger.error(`[ClaudeConnector] cli.js 不存在: ${cliJs}`);
@@ -288,7 +247,11 @@ class ClaudeConnector extends BaseConnector {
       };
     }
 
-    this.logger.log(`[ClaudeConnector] 执行命令: ${cmd} ${args.slice(0, 3).join(' ')}...`);
+    // 详细日志：记录 spawn 调用
+    this.logger.success('ClaudeConnector', `执行命令: ${cmd}`);
+    this.logger.success('ClaudeConnector', `参数: ${args.slice(0, 3).join(' ')}`);
+    this.logger.success('ClaudeConnector', `工作目录: ${spawnOptions.cwd}`);
+    this.logger.success('ClaudeConnector', `cmd 存在: ${fs.existsSync(cmd)}`);
     return spawn(cmd, args, spawnOptions);
   }
 
@@ -352,7 +315,18 @@ class ClaudeConnector extends BaseConnector {
     });
 
     child.on('error', (err) => {
-      this.logger.error(`[ClaudeConnector] 进程错误: ${err.message}`);
+      // 增强错误信息：提供完整的诊断信息
+      this.logger.error(`[ClaudeConnector] 进程错误:`, {
+        code: err.code,
+        message: err.message,
+        path: err.path,
+        cmd: err.cmd,
+        spawnargs: err.spawnargs ? err.spawnargs.slice(0, 3) : [],
+        nodeExe: this.nodeExe,
+        nodeExeExists: this.nodeExe ? fs.existsSync(this.nodeExe) : false,
+        workDir: this.workDir,
+        workDirExists: fs.existsSync(this.workDir)
+      });
       if (onError) {
         onError(err);
       }
