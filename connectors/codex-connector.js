@@ -145,16 +145,17 @@ class CodexConnector extends BaseConnector {
     // 始终使用 exec 非交互模式
     let args = ['exec', '--json', '--skip-git-repo-check'];
 
-    // 🔥 权限控制参数（参考 Polaris 实现）
+    // 🔥 权限控制参数（根据 Codex CLI 实际支持的参数）
     if (this.dangerousBypass) {
       // 危险模式：完全开放，跳过审批和沙箱
       args.push('--dangerously-bypass-approvals-and-sandbox');
       this.logger.log('[CodexConnector] 使用危险全开放模式（dangerousBypass=true）');
     } else {
-      // 安全模式：配置沙箱和审批策略
+      // 标准模式：配置沙箱
+      // 注意：Codex CLI 不支持 --approval-policy 参数
+      // 如需自动执行，使用 --full-auto 或设置 dangerousBypass=true
       args.push('--sandbox', this.sandboxMode);
-      args.push('--approval-policy', this.approvalPolicy);
-      this.logger.log(`[CodexConnector] 使用沙箱模式: ${this.sandboxMode}, 审批策略: ${this.approvalPolicy}`);
+      this.logger.log(`[CodexConnector] 使用沙箱模式: ${this.sandboxMode}`);
     }
 
     // 消息作为参数传递
@@ -506,9 +507,32 @@ class CodexConnector extends BaseConnector {
       this.logger.log(`[CodexConnector] 进程结束: ${finalSessionId}, code: ${code}`);
       this.logger.log(`[CodexConnector] hasParsedEvents: ${hasParsedEvents}`);
 
-      // 🔍 只没有解析到事件时，才使用原始输出作为降级方案
-      // 这样可以避免重复推送（已通过 JSONL 解析推送的内容）
-      if (!hasParsedEvents && stdoutBuffer.trim() && wrappedOnEvent) {
+      // 🔍 当进程失败且没有解析到事件时，尝试发送错误信息
+      if (code !== 0 && !hasParsedEvents && wrappedOnEvent) {
+        let errorMsg = '';
+        if (stderrBuffer.trim()) {
+          // 优先使用 stderr 错误信息
+          errorMsg = `⚠️ Codex 执行失败 (退出码 ${code}):\n\n${stderrBuffer.trim()}`;
+          this.logger.error('[CodexConnector] 进程失败，发送 stderr 错误信息');
+        } else if (stdoutBuffer.trim()) {
+          // 降级：使用 stdout
+          errorMsg = stdoutBuffer.trim();
+          this.logger.warning('[CodexConnector] 进程失败，使用 stdout 作为错误信息');
+        } else {
+          // 完全没有输出
+          errorMsg = `⚠️ Codex 执行失败，退出码 ${code}，无输出信息`;
+          this.logger.error('[CodexConnector] 进程失败，无任何输出');
+        }
+
+        wrappedOnEvent({
+          type: 'assistant',
+          message: {
+            content: [{ type: 'text', text: errorMsg }]
+          }
+        });
+      } else if (!hasParsedEvents && stdoutBuffer.trim() && wrappedOnEvent) {
+        // 🔍 只没有解析到事件时，才使用原始输出作为降级方案
+        // 这样可以避免重复推送（已通过 JSONL 解析推送的内容）
         this.logger.warning('[CodexConnector] 未解析到 JSONL 事件，使用原始输出作为降级方案');
         wrappedOnEvent({
           type: 'assistant',
