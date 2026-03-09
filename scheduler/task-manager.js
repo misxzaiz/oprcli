@@ -7,6 +7,46 @@ const cron = require('node-cron')
 const fs = require('fs').promises
 const path = require('path')
 
+/**
+ * 将简写间隔转换为 cron 表达式
+ * 支持格式: 30s, 10m, 1h
+ */
+function intervalToCron(interval) {
+  if (!interval || typeof interval !== 'string') {
+    return null
+  }
+
+  // 已经是 cron 表达式
+  if (interval.includes(' ') && cron.validate(interval)) {
+    return interval
+  }
+
+  const match = interval.match(/^(\d+)([smh])$/)
+  if (!match) {
+    return null
+  }
+
+  const value = parseInt(match[1], 10)
+  const unit = match[2]
+
+  switch (unit) {
+    case 's':
+      // 每 N 秒: 使用 cron 的秒字段
+      if (value < 1 || value > 59) return null
+      return `*/${value} * * * * *`
+    case 'm':
+      // 每 N 分钟
+      if (value < 1 || value > 59) return null
+      return `*/${value} * * * *`
+    case 'h':
+      // 每 N 小时
+      if (value < 1 || value > 23) return null
+      return `0 */${value} * * *`
+    default:
+      return null
+  }
+}
+
 class TaskManager {
   constructor(server, logger) {
     this.server = server
@@ -231,6 +271,33 @@ class TaskManager {
     }
 
     this.logger.success('SCHEDULER', `任务已禁用: ${task.name}`)
+  }
+
+  /**
+   * 设置全局开关
+   */
+  async setEnabled(enabled) {
+    this.enabled = enabled
+
+    if (enabled) {
+      // 启用：开始调度所有已启用的任务
+      await this.scheduleTasks()
+      this.logger.success('SCHEDULER', '定时任务功能已启用')
+    } else {
+      // 禁用：停止所有调度
+      this.scheduledJobs.forEach(job => job.stop())
+      this.scheduledJobs.clear()
+      this.logger.info('SCHEDULER', '定时任务功能已禁用')
+    }
+
+    // 保存配置
+    await this.saveConfig()
+
+    return {
+      success: true,
+      enabled: this.enabled,
+      scheduledJobs: this.scheduledJobs.size
+    }
   }
 
   /**
@@ -533,3 +600,4 @@ class TaskManager {
 }
 
 module.exports = TaskManager
+module.exports.intervalToCron = intervalToCron

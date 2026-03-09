@@ -14,7 +14,7 @@ class Config {
   load() {
     // 核心配置
     this.provider = process.env.PROVIDER || 'claude'
-    this.port = process.env.PORT ? parseInt(process.env.PORT) : null
+    this.port = process.env.PORT ? parseInt(process.env.PORT) : 3000
 
     // 项目启动目录（文档路径）
     this.projectDir = process.cwd()
@@ -94,8 +94,8 @@ class Config {
 
     // 系统提示词配置
     this.systemPrompts = {
-      global: process.env.SYSTEM_PROMPT,
-      promptsDir: process.env.SYSTEM_PROMPTS_DIR || path.join(__dirname, '../system-prompts'),
+      global: process.env.SYSTEM_PROMPT || '你是一个可靠、务实的助手。请先给结论，再给可执行步骤；不确定时明确说明。',
+      promptsDir: process.env.SYSTEM_PROMPTS_DIR || './system-prompts',
       mode: (process.env.PROMPT_MODE || 'universal').toLowerCase(),
       channelAware: process.env.PROMPT_CHANNEL_AWARE !== 'false',
       includeSourceContext: process.env.PROMPT_INCLUDE_SOURCE_CONTEXT !== 'false'
@@ -109,6 +109,12 @@ class Config {
         webhook: process.env.NOTIFICATION_DINGTALK_WEBHOOK,
         secret: process.env.NOTIFICATION_DINGTALK_SECRET
       }
+    }
+
+    // 定时任务配置
+    this.scheduler = {
+      enabled: process.env.SCHEDULER_ENABLED !== 'false',
+      tasksFilePath: process.env.TASKS_FILE_PATH || './scheduler/tasks.json'
     }
 
     // 审计日志配置
@@ -320,9 +326,9 @@ class Config {
     // Claude 配置验证
     if (this.provider === 'claude') {
       if (!this.claude.cmdPath) {
-        errors.push({
+        warnings.push({
           field: 'CLAUDE_CMD_PATH',
-          message: 'Claude 命令路径未配置',
+          message: 'Claude 命令路径未配置，将使用系统默认',
           hint: '请设置 CLAUDE_CMD_PATH 环境变量'
         })
       } else if (!this._checkFileExists(this.claude.cmdPath)) {
@@ -330,20 +336,6 @@ class Config {
           field: 'CLAUDE_CMD_PATH',
           message: `Claude 命令路径不存在或无法访问: ${this.claude.cmdPath}`,
           hint: '请检查路径是否正确'
-        })
-      }
-
-      if (!this.claude.workDir) {
-        errors.push({
-          field: 'CLAUDE_WORK_DIR',
-          message: 'Claude 工作目录未配置',
-          hint: '请设置 CLAUDE_WORK_DIR 环境变量'
-        })
-      } else if (!this._checkDirectoryExists(this.claude.workDir)) {
-        warnings.push({
-          field: 'CLAUDE_WORK_DIR',
-          message: `工作目录不存在或无法访问: ${this.claude.workDir}`,
-          hint: '请检查目录是否存在'
         })
       }
 
@@ -359,9 +351,9 @@ class Config {
     // IFlow 配置验证
     if (this.provider === 'iflow') {
       if (!this.iflow.workDir) {
-        errors.push({
+        warnings.push({
           field: 'IFLOW_WORK_DIR',
-          message: 'IFlow 工作目录未配置',
+          message: 'IFlow 工作目录未配置，将使用默认目录',
           hint: '请设置 IFLOW_WORK_DIR 环境变量'
         })
       } else if (!this._checkDirectoryExists(this.iflow.workDir)) {
@@ -375,14 +367,14 @@ class Config {
     // 钉钉配置验证
     if (this.dingtalk.enabled) {
       if (!this.dingtalk.clientId) {
-        errors.push({
+        warnings.push({
           field: 'DINGTALK_CLIENT_ID',
           message: '钉钉客户端 ID 未配置',
           hint: '请设置 DINGTALK_CLIENT_ID 环境变量'
         })
       }
       if (!this.dingtalk.clientSecret) {
-        errors.push({
+        warnings.push({
           field: 'DINGTALK_CLIENT_SECRET',
           message: '钉钉客户端密钥未配置',
           hint: '请设置 DINGTALK_CLIENT_SECRET 环境变量'

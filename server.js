@@ -356,9 +356,20 @@ class UnifiedServer {
   • tasks  - 查看任务列表
   • tasks status  - 查看任务状态
   • tasks reload  - 重载任务配置
+  • tasks on  - 启用定时任务功能
+  • tasks off  - 禁用定时任务功能
   • tasks run <id>  - 手动执行任务
   • tasks enable <id>  - 启用任务
   • tasks disable <id>  - 禁用任务
+  • tasks add <id> <间隔> <消息>  - 创建任务
+  • tasks rm <id>  - 删除任务
+  
+  间隔格式：30s/10m/1h 或 cron 表达式
+  选项：--name=名称 --provider=模型 --enabled=true/false
+  示例：tasks add drink 30m 该喝水了 --provider=iflow
+
+🔄 服务管理：
+  • rs / restart / 重启  - 远程重启服务 (PM2模式)
 
 ℹ️ 信息查询：
   • status / 状态  - 查看当前状态
@@ -970,12 +981,162 @@ class UnifiedServer {
     return { status: 'SUCCESS' }
   }
 
+  async _handleTasksOn(conversationId, replyTarget, platform, originalMessage, type) {
+    if (!this.scheduler) {
+      await platform.send(replyTarget, '⚠️ 定时任务管理器未初始化', originalMessage, type)
+      return { status: 'SUCCESS' }
+    }
+
+    try {
+      const result = await this.scheduler.taskManager.setEnabled(true)
+      await platform.send(replyTarget,
+        `✅ 定时任务功能已启用\n已调度 ${result.scheduledJobs} 个任务`, originalMessage, type
+      )
+    } catch (error) {
+      await platform.send(replyTarget, `❌ 启用失败: ${error.message}`, originalMessage, type)
+    }
+
+    return { status: 'SUCCESS' }
+  }
+
+  async _handleTasksOff(conversationId, replyTarget, platform, originalMessage, type) {
+    if (!this.scheduler) {
+      await platform.send(replyTarget, '⚠️ 定时任务管理器未初始化', originalMessage, type)
+      return { status: 'SUCCESS' }
+    }
+
+    try {
+      await this.scheduler.taskManager.setEnabled(false)
+      await platform.send(replyTarget, '✅ 定时任务功能已关闭', originalMessage, type)
+    } catch (error) {
+      await platform.send(replyTarget, `❌ 关闭失败: ${error.message}`, originalMessage, type)
+    }
+
+    return { status: 'SUCCESS' }
+  }
+
+  async _handleTaskAdd(arg, conversationId, replyTarget, platform, originalMessage, type) {
+    if (!this.scheduler) {
+      await platform.send(replyTarget, '⚠️ 定时任务管理器未初始化', originalMessage, type)
+      return { status: 'SUCCESS' }
+    }
+
+    if (!arg) {
+      await platform.send(replyTarget,
+        '❌ 用法: tasks add <id> <interval> <message> [--name=名称] [--provider=模型] [--enabled=true/false]\n' +
+        '示例: tasks add weather 30m 每半小时提醒我喝水', originalMessage, type
+      )
+      return { status: 'SUCCESS' }
+    }
+
+    // 解析参数
+    // 格式: tasks add <id> <interval> <message> [--name=名称] [--provider=模型]
+    const parts = arg.split(/\s+/)
+    if (parts.length < 3) {
+      await platform.send(replyTarget,
+        '❌ 参数不足\n用法: tasks add <id> <interval> <message> [--name=名称] [--provider=模型] [--enabled=true/false]', originalMessage, type
+      )
+      return { status: 'SUCCESS' }
+    }
+
+    const taskId = parts[0]
+    const interval = parts[1]
+
+    // 提取选项和消息
+    let name = null
+    let provider = 'claude'
+    let enabled = true
+    let messageParts = []
+
+    for (let i = 2; i < parts.length; i++) {
+      if (parts[i].startsWith('--name=')) {
+        name = parts[i].substring(7)
+      } else if (parts[i].startsWith('--provider=')) {
+        provider = parts[i].substring(11)
+      } else if (parts[i].startsWith('--enabled=')) {
+        enabled = parts[i].substring(9) === 'true'
+      } else {
+        messageParts.push(parts[i])
+      }
+    }
+
+    const message = messageParts.join(' ')
+    if (!message) {
+      await platform.send(replyTarget, '❌ 请提供任务消息', originalMessage, type)
+      return { status: 'SUCCESS' }
+    }
+
+    // 转换 interval 为 cron
+    const { intervalToCron } = require('./scheduler/task-manager')
+    const schedule = intervalToCron(interval)
+    if (!schedule) {
+      await platform.send(replyTarget,
+        `❌ 无效的间隔格式: ${interval}\n` +
+        '支持格式: 30s, 10m, 1h 或 cron 表达式', originalMessage, type
+      )
+      return { status: 'SUCCESS' }
+    }
+
+    try {
+      const result = await this.scheduler.taskManager.addTask({
+        id: taskId,
+        name: name || taskId,
+        schedule,
+        message,
+        provider,
+        enabled
+      })
+
+      if (result.success) {
+        await platform.send(replyTarget,
+          `✅ 任务已创建\n` +
+          `ID: ${result.task.id}\n` +
+          `名称: ${result.task.name}\n` +
+          `调度: ${result.task.schedule}\n` +
+          `模型: ${provider}\n` +
+          `状态: ${enabled ? '已启用' : '已禁用'}`, originalMessage, type
+        )
+      } else {
+        await platform.send(replyTarget, `❌ 创建失败: ${result.error}`, originalMessage, type)
+      }
+    } catch (error) {
+      await platform.send(replyTarget, `❌ 创建失败: ${error.message}`, originalMessage, type)
+    }
+
+    return { status: 'SUCCESS' }
+  }
+
+  async _handleTaskRm(taskId, conversationId, replyTarget, platform, originalMessage, type) {
+    if (!this.scheduler) {
+      await platform.send(replyTarget, '⚠️ 定时任务管理器未初始化', originalMessage, type)
+      return { status: 'SUCCESS' }
+    }
+
+    if (!taskId) {
+      await platform.send(replyTarget, '❌ 请指定任务 ID：task rm <id>', originalMessage, type)
+      return { status: 'SUCCESS' }
+    }
+
+    try {
+      const result = await this.scheduler.taskManager.removeTask(taskId)
+      if (result.success) {
+        await platform.send(replyTarget, `✅ ${result.message}`, originalMessage, type)
+      } else {
+        await platform.send(replyTarget, `❌ 删除失败: ${result.error}`, originalMessage, type)
+      }
+    } catch (error) {
+      await platform.send(replyTarget, `❌ 删除失败: ${error.message}`, originalMessage, type)
+    }
+
+    return { status: 'SUCCESS' }
+  }
+
   async start() {
     // 验证配置
     const validation = config.validate()
     if (!validation.valid) {
       console.error('❌ 配置错误:')
-      validation.errors.forEach(err => console.error(`  - ${err}`))
+      validation.errors.forEach(err => console.error(`  - ${err.message || JSON.stringify(err)}`))
       process.exit(1)
     }
 
@@ -1011,6 +1172,14 @@ class UnifiedServer {
     this.scheduler = new SchedulerModule(this, this.logger)
     await this.scheduler.start()
 
+    // 显示配置警告（如有）
+    if (validation.warnings.length > 0) {
+      this.logger.log('\n⚠️  配置警告:')
+      validation.warnings.forEach(w => {
+        this.logger.log(`   - ${w.message}`)
+      })
+    }
+
     // 启动 HTTP 服务器（仅在端口配置时）
     if (config.port) {
       const server = this.app.listen(config.port, () => {
@@ -1018,6 +1187,7 @@ class UnifiedServer {
         this.logger.log('  Unified AI CLI Connector Server')
         this.logger.log('========================================')
         this.logger.log(`\n🌐 服务器运行在: http://localhost:${config.port}`)
+        this.logger.log(`📄 配置页面: http://localhost:${config.port}/config/config.html`)
         this.logger.log(`🤖 提供商: ${config.provider.toUpperCase()}`)
         this.logger.log(`📱 钉钉: ${dingtalkEnabled ? '✅ 已启用' : '❌ 未启用'}`)
         this.logger.log('\n按 Ctrl+C 停止服务器\n')

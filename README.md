@@ -6,8 +6,9 @@
 
 - **多 AI 支持**：Claude Code、IFlow、Codex、Agent 引擎
 - **平台集成**：钉钉机器人、QQ 机器人
-- **定时任务**：支持 cron 表达式的任务调度
+- **定时任务**：支持 cron 表达式和简写间隔的任务调度
 - **语音识别**：QQ 语音消息转文字（百度语音）
+- **Web 配置**：可视化配置管理界面
 
 ## 快速开始
 
@@ -23,6 +24,12 @@ npm install
 
 ```bash
 cp .env.example .env
+```
+
+或直接启动，访问配置页面进行配置：
+
+```
+http://localhost:12480/config/config.html
 ```
 
 编辑 `.env` 文件，主要配置：
@@ -47,9 +54,39 @@ DINGTALK_CLIENT_ID=xxx
 DINGTALK_CLIENT_SECRET=xxx
 
 # QQ Bot（可选）
-QQBOT_UIN=机器人QQ号
-QQBOT_TOKEN=机器人Token
+QQBOT_APP_ID=xxx
+QQBOT_CLIENT_SECRET=xxx
 ```
+
+## 注册与获取凭证
+
+以下服务均提供免费服务：
+
+| 服务 | 用途 | 注册地址 |
+|------|------|----------|
+| **QQ 机器人** | QQ 平台机器人接入 | [q.qq.com/qqbot](https://q.qq.com/qqbot/openclaw/index.html) |
+| **IFlow** | AI 对话服务 | [iflow.cn](https://iflow.cn/) |
+| **IFlow CLI** | IFlow 命令行工具 | [cli.iflow.cn](https://cli.iflow.cn/) |
+| **钉钉开放平台** | 钉钉机器人接入 | [open-dev.dingtalk.com](https://open-dev.dingtalk.com/) |
+| **百度语音** | 语音识别服务 | [百度 AI 控制台](https://console.bce.baidu.com/ai-engine/speech/overview/index) |
+
+### 凭证获取说明
+
+**QQ 机器人：**
+1. 访问 QQ 开放平台，登录后创建机器人应用
+2. 获取 `App ID` 和 `Client Secret`
+
+**IFlow：**
+1. 支持账号登录或 APPKEY 方式
+2. 在控制台获取 API Key
+
+**钉钉机器人：**
+1. 创建企业内部应用
+2. 获取 `Client ID` 和 `Client Secret`
+
+**百度语音：**
+1. 创建语音识别应用
+2. 获取 `API Key` 和 `Secret Key`
 
 ## 运行模式
 
@@ -102,7 +139,9 @@ pm2 save
 | 日志管理 | ❌ | ✅ |
 | 进程监控 | ❌ | ✅ |
 
-服务运行在 `http://localhost:12480`
+服务运行在 `http://localhost:3000`
+
+配置页面：`http://localhost:3000/config/config.html`
 
 ## 机器人命令
 
@@ -155,6 +194,10 @@ COMMAND_REQUIRE_SLASH_LIST=restart,stop,path,tasks
 
 详细配置说明见 [命令配置文档](docs/COMMAND_CONFIGURATION.md)。
 
+**定时任务间隔格式：**
+- 简写：`30s`（30秒）、`10m`（10分钟）、`1h`（1小时）
+- Cron：`0 9 * * *`（每天9点）
+
 ## 项目结构
 
 ```
@@ -165,6 +208,7 @@ oprcli/
 ├── integrations/       # 平台集成（钉钉、QQ）
 ├── scheduler/          # 定时任务
 ├── server/             # 服务器模块
+├── public/             # Web 配置页面
 ├── system-prompts/     # 系统提示词
 └── utils/              # 工具模块
 ```
@@ -173,19 +217,32 @@ oprcli/
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `PROVIDER` | AI 提供商 | `iflow` |
+| `PROVIDER` | AI 提供商 | `claude` |
 | `PORT` | 服务端口 | `12480` |
-| `IFLOW_WORK_DIR` | IFlow 工作目录 | - |
+| `DEFAULT_WORK_DIR` | 默认工作目录 | - |
 | `CLAUDE_CMD_PATH` | Claude 命令路径 | - |
-| `CLAUDE_WORK_DIR` | Claude 工作目录 | - |
-| `AGENT_LLM_PROVIDER` | Agent LLM 提供商 | `iflow` |
-| `AGENT_MODEL` | Agent 模型 | `glm-4-flash` |
+| `IFLOW_PATH` | IFlow 命令路径 | - |
+| `CODEX_PATH` | Codex 命令路径 | - |
 | `DINGTALK_CLIENT_ID` | 钉钉 Client ID | - |
 | `DINGTALK_CLIENT_SECRET` | 钉钉 Secret | - |
-| `QQBOT_UIN` | QQ 机器人号 | - |
-| `QQBOT_TOKEN` | QQ 机器人 Token | - |
+| `QQBOT_APP_ID` | QQ Bot App ID | - |
+| `QQBOT_CLIENT_SECRET` | QQ Bot Secret | - |
+| `SCHEDULER_ENABLED` | 启用定时任务 | `true` |
+| `STREAM_ENABLED` | 启用流式输出 | `true` |
+| `LOG_LEVEL` | 日志级别 | `DEBUG` |
 
 更多配置见 `.env.example`。
+
+## 致谢
+
+感谢以下开源项目和服务：
+
+- [Claude Code](https://www.anthropic.com/claude) - Anthropic AI 编程助手
+- [IFlow](https://iflow.cn/) - 智能 AI 助手平台
+- [OpenAI Codex](https://github.com/openai/codex) - OpenAI 编程模型
+- [QQ 开放平台](https://q.qq.com/) - 腾讯 QQ 机器人平台
+- [钉钉开放平台](https://open.dingtalk.com/) - 阿里巴巴企业协作平台
+- [百度 AI](https://ai.baidu.com/) - 百度智能云语音服务
 
 ## License
 

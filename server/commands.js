@@ -29,12 +29,18 @@ const COMMANDS = {
   '路径': { type: 'path', hasArg: true, requireSlash: true },
 
   // 任务管理
-  tasks: { type: 'tasks_list', requireSlash: true },
-  'tasks status': { type: 'tasks_status', requireSlash: true },
-  'tasks reload': { type: 'tasks_reload', requireSlash: true },
-  'tasks run': { type: 'tasks_run', hasArg: true, requireSlash: true },
-  'tasks enable': { type: 'tasks_enable', hasArg: true, requireSlash: true },
-  'tasks disable': { type: 'tasks_disable', hasArg: true, requireSlash: true },
+  tasks: { type: 'tasks_list' },
+  'tasks status': { type: 'tasks_status' },
+  'tasks reload': { type: 'tasks_reload' },
+  'tasks run': { type: 'tasks_run', hasArg: true },
+  'tasks enable': { type: 'tasks_enable', hasArg: true },
+  'tasks disable': { type: 'tasks_disable', hasArg: true },
+  'tasks on': { type: 'tasks_on' },
+  'tasks off': { type: 'tasks_off' },
+
+  // 任务添加/删除
+  'tasks add': { type: 'tasks_add', hasArg: true },
+  'tasks rm': { type: 'tasks_rm', hasArg: true },
 
   // 会话管理
   sessions: { type: 'sessions_list', requireSlash: true },
