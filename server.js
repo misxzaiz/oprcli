@@ -802,7 +802,7 @@ class UnifiedServer {
       return eventType === 'assistant_chunk' || eventType === 'result'
     }
     if (profile === 'standard') {
-      return ['assistant_chunk', 'result', 'tool_result', 'error', 'end'].includes(eventType)
+      return ['assistant_chunk', 'result', 'tool_use', 'tool_result', 'error', 'end'].includes(eventType)
     }
     return true // full/debug
   }

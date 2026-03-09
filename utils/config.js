@@ -42,7 +42,11 @@ class Config {
       workDir: process.env.CODEX_WORK_DIR || this.defaultWorkDir,  // 如果未设置则使用默认工作目录
       systemPromptFile: process.env.CODEX_SYSTEM_PROMPT_FILE,
       model: process.env.CODEX_MODEL,
-      provider: process.env.CODEX_MODEL_PROVIDER
+      provider: process.env.CODEX_MODEL_PROVIDER,
+      // 权限控制配置（参考 Polaris）
+      sandboxMode: process.env.CODEX_SANDBOX_MODE || 'workspace-write',  // workspace-write | workspace-read-only | danger-full-access
+      approvalPolicy: process.env.CODEX_APPROVAL_POLICY || 'never',  // never | on-request | on-failure | untrusted
+      dangerousBypass: process.env.CODEX_DANGEROUS_BYPASS === 'true'  // 是否启用危险全开放模式
     }
 
     // Agent 配置
@@ -469,6 +473,10 @@ class Config {
           model: this.codex.model,
           provider: this.codex.provider
         },
+        // 权限控制配置
+        sandboxMode: this.codex.sandboxMode,
+        approvalPolicy: this.codex.approvalPolicy,
+        dangerousBypass: this.codex.dangerousBypass,
         systemPrompt
       }
     } else if (targetProvider === 'agent') {

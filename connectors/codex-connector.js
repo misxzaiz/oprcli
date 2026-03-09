@@ -33,6 +33,11 @@ class CodexConnector extends BaseConnector {
     this.currentSessionId = null;
     this.modelConfig = options.modelConfig || {};
 
+    // 🆕 权限控制配置（参考 Polaris）
+    this.sandboxMode = options.sandboxMode || 'workspace-write';
+    this.approvalPolicy = options.approvalPolicy || 'never';
+    this.dangerousBypass = options.dangerousBypass || false;
+
     // 🆕 会话历史存储（实现上下文记忆）
     this.conversationHistory = new Map(); // sessionId -> [{role, content, timestamp}]
     this.maxHistoryLength = parseInt(process.env.CODEX_MAX_HISTORY_LENGTH || '20', 10); // 最大历史轮数
@@ -139,6 +144,18 @@ class CodexConnector extends BaseConnector {
   _buildCommandArgs(message, isResume, sessionId = null) {
     // 始终使用 exec 非交互模式
     let args = ['exec', '--json', '--skip-git-repo-check'];
+
+    // 🔥 权限控制参数（参考 Polaris 实现）
+    if (this.dangerousBypass) {
+      // 危险模式：完全开放，跳过审批和沙箱
+      args.push('--dangerously-bypass-approvals-and-sandbox');
+      this.logger.log('[CodexConnector] 使用危险全开放模式（dangerousBypass=true）');
+    } else {
+      // 安全模式：配置沙箱和审批策略
+      args.push('--sandbox', this.sandboxMode);
+      args.push('--approval-policy', this.approvalPolicy);
+      this.logger.log(`[CodexConnector] 使用沙箱模式: ${this.sandboxMode}, 审批策略: ${this.approvalPolicy}`);
+    }
 
     // 消息作为参数传递
     if (message) {
