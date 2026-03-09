@@ -152,11 +152,34 @@ class BaseConnector {
    */
   _terminateProcess(child) {
     const { spawn } = require('child_process')
+    const path = require('path')
 
     if (process.platform === 'win32') {
-      spawn('taskkill', ['/F', '/T', '/PID', child.pid.toString()], {
-        stdio: 'ignore'
-      })
+      // 🔥 优先使用完整路径的 taskkill（防止 ENOENT）
+      const taskkillPaths = [
+        path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'taskkill.exe'),
+        'C:\\Windows\\System32\\taskkill.exe',
+        'taskkill' // 降级：依赖 PATH
+      ]
+
+      for (const taskkillPath of taskkillPaths) {
+        try {
+          spawn(taskkillPath, ['/F', '/T', '/PID', child.pid.toString()], {
+            stdio: 'ignore',
+            timeout: 5000
+          })
+          break
+        } catch (e) {
+          // 尝试下一个路径
+        }
+      }
+
+      // 降级：直接使用 child.kill()
+      setTimeout(() => {
+        if (!child.killed) {
+          child.kill('SIGKILL')
+        }
+      }, 1000).unref()
     } else {
       child.kill('SIGTERM')
       setTimeout(() => {
@@ -173,6 +196,75 @@ class BaseConnector {
    */
   _isWindows() {
     return process.platform === 'win32'
+  }
+
+  /**
+   * 验证文件路径是否存在
+   * @param {string} filePath - 文件路径
+   * @returns {boolean} 是否存在
+   */
+  _pathExists(filePath) {
+    const fs = require('fs')
+    try {
+      return fs.existsSync(filePath)
+    } catch (e) {
+      return false
+    }
+  }
+
+  /**
+   * 查找可执行文件（支持多个候选路径）
+   * @param {string[]} candidates - 候选路径列表
+   * @param {string} commandName - 命令名称（用于日志）
+   * @returns {string|null} 找到的路径或 null
+   */
+  _findExecutable(candidates, commandName = 'command') {
+    const fs = require('fs')
+
+    for (const candidate of candidates) {
+      if (candidate && fs.existsSync(candidate)) {
+        if (this.logger) {
+          this.logger.log(`[BaseConnector] 找到 ${commandName}: ${candidate}`)
+        }
+        return candidate
+      }
+    }
+
+    if (this.logger) {
+      this.logger.warning(`[BaseConnector] 未找到 ${commandName}`)
+    }
+    return null
+  }
+
+  /**
+   * 解析命令行命令到实际可执行文件
+   * @param {string} command - 命令（如 'node', 'npm' 等）
+   * @returns {string|null} 可执行文件路径或 null
+   */
+  _resolveCommand(command) {
+    const { spawnSync } = require('child_process')
+    const path = require('path')
+
+    // Windows 下使用 where，Unix 使用 which
+    const detector = this._isWindows() ? 'where' : 'which'
+
+    try {
+      const result = spawnSync(detector, [command], {
+        encoding: 'utf8',
+        timeout: 5000
+      })
+
+      if (result.status === 0 && result.stdout) {
+        const resolved = result.stdout.trim().split('\n')[0]
+        if (resolved && require('fs').existsSync(resolved)) {
+          return resolved
+        }
+      }
+    } catch (e) {
+      // 忽略错误
+    }
+
+    return null
   }
 
   /**

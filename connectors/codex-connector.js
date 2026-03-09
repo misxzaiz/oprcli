@@ -364,10 +364,20 @@ class CodexConnector extends BaseConnector {
       // C:/Users/.../npm/codex.cmd -> C:/Users/.../npm/node_modules/@openai/codex/bin/codex.js
       const npmPath = this.codexPath.replace(/codex\.cmd$/, '');
       executable = `${npmPath}node_modules/@openai/codex/bin/codex.js`;
+
+      // 🔥 验证解析后的文件是否存在
+      if (!fs.existsSync(executable)) {
+        throw new Error(`codex.js 不存在: ${executable}`);
+      }
+
       command = 'node';
       finalArgs = [executable, ...args];
       useShell = false; // 直接用 node 运行，不需要 shell
     } else if (this.codexPath.endsWith('.js')) {
+      // 验证 .js 文件是否存在
+      if (!fs.existsSync(executable)) {
+        throw new Error(`codex.js 不存在: ${executable}`);
+      }
       command = 'node';
       finalArgs = [executable, ...args];
       useShell = false;

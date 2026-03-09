@@ -160,13 +160,17 @@ class ClaudeConnector extends BaseConnector {
     // 查找 node.exe
     let nodeExe = null;
 
-    // 方法 1: 使用 'where node' 查找系统 node
+    // 方法 1: 使用 'where node' 查找系统 node（增强验证）
     try {
       const { spawnSync } = require('child_process');
-      const result = spawnSync('where', ['node'], { encoding: 'utf8' });
+      const result = spawnSync('where', ['node'], { encoding: 'utf8', timeout: 5000 });
       if (result.status === 0 && result.stdout) {
-        nodeExe = result.stdout.trim().split('\n')[0];
-        this.logger.log(`[ClaudeConnector] 找到 node.exe: ${nodeExe}`);
+        const candidate = result.stdout.trim().split('\n')[0];
+        // 验证文件是否真的存在
+        if (candidate && fs.existsSync(candidate)) {
+          nodeExe = candidate;
+          this.logger.log(`[ClaudeConnector] 找到 node.exe: ${nodeExe}`);
+        }
       }
     } catch (e) {
       this.logger.log('[ClaudeConnector] where node 失败:', e.message);
@@ -175,14 +179,13 @@ class ClaudeConnector extends BaseConnector {
     // 方法 2: npm 目录下的 node.exe
     if (!nodeExe) {
       const npmNodeExe = path.join(npmDir, 'node.exe');
-      try {
-        fs.accessSync(npmNodeExe);
+      if (fs.existsSync(npmNodeExe)) {
         nodeExe = npmNodeExe;
         this.logger.log(`[ClaudeConnector] 找到 node.exe: ${nodeExe}`);
-      } catch (e) {}
+      }
     }
 
-    // 方法 3: 常见安装路径
+    // 方法 3: 常见安装路径（带验证）
     if (!nodeExe) {
       const commonPaths = [
         'C:\\Program Files\\nodejs\\node.exe',
@@ -192,19 +195,18 @@ class ClaudeConnector extends BaseConnector {
       ].filter(Boolean);
 
       for (const p of commonPaths) {
-        try {
-          fs.accessSync(p);
+        if (fs.existsSync(p)) {
           nodeExe = p;
           this.logger.log(`[ClaudeConnector] 找到 node.exe: ${p}`);
           break;
-        } catch (e2) {}
+        }
       }
     }
 
-    // 如果还是找不到，报错
+    // 🔥 方法 4: 使用当前运行的 Node.js（最后降级方案）
     if (!nodeExe) {
-      this.logger.error('[ClaudeConnector] 无法找到 node.exe，请确保 Node.js 已安装');
-      return null;
+      nodeExe = process.execPath;
+      this.logger.log(`[ClaudeConnector] 使用当前 Node.js: ${nodeExe}`);
     }
 
     // 查找 cli.js
@@ -216,13 +218,12 @@ class ClaudeConnector extends BaseConnector {
       'cli.js'
     ));
 
-    try {
-      fs.accessSync(cliJs);
-      return { nodeExe, cliJs };
-    } catch (e) {
+    if (!fs.existsSync(cliJs)) {
       this.logger.error(`[ClaudeConnector] cli.js 不存在: ${cliJs}`);
       return null;
     }
+
+    return { nodeExe, cliJs };
   }
 
   _buildCommandArgs(message, systemPrompt, isResume, sessionId = null) {
@@ -257,6 +258,12 @@ class ClaudeConnector extends BaseConnector {
 
     if (process.platform === 'win32') {
       cmd = this.nodeExe;
+
+      // 🔥 验证 nodeExe 是否存在（防止 ENOENT）
+      if (!fs.existsSync(cmd)) {
+        throw new Error(`node.exe 不存在: ${cmd}`);
+      }
+
       const env = { ...process.env };
       delete env.CLAUDECODE;
 

@@ -5,7 +5,7 @@
 module.exports = {
   apps: [
     {
-      name: 'oprcli',
+      name: 'oprcli-prod',
       script: './server.js',
       cwd: './',
       instances: 1,

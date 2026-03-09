@@ -194,6 +194,18 @@ class IFlowConnector extends BaseConnector {
   }
 
   _spawnProcess(cmdStr, stdinMessage = null) {
+    // 🔥 验证 iflowPath 是否存在（防止 ENOENT）
+    if (this._isWindows() && !this.iflowPath.endsWith('.cmd') && !this.iflowPath.endsWith('.exe')) {
+      // 如果不是 .cmd/.exe 文件，检查是否为命令（需要 PATH）
+      // 这里不做验证，让 shell 去查找
+    } else if (this._isWindows()) {
+      // 检查文件是否存在
+      const { existsSync } = require('fs');
+      if (!existsSync(this.iflowPath)) {
+        throw new Error(`iflow 命令不存在: ${this.iflowPath}`);
+      }
+    }
+
     const spawnOptions = {
       cwd: this.workDir,
       // 🔧 修复：使用 pipe 作为 stdin，支持传递长消息

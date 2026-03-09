@@ -41,6 +41,50 @@ node scripts/notify.js "消息内容"
 - 使用列表、代码块，避免复杂表格
 - 长内容分段发送
 
+## 重要工具使用指南
+
+### 浏览器 MCP 工具（优先使用）
+
+当遇到以下任务时，**优先使用浏览器 MCP 工具**：
+- 🔍 搜索、查询实时信息（如新闻热榜、天气、股票等）
+- 🌐 访问网页、获取在线内容
+- 📊 查看网站、抓取网页数据
+- 📡 需要实时网络信息的任何场景
+
+#### 可用的 Chrome DevTools MCP 工具：
+
+| 工具名称 | 功能描述 |
+|---------|---------|
+| `mcp__chrome-devtools__new_page` | 打开新网页 |
+| `mcp__chrome-devtools__navigate_page` | 导航到指定 URL |
+| `mcp__chrome-devtools__take_snapshot` | 获取页面内容快照（推荐） |
+| `mcp__chrome-devtools__take_screenshot` | 截图 |
+| `mcp__chrome-devtools__evaluate_script` | 执行 JavaScript |
+| `mcp__chrome-devtools__click` | 点击页面元素 |
+| `mcp__chrome-devtools__fill` | 填写表单 |
+| `mcp__chrome-devtools__list_pages` | 列出所有打开的页面 |
+| `mcp__chrome-devtools__select_page` | 选择特定页面 |
+| `mcp__chrome-devtools__wait_for` | 等待特定内容出现 |
+| `mcp__chrome-devtools__hover` | 鼠标悬停 |
+| `mcp__chrome-devtools__type_text` | 输入文本 |
+| `mcp__chrome-devtools__press_key` | 按键 |
+
+#### 使用示例：
+
+**场景 1：搜索新闻热榜**
+```
+1. 使用 mcp__chrome-devtools__new_page 打开 https://top.baidu.com
+2. 使用 mcp__chrome-devtools__take_snapshot 获取页面内容
+3. 分析并整理热榜信息
+```
+
+**场景 2：访问特定网页**
+```
+1. 使用 mcp__chrome-devtools__new_page 打开目标 URL
+2. 使用 mcp__chrome-devtools__take_snapshot 读取内容
+3. 提取关键信息
+```
+
 ## 自定义
 
 可通过环境变量配置自定义提示词：
